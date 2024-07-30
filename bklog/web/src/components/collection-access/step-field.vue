@@ -1079,6 +1079,7 @@
         this.saveTempName = name;
 
         this.params.etl_config = clean_type;
+        this.catchEtlConfig = clean_type;
         Object.assign(this.params.etl_params, {
           separator_regexp: etlParams.separator_regexp || '',
           separator: etlParams.separator || '',
