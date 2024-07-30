@@ -71,6 +71,19 @@
       // stepStorage,
       advanceCleanLand,
     },
+
+    beforeRouteLeave(_to, _from, next) {
+      if (!this.isSubmit && !this.showRouterLeaveTip) {
+        this.$bkInfo({
+          title: this.$t('是否放弃本次操作？'),
+          confirmFn: () => {
+            next();
+          },
+        });
+        return;
+      }
+      next();
+    },
     data() {
       return {
         curStep: 1,
@@ -84,19 +97,6 @@
       ...mapState({
         showRouterLeaveTip: state => state.showRouterLeaveTip,
       }),
-    },
-
-    beforeRouteLeave(to, from, next) {
-      if (!this.isSubmit && !this.showRouterLeaveTip) {
-        this.$bkInfo({
-          title: this.$t('是否放弃本次操作？'),
-          confirmFn: () => {
-            next();
-          },
-        });
-        return;
-      }
-      next();
     },
     methods: {
       changeSubmit(isSubmit) {
