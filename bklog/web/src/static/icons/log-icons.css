@@ -421,3 +421,7 @@
 .icon-log-trend:before {
   content: '\e18c';
 }
+
+.icon-overview:before {
+	content: "\e18f";
+}

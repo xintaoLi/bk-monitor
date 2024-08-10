@@ -54,6 +54,7 @@
           :config-data="configData"
           @show-origin-log="showOriginLog"
         />
+        <GraphAnalysis v-if="active === 'graph_analysis'"></GraphAnalysis>
       </keep-alive>
     </div>
   </div>
@@ -65,9 +66,10 @@
 
   import LogClustering from './log-clustering/index.vue';
   import OriginalLog from './original-log/index.vue';
+  import GraphAnalysis from './graph-analysis/index';
 
   export default {
-    components: { OriginalLog, LogClustering },
+    components: { OriginalLog, LogClustering, GraphAnalysis },
     inheritAttrs: false,
     props: {
       configData: {
@@ -118,6 +120,7 @@
           list.push({ name: 'clustering', label: this.$t('日志聚类') });
         }
 
+        list.push({ name: 'graph_analysis', label: this.$t('图表分析') });
         return list;
       },
     },
