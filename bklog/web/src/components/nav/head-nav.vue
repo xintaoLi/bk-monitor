@@ -65,7 +65,7 @@
     >
       <!-- 全局设置 -->
       <bk-dropdown-menu
-        v-if="!isExternal"
+        v-if="isShowGlobalSetIcon"
         align="center"
         trigger="click"
         @hide="dropdownGlobalHide"
@@ -269,7 +269,12 @@
       GlobalDialog,
     },
     mixins: [navMenuMixin],
-    props: {},
+    props: {
+      welcomeData: {
+        type: Object,
+        default: null,
+      },
+    },
     data() {
       return {
         isFirstLoad: true,
@@ -304,8 +309,10 @@
       ...mapGetters('globals', ['globalsData']),
       platformData() {
         const { appLogo, i18n } = platformConfigStore.publicConfig;
+        const bkRepoUrl = window.BK_SHARED_RES_URL;
+        const publicConfigName = i18n?.name ?? this.$t('日志平台');
         return {
-          name: i18n?.name ?? window.TITLE_MENU,
+          name: !!bkRepoUrl ? publicConfigName : this.$t('日志平台'),
           logo: appLogo || logoImg,
         };
       },
@@ -332,6 +339,9 @@
           return menu.feature === 'on' && (this.isExternal ? this.externalMenu.includes(menu.id) : true);
         });
       },
+      isShowGlobalSetIcon() {
+        return !this.welcomeData && !this.isExternal;
+      }
     },
     watch: {
       $route() {
