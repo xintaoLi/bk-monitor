@@ -27,6 +27,8 @@
 import { Component } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
+import StyleImages from './images/index';
+
 import './index.scss';
 
 interface IProps {
@@ -65,26 +67,46 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
         icon: '',
         text: this.$t('折线图'),
         click: () => this.handleGraphCategoryClick(GraphCategory.LINE),
+        images: {
+          def: StyleImages.chartLineDef,
+          active: StyleImages.chartLineActive,
+        },
       },
       [GraphCategory.BAR]: {
         icon: '',
         text: this.$t('柱状图'),
         click: () => this.handleGraphCategoryClick(GraphCategory.BAR),
+        images: {
+          def: StyleImages.chartBarDef,
+          active: StyleImages.chartBarActive,
+        },
       },
       [GraphCategory.LINE_BAR]: {
         icon: '',
         text: this.$t('柱线图'),
         click: () => this.handleGraphCategoryClick(GraphCategory.LINE_BAR),
+        images: {
+          def: StyleImages.chartLineBarDef,
+          active: StyleImages.chartLineBarActive,
+        },
       },
       [GraphCategory.PIE]: {
         icon: '',
         text: this.$t('饼图'),
         click: () => this.handleGraphCategoryClick(GraphCategory.PIE),
+        images: {
+          def: StyleImages.chartPieDef,
+          active: StyleImages.chartPieActive,
+        },
       },
       [GraphCategory.TABLE]: {
         icon: '',
         text: this.$t('表格'),
         click: () => this.handleGraphCategoryClick(GraphCategory.TABLE),
+        images: {
+          def: StyleImages.chartTableDef,
+          active: StyleImages.chartTableActive,
+        },
       },
     };
   }
@@ -102,12 +124,16 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
   renderGraphCategory() {
     return this.graphCategoryList.map(category => {
       const item = this.graphCategory[category];
+      const isActive = this.activeGraphCategory === category;
+      const imgHref = isActive ? item.images.active : item.images.def;
       return (
         <div
-          class={{ 'category-item': true, active: this.activeGraphCategory === category }}
+          class={{ 'category-item': true, active: isActive }}
           onClick={item.click}
         >
-          <div class={['category-img', item.icon]}></div>
+          <div class='category-img'>
+            <image href={imgHref}></image>
+          </div>
           <div class='category-text'>{item.text}</div>
         </div>
       );
