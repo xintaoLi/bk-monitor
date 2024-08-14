@@ -27,6 +27,7 @@
 import { Component } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
+import GraphDragTool from './drag-tool/index';
 import StyleImages from './images/index';
 
 import './index.scss';
@@ -48,11 +49,18 @@ enum GraphCategory {
   TABLE = 'table',
 }
 
-@Component
+@Component({
+  components: { GraphDragTool },
+})
 export default class GraphAnalysisIndex extends tsc<IProps> {
   activeItem = OptionList.Analysis;
+  minAxiosOptionHeight = 148;
   axiosOptionHeight = 148;
+  rightOptionWidth = 360;
+  minRightOptionWidth = 360;
   activeGraphCategory = GraphCategory.BAR;
+  advanceHeight = 164;
+  activeSettings = ['basic_info', 'field_setting'];
   graphCategoryList = [
     GraphCategory.LINE,
     GraphCategory.BAR,
@@ -60,6 +68,25 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
     GraphCategory.PIE,
     GraphCategory.TABLE,
   ];
+
+  basicInfoTitle = {
+    show: true,
+    title: '',
+  };
+
+  basicInfoSubTitle = {
+    show: false,
+    title: '',
+  };
+
+  basicInfoDescription = {
+    show: false,
+    title: '',
+  };
+
+  fieldList = [1, 2, 3, 4];
+  advanceSetting = false;
+  activeCanvasType = 'bar';
 
   get graphCategory() {
     return {
@@ -117,8 +144,29 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
     };
   }
 
+  get canvasStyle() {
+    return {
+      height: `calc(100% - ${this.axiosOptionHeight + 32}px)`,
+    };
+  }
+
+  get rightOptionStyle() {
+    return {
+      width: `${this.rightOptionWidth}px`,
+    };
+  }
+
+  get advanceSettingClass() {
+    return this.advanceSetting ? 'icon-collapse-small' : 'icon-expand-small';
+  }
+
   handleGraphCategoryClick(category: GraphCategory) {
     this.activeGraphCategory = category;
+  }
+
+  handleAdvanceSettingClick() {
+    this.advanceSetting = !this.advanceSetting;
+    this.axiosOptionHeight = this.axiosOptionHeight + (this.advanceSetting ? 1 : -1) * this.advanceHeight;
   }
 
   renderGraphCategory() {
@@ -132,12 +180,153 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
           onClick={item.click}
         >
           <div class='category-img'>
-            <image href={imgHref}></image>
+            <img src={imgHref}></img>
           </div>
           <div class='category-text'>{item.text}</div>
         </div>
       );
     });
+  }
+
+  renderBasicInfo() {
+    return [
+      <div class='basic-info-row'>
+        <bk-checkbox
+          v-model={this.basicInfoTitle.show}
+          checked={true}
+          false-value={false}
+          true-value={true}
+        >
+          {this.$t('标题')}
+        </bk-checkbox>
+        {this.basicInfoTitle.show && (
+          <bk-input
+            style='margin-top: 8px;'
+            v-model={this.basicInfoTitle.title}
+            placeholder={this.$t('请输入标题')}
+          ></bk-input>
+        )}
+      </div>,
+      <div class='basic-info-row'>
+        <bk-checkbox
+          v-model={this.basicInfoSubTitle.show}
+          checked={false}
+          false-value={false}
+          true-value={true}
+        >
+          {this.$t('副标题')}
+        </bk-checkbox>
+        {this.basicInfoSubTitle.show && (
+          <bk-input
+            style='margin-top: 8px;'
+            v-model={this.basicInfoSubTitle.title}
+            placeholder={this.$t('请输入副标题')}
+          ></bk-input>
+        )}
+      </div>,
+      <div class='basic-info-row'>
+        <bk-checkbox
+          v-model={this.basicInfoDescription.show}
+          checked={false}
+          false-value={false}
+          true-value={true}
+        >
+          {this.$t('描述')}
+        </bk-checkbox>
+        {this.basicInfoDescription.show && (
+          <bk-input
+            style='margin-top: 8px;'
+            v-model={this.basicInfoDescription.title}
+            placeholder={this.$t('请输入描述')}
+            type='textarea'
+          ></bk-input>
+        )}
+      </div>,
+    ];
+  }
+
+  renderFieldsSetting() {
+    return this.fieldList.map(field => {
+      return (
+        <div
+          key={field}
+          class='field-setting-row'
+        >
+          <div class='field'>字段{field}</div>
+          <div class='type'>指标</div>
+        </div>
+      );
+    });
+  }
+
+  renderDimensionsAndIndexSetting() {
+    const getAadvanceSettingList = () => {
+      if (!this.advanceSetting) {
+        return [];
+      }
+      return [
+        <div class='dimensions-index-row'>
+          <div class='label'>{this.$t('过滤')}</div>
+          <div class='settings'></div>
+        </div>,
+        <div class='dimensions-index-row'>
+          <div class='label'>{this.$t('排序')}</div>
+          <div class='settings'></div>
+        </div>,
+        <div class='dimensions-index-row'>
+          <div class='label'>{this.$t('限制')}</div>
+          <div class='settings white'>
+            <bk-input
+              style='width: 120px;'
+              type='number'
+            ></bk-input>
+          </div>
+        </div>,
+      ];
+    };
+
+    return [
+      <div class='dimensions-index-row'>
+        <div class='label'>{this.$t('指标')}</div>
+        <div class='settings'></div>
+      </div>,
+      <div class='dimensions-index-row'>
+        <div class='label'>{this.$t('维度')}</div>
+        <div class='settings'></div>
+      </div>,
+      <div class='dimensions-index-row'>
+        <div class='label'></div>
+        <div
+          class='advance-setting'
+          onClick={this.handleAdvanceSettingClick}
+        >
+          {this.$t('高级设置')}
+          <i class={['log-icon', this.advanceSettingClass]}></i>
+        </div>
+      </div>,
+      ...getAadvanceSettingList(),
+    ];
+  }
+
+  handleCanvasTypeChange(t) {
+    this.activeCanvasType = t;
+  }
+
+  handleHorizionMoveEnd({ offsetY }) {
+    let target = this.axiosOptionHeight + offsetY ?? 0;
+    if (this.minAxiosOptionHeight > target) {
+      target = this.minAxiosOptionHeight;
+    }
+
+    this.axiosOptionHeight = target;
+  }
+  handleVerticalMoveEnd({ offsetX }) {
+    let target = this.rightOptionWidth - offsetX;
+    if (this.minRightOptionWidth > target) {
+      target = this.minRightOptionWidth;
+    }
+
+    this.rightOptionWidth = target;
   }
 
   render() {
@@ -170,15 +359,66 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
             <div
               style={this.axiosStyle}
               class='graph-axios-options'
-            ></div>
-            <div class='graph-canvas-options'></div>
+            >
+              <GraphDragTool
+                class='horizional-drag-tool'
+                direction='horizional'
+                onMove-end={this.handleHorizionMoveEnd}
+              ></GraphDragTool>
+              {this.renderDimensionsAndIndexSetting()}
+            </div>
+            <div
+              style={this.canvasStyle}
+              class='graph-canvas-options'
+            >
+              <div class='canvas-head'>
+                {this.basicInfoTitle.show ? <span class='title'>{this.basicInfoTitle.title}</span> : ''}
+                <span class='icons'>
+                  <span
+                    class={{ active: this.activeCanvasType === 'bar' }}
+                    onClick={() => this.handleCanvasTypeChange('bar')}
+                  >
+                    <i class='log-icon icon-bar'></i>
+                  </span>
+                  <span
+                    class={{ active: this.activeCanvasType === 'table' }}
+                    onClick={() => this.handleCanvasTypeChange('table')}
+                  >
+                    <i class='log-icon icon-table'></i>
+                  </span>
+                </span>
+              </div>
+              <div></div>
+            </div>
           </div>
-          <div class='body-right'>
+          <div
+            style={this.rightOptionStyle}
+            class='body-right'
+          >
             <div class='graph-category'>
               <div class='category-title'>{this.$t('图表样式')}</div>
               <div class='category-list'>{this.renderGraphCategory()}</div>
             </div>
-            <div class='graph-info'></div>
+            <div class='graph-info'>
+              <GraphDragTool
+                class='vertical-drag-tool'
+                direction='vertical'
+                onMove-end={this.handleVerticalMoveEnd}
+              ></GraphDragTool>
+              <bk-collapse
+                class='graph-info-collapse'
+                v-model={this.activeSettings}
+              >
+                <bk-collapse-item name='basic_info'>
+                  <span class='graph-info-collapse-title'>{this.$t('基础信息')}</span>
+                  <div slot='content'>{this.renderBasicInfo()}</div>
+                </bk-collapse-item>
+                <bk-collapse-item name='field_setting'>
+                  <span class='graph-info-collapse-title'>{this.$t('字段设置')}</span>
+                  <div slot='content'>{this.renderFieldsSetting()}</div>
+                </bk-collapse-item>
+              </bk-collapse>
+            </div>
           </div>
         </div>
       </div>
