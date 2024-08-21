@@ -89,51 +89,60 @@
         background: #ffffff;
         box-shadow: inset 0 -1px 0 0 #dcdee5;
 
-        .horizional-drag-tool {
-          position: absolute;
-          right: 0;
-          bottom: 0;
-          left: 0;
+        .graph-axios-rows {
+          height: calc(100% - 8px);
+          overflow: auto;
+
+          .dimensions-index-row {
+            display: flex;
+            align-items: center;
+            height: 32px;
+            margin-bottom: 16px;
+
+            .label {
+              width: 46px;
+              height: 20px;
+              font-size: 12px;
+              line-height: 20px;
+              color: #63656e;
+              letter-spacing: 0;
+            }
+
+            .settings {
+              width: calc(100% - 46px);
+              height: 32px;
+              background: #f5f7fa;
+              border-radius: 2px;
+
+              &.white {
+                background: transparent;
+              }
+            }
+
+            .advance-setting {
+              height: 20px;
+              font-size: 12px;
+              line-height: 20px;
+              color: #3a84ff;
+              letter-spacing: 0;
+              cursor: pointer;
+
+              i {
+                margin: 0 4px;
+                font-size: 16px;
+              }
+            }
+          }
         }
 
-        .dimensions-index-row {
-          display: flex;
-          align-items: center;
-          height: 32px;
-          margin-bottom: 16px;
+        .graph-axios-drag {
+          height: 8px;
 
-          .label {
-            width: 46px;
-            height: 20px;
-            font-size: 12px;
-            line-height: 20px;
-            color: #63656E;
-            letter-spacing: 0;
-          }
-
-          .settings {
-            width: calc(100% - 46px);
-            height: 32px;
-            background: #F5F7FA;
-            border-radius: 2px;
-
-            &.white {
-              background: transparent;
-            }
-          }
-
-          .advance-setting {
-            height: 20px;
-            font-size: 12px;
-            line-height: 20px;
-            color: #3A84FF;
-            letter-spacing: 0;
-            cursor: pointer;
-
-            i {
-              margin: 0 4px;
-              font-size: 16px;
-            }
+          .horizional-drag-tool {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
           }
         }
       }
@@ -163,7 +172,7 @@
             width: 44px;
             height: 24px;
             padding: 2px;
-            background: #F0F1F5;
+            background: #f0f1f5;
             border-radius: 2px;
 
             > span {
@@ -173,16 +182,21 @@
               width: 20px;
               height: 20px;
               font-size: 12px;
-              color: #989CA7;
+              color: #989ca7;
               cursor: pointer;
               border-radius: 1px;
 
               &.active {
-                color: #3A84FF;
-                background: #FFFFFF;
+                color: #3a84ff;
+                background: #ffffff;
               }
             }
           }
+        }
+
+        .graph-context {
+          width: 100%;
+          height: calc(100% - 22px);
         }
       }
     }

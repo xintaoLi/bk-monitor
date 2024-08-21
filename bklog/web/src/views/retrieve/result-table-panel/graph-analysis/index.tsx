@@ -167,6 +167,7 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
   handleAdvanceSettingClick() {
     this.advanceSetting = !this.advanceSetting;
     this.axiosOptionHeight = this.axiosOptionHeight + (this.advanceSetting ? 1 : -1) * this.advanceHeight;
+    this.minAxiosOptionHeight = this.minAxiosOptionHeight + (this.advanceSetting ? 1 : -1) * this.advanceHeight;
   }
 
   renderGraphCategory() {
@@ -329,6 +330,23 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
     this.rightOptionWidth = target;
   }
 
+  renderCanvasChartAndTable() {
+    const showTable = this.activeCanvasType === 'table';
+    const tableStyle = { display: showTable ? 'block' : 'none' };
+    const chartStyle = { display: !showTable ? 'block' : 'none' };
+    return [
+      <div
+        style={tableStyle}
+        class='graph-context graph-table'
+      ></div>,
+      <div
+        ref='refGraphChart'
+        style={chartStyle}
+        class='graph-context graph-chart'
+      ></div>,
+    ];
+  }
+
   render() {
     return (
       <div class='graph-analysis-index'>
@@ -360,12 +378,14 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
               style={this.axiosStyle}
               class='graph-axios-options'
             >
-              <GraphDragTool
-                class='horizional-drag-tool'
-                direction='horizional'
-                onMove-end={this.handleHorizionMoveEnd}
-              ></GraphDragTool>
-              {this.renderDimensionsAndIndexSetting()}
+              <div class='graph-axios-rows'>{this.renderDimensionsAndIndexSetting()}</div>
+              <div class='graph-axios-drag'>
+                <GraphDragTool
+                  class='horizional-drag-tool'
+                  direction='horizional'
+                  onMove-end={this.handleHorizionMoveEnd}
+                ></GraphDragTool>
+              </div>
             </div>
             <div
               style={this.canvasStyle}
@@ -388,7 +408,7 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
                   </span>
                 </span>
               </div>
-              <div></div>
+              {this.renderCanvasChartAndTable()}
             </div>
           </div>
           <div

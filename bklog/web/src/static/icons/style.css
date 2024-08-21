@@ -168,11 +168,11 @@ url("fonts/iconcool.eot?#iefix") format("embedded-opentype");
 	content: "\e192";
 }
 
-.icon-collapse-small.:before {
+.icon-collapse-small:before {
 	content: "\e18a";
 }
 
-.icon-expand-small.:before {
+.icon-expand-small:before {
 	content: "\e189";
 }
 
