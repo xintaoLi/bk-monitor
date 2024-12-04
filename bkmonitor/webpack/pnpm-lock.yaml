@@ -340,7 +340,7 @@ importers:
     dependencies:
       '@blueking/ai-blueking':
         specifier: 0.3.4
-        version: 0.3.4(dayjs@1.11.11)(highlight.js@11.5.1)(markdown-it-code-copy@0.2.1)(markdown-it@13.0.2)
+        version: 0.3.4(dayjs@1.11.13)(highlight.js@11.5.1)(markdown-it-code-copy@0.2.1)(markdown-it@13.0.2)
       '@blueking/bk-weweb':
         specifier: 0.0.26-beta.6
         version: 0.0.26-beta.6
