@@ -75,7 +75,7 @@ export default defineComponent({
     const store = useStore();
     const { $t } = useLocale();
     const columns = ref([]);
-    const tableData = ref([]);
+    let tableData = [];
     const refRootElement: Ref<HTMLElement> = ref();
     const refBoxElement: Ref<HTMLElement> = ref();
     const rowUpdateCounter = ref(0);
@@ -109,9 +109,9 @@ export default defineComponent({
       return count;
     });
 
-    const hasMoreList = computed(() => totalCount.value > tableData.value.length);
+    const hasMoreList = computed(() => totalCount.value > tableData.length);
 
-    const visibleIndexs = ref({ startIndex: 0, endIndex: 30 });
+    const visibleIndexs = ref({ startIndex: 0, endIndex: 0 });
 
     const rowsOffsetTop = ref(0);
     const searchContainerHeight = ref(52);
@@ -126,7 +126,7 @@ export default defineComponent({
     const sizes = ref([]);
     const updateSizes = () => {
       let accumulator = 0;
-      sizes.value = tableData.value.map(row => {
+      sizes.value = tableData.map(row => {
         const rowConfig = row[ROW_CONFIG];
         const current = rowConfig.minHeight;
         accumulator += current;
@@ -141,7 +141,7 @@ export default defineComponent({
     });
 
     const updateRowHeight = (rowIndex: number, target: HTMLElement) => {
-      const row = tableData.value[rowIndex];
+      const row = tableData[rowIndex];
       if (!row?.[ROW_KEY] || !target || !tableRowStore.has(row[ROW_KEY])) {
         return;
       }
@@ -460,20 +460,30 @@ export default defineComponent({
       const endIndex = length ?? visibleIndexs.value.endIndex;
       clearRowConfigCache(endIndex - 1);
       const startIndex = endIndex - 1;
-      for (let i = startIndex; i < tableData.value.length; i++) {
-        const config = tableData.value[i][ROW_CONFIG];
+      for (let i = startIndex; i < tableData.length; i++) {
+        const config = tableData[i][ROW_CONFIG];
         ['minHeight', 'rowMinHeight'].forEach(key => {
           config[key] = 40;
         });
       }
     };
 
+    const viewList = ref([]);
+    const updateViewList = () => {
+      const startIndex = visibleIndexs.value.startIndex - bufferCount;
+      const endIndex = visibleIndexs.value.endIndex + bufferCount;
+      const totalCount = tableData.length;
+      const startIdx = startIndex >= 0 ? startIndex : 0;
+      const endIdx = endIndex <= totalCount ? endIndex : totalCount;
+      viewList.value = new Array(endIdx - startIdx).fill('').map((_, index) => index + startIdx);
+    };
+
     const loadTableData = (next?) => {
-      clearRowConfigCache(tableData.value.length);
+      clearRowConfigCache(tableData.length);
       const startIdx = 0;
       const endIdx = pageIndex.value * pageSize;
       dounceSetUpdateRow('all', () => {
-        tableData.value = (indexSetQueryResult.value.list || []).slice(startIdx, endIdx).map((row, index) => {
+        tableData = (indexSetQueryResult.value.list || []).slice(startIdx, endIdx).map((row, index) => {
           const rowKey = `${ROW_KEY}_${index}`;
 
           return Object.assign({}, row, {
@@ -537,10 +547,18 @@ export default defineComponent({
     watch(
       () => [tableDataSize.value],
       () => {
+        const { startIndex, endIndex } = visibleIndexs.value;
+
+        if (startIndex === endIndex && startIndex === 0) {
+          visibleIndexs.value.startIndex = 0;
+          visibleIndexs.value.endIndex = bufferCount;
+        }
+
         // 如果是初始请求，执行默认赋值操作
         if (pageIndex.value === 1) {
           columns.value = loadTableColumns();
           loadTableData(() => {
+            updateViewList();
             updateSizes();
           });
         }
@@ -555,6 +573,13 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => [visibleIndexs.value.startIndex, visibleIndexs.value.endIndex],
+      () => {
+        console.log('visible index changed');
+        updateViewList();
+      },
+    );
     const handleColumnWidthChange = (w, col) => {
       const width = w > 4 ? w : 40;
       const longFiels = visibleFields.value.filter(
@@ -605,7 +630,7 @@ export default defineComponent({
       if (isRequesting.value) {
         return;
       }
-      if (totalCount.value > tableData.value.length) {
+      if (totalCount.value > tableData.length) {
         isRequesting.value = true;
         delay = 300;
         // 如果是前端已经请求缓存，这里直接启用缓存数据
@@ -630,7 +655,7 @@ export default defineComponent({
     };
 
     const getVisibleRows = (scrollTop, visibleHeight) => {
-      const rows = tableData.value;
+      const rows = tableData;
       let startIdx = 0;
       let endIdx = rows.length - 1;
 
@@ -700,10 +725,10 @@ export default defineComponent({
       searchContainerHeight.value = entry.contentRect.height;
     });
 
-    onMounted(() => {
-      visibleIndexs.value.startIndex = 0;
-      visibleIndexs.value.endIndex = bufferCount;
-    });
+    // onMounted(() => {
+    //   visibleIndexs.value.startIndex = 0;
+    //   visibleIndexs.value.endIndex = bufferCount;
+    // });
 
     onBeforeUnmount(() => {
       tableRowStore.clear();
@@ -761,17 +786,7 @@ export default defineComponent({
     });
 
     const showHeader = computed(() => {
-      return props.contentType === 'table' && tableData.value.length > 0;
-    });
-
-    const viewList = computed(() => {
-      const startIndex = visibleIndexs.value.startIndex - bufferCount;
-      const endIndex = visibleIndexs.value.endIndex + bufferCount;
-      const totalCount = tableData.value.length;
-      const startIdx = startIndex >= 0 ? startIndex : 0;
-      const endIdx = endIndex <= totalCount ? endIndex : totalCount;
-      const result = new Array(endIdx - startIdx).fill('').map((_, index) => index + startIdx);
-      return result;
+      return props.contentType === 'table' && tableData.length > 0;
     });
 
     const renderHeadVNode = () => {
@@ -851,7 +866,7 @@ export default defineComponent({
 
     const renderRowVNode = () => {
       return viewList.value.map(rowIndex => {
-        const row = tableData.value[rowIndex];
+        const row = tableData[rowIndex];
         const rowView = sizes.value[rowIndex];
         const rowStyle = {
           minHeight: `${row[ROW_CONFIG].minHeight}px`,
@@ -905,7 +920,7 @@ export default defineComponent({
             style={{ width: `${offsetWidth.value}px` }}
             v-bkloading={{ isLoading: isRequesting.value, opacity: 0.1 }}
           >
-            {hasMoreList.value || tableData.value.length === 0 ? '' : `已加载所有数据`}
+            {hasMoreList.value || tableData.length === 0 ? '' : `已加载所有数据`}
           </div>
         </div>
       );
@@ -916,7 +931,7 @@ export default defineComponent({
     };
 
     const renderResultContainer = () => {
-      if (tableData.value.length) {
+      if (tableData.length) {
         return [
           renderHeadVNode(),
           <div
