@@ -26,7 +26,6 @@
 import { Ref } from 'vue';
 
 import JsonView from '../global/json-view';
-// import jsonEditorTask, { EditorTask } from '../global/utils/json-editor-task';
 import segmentPopInstance from '../global/utils/segment-pop-instance';
 import UseSegmentPropInstance from './use-segment-pop';
 

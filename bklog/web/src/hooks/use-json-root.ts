@@ -142,13 +142,6 @@ export default ({ fields, onSegmentClick }) => {
     });
 
     return initRootOperator(depth);
-    // .then(() => {
-    //   rootFieldOperator.values().forEach(val => {
-    //     if (val.isJson) {
-    //       val.editor?.setValue.call(val.editor, depth);
-    //     }
-    //   });
-    // });
   };
 
   const setExpand = depth => {
