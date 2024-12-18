@@ -277,54 +277,7 @@ export default defineComponent({
       return data;
     };
 
-    const handleAddCondition = (field, operator, value, isLink = false, depth = undefined) => {
-      store
-        .dispatch('setQueryCondition', { field, operator, value, isLink, depth })
-        .then(([newSearchList, searchMode, isNewSearchPage]) => {
-          if (isLink) {
-            const openUrl = getConditionRouterParams(newSearchList, searchMode, isNewSearchPage);
-            window.open(openUrl, '_blank');
-          }
-        });
-    };
 
-    const handleIconClick = (type, content, field, row, isLink, depth) => {
-      let value = ['date', 'date_nanos'].includes(field.field_type) ? row[field.field_name] : content;
-      value = String(value)
-        .replace(/<mark>/g, '')
-        .replace(/<\/mark>/g, '');
-
-      if (type === 'search') {
-        // 将表格单元添加到过滤条件
-        handleAddCondition(field.field_name, 'eq', [value], isLink);
-      } else if (type === 'copy') {
-        // 复制单元格内容
-        copyMessage(value);
-      } else if (['is', 'is not', 'new-search-page-is'].includes(type)) {
-        handleAddCondition(field.field_name, type, value === '--' ? [] : [value], isLink, depth);
-      }
-    };
-
-    const handleMenuClick = (option, isLink) => {
-      switch (option.operation) {
-        case 'is':
-        case 'is not':
-        case 'not':
-        case 'new-search-page-is':
-          const { fieldName, operation, value, depth } = option;
-          const operator = operation === 'not' ? 'is not' : operation;
-          handleAddCondition(fieldName, operator, value === '--' ? [] : [value], isLink, depth);
-          break;
-        case 'copy':
-          copyMessage(option.value);
-          break;
-        case 'display':
-          emit('fields-updated', option.displayFieldNames, undefined, false);
-          break;
-        default:
-          break;
-      }
-    };
 
     const { renderHead } = useHeaderRender();
     const loadTableColumns = () => {
@@ -346,9 +299,6 @@ export default defineComponent({
                     content={getTableColumnContent(row, field)}
                     field={field}
                     is-wrap={tableLineIsWrap.value}
-                    onIcon-click={(type, content, isLink, depth) =>
-                      handleIconClick(type, content, field, row, isLink, depth)
-                    }
                   ></TableColumn>
                 );
               },
@@ -395,7 +345,6 @@ export default defineComponent({
                 fields={visibleFields.value}
                 formatJson={formatJson.value}
                 jsonValue={row}
-                onMenu-click={({ option, isLink }) => handleMenuClick(option, isLink)}
               ></JsonFormatter>
             );
           },
