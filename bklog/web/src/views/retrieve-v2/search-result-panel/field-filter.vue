@@ -37,9 +37,10 @@
       item.filterExpand = false; // 字段过滤展开
       item.filterVisible = true;
       // fieldAliasMap[item.field_name] = item.field_alias || item.field_name;
-      fieldAliasMap[item.field_name] = fieldShowName.value === 'field_name'
-        ? item.field_alias || item.field_name
-        : item.alias_name || item.field_alias || item.field_name;
+      fieldAliasMap[item.field_name] =
+        fieldShowName.value === 'field_name'
+          ? item.field_alias || item.field_name
+          : item.alias_name || item.field_alias || item.field_name;
     });
     return fieldAliasMap;
   });
@@ -53,7 +54,6 @@
     };
   });
 
-  // const showFieldAlias = computed(() => store.state.showFieldAlias);
   const visibleFields = computed(() => store.state.visibleFields ?? []);
 
   /**
@@ -73,8 +73,7 @@
     emit('field-status-change', !props.value);
     emit('input', !props.value);
   };
-  const handlerChange = (value) => {
-  }
+  const handlerChange = value => {};
 </script>
 
 <template>
