@@ -56,8 +56,9 @@ class RouteUrlResolver {
   /**
    * 将URL参数解析为store里面缓存的数据结构
    */
-  public convertQueryToStore() {
-    return this.resolveFieldList.reduce((output, key) => {
+  public convertQueryToStore(): Record<string, any> {
+    const isEmptySearchMode = !['sql', 'ui'].includes(this.query?.search_mode);
+    const restult = this.resolveFieldList.reduce((output, key) => {
       const value = this.resolver.get(key)?.(this.query?.[key]) ?? this.commonResolver(this.query?.[key]);
       if (value !== undefined) {
         return Object.assign(output, { [key]: value });
@@ -65,6 +66,8 @@ class RouteUrlResolver {
 
       return output;
     }, {});
+
+    return this.formatDefAddition(restult, isEmptySearchMode);
   }
 
   /**
@@ -79,6 +82,25 @@ class RouteUrlResolver {
       ...routeQuery,
       ...undefinedQuery,
     };
+  }
+
+  /**
+   * 根据URL参数获取默认的附加参数
+   * 这里主要用于处理默认条件转换，处理以下情况的参数合并
+   * （1）旧版日志检索跳转时，keyword 和 addition 同时存在
+   */
+  private formatDefAddition(result, resetAddition = false) {
+    result.__reset_router_query = undefined;
+    if (result?.keyword?.length && result?.addition?.length && resetAddition) {
+      result.addition.push({ field: '__query_string__', operator: 'contains match phrase', value: result.keyword });
+      result.keyword = undefined;
+      result.__reset_router_query = {
+        addition: JSON.stringify(result.addition),
+        keyword: undefined,
+      };
+    }
+
+    return result;
   }
 
   private getDefaultResolveFieldList() {
@@ -159,6 +181,10 @@ class RouteUrlResolver {
   private searchModeResolver() {
     if (['sql', 'ui'].includes(this.query.search_mode)) {
       return this.query.search_mode;
+    }
+
+    if (this.query.keyword?.length && this.query.addition?.length) {
+      return 'ui';
     }
 
     if (this.query.keyword?.length) {

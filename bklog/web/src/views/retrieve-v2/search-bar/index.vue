@@ -46,6 +46,10 @@
       return queryParams.findIndex(m => m === route.query.search_mode);
     }
 
+    if (route.query.keyword?.length && route.query.addition?.length > 4) {
+      return 0;
+    }
+
     if (route.query.keyword?.length) {
       return 1;
     }
