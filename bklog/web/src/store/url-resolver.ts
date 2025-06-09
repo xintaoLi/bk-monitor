@@ -28,13 +28,19 @@
 import { handleTransformToTimestamp, intTimestampStr } from '@/components/time-range/utils';
 
 import { ConditionOperator } from './condition-operator';
+import { Route } from 'vue-router';
+import { BK_LOG_STORAGE } from './store.type';
 
+/**
+ * 初始化App时解析URL中的参数
+ * 对应结果映射到Store里面
+ */
 class RouteUrlResolver {
   private route;
   private resolver: Map<string, (str) => unknown>;
   private resolveFieldList: string[];
 
-  constructor({ route, resolveFieldList }) {
+  constructor({ route, resolveFieldList }: { route: Route; resolveFieldList?: string[] }) {
     this.route = route;
     this.resolver = new Map<string, (str) => unknown>();
     this.resolveFieldList = resolveFieldList ?? this.getDefaultResolveFieldList();
@@ -56,7 +62,7 @@ class RouteUrlResolver {
   /**
    * 将URL参数解析为store里面缓存的数据结构
    */
-  public convertQueryToStore() {
+  public convertQueryToStore<T>(): T {
     return this.resolveFieldList.reduce((output, key) => {
       const value = this.resolver.get(key)?.(this.query?.[key]) ?? this.commonResolver(this.query?.[key]);
       if (value !== undefined) {
@@ -64,16 +70,16 @@ class RouteUrlResolver {
       }
 
       return output;
-    }, {});
+    }, {}) as T;
   }
 
   /**
    * 需要清理URL参数时，获取默认的参数配置列表
    * @returns
    */
-  public getDefUrlQuery() {
+  public getDefUrlQuery(ignoreList = []) {
     const routeQuery = this.query;
-    const appendParamKeys = [...this.resolveFieldList, 'end_time'];
+    const appendParamKeys = [...this.resolveFieldList, 'end_time'].filter(f => !(ignoreList ?? []).includes(f));
     const undefinedQuery = appendParamKeys.reduce((out, key) => Object.assign(out, { [key]: undefined }), {});
     return {
       ...routeQuery,
@@ -96,6 +102,12 @@ class RouteUrlResolver {
       'ip_chooser',
       'search_mode',
       'clusterParams',
+      'bizId',
+      'spaceUid',
+      'format',
+      'index_id',
+      BK_LOG_STORAGE.FAVORITE_ID,
+      BK_LOG_STORAGE.HISTORY_ID,
     ];
   }
 
@@ -116,14 +128,12 @@ class RouteUrlResolver {
     return this.objectResolver(str);
   }
 
-  private getTimeSecVal(val: number) {
-    const diff = `${val}`.length - 10;
-    let temp = 1;
-    for (let i = 0; i < diff; i++) {
-      temp = temp * 10;
+  private timeFormatResolver(str) {
+    if (str === undefined || str === null || str === '') {
+      return 'YYYY-MM-DD HH:mm:ss';
     }
 
-    return val / temp;
+    return str;
   }
 
   /**
@@ -136,13 +146,17 @@ class RouteUrlResolver {
       return intTimestampStr(r);
     });
 
-    const result: number[] = handleTransformToTimestamp(decodeValue);
-    return { start_time: this.getTimeSecVal(result[0]), end_time: this.getTimeSecVal(result[1]) };
+    const result: number[] = handleTransformToTimestamp(decodeValue, this.timeFormatResolver(this.query.format));
+    return { start_time: result[0], end_time: result[1] };
   }
 
   private additionResolver(str) {
-    return this.commonResolver(str, val => {
-      return (JSON.parse(decodeURIComponent(val)) ?? []).map(val => {
+    return this.commonResolver(str, value => {
+      if (value === undefined || value === null || value === '') {
+        return [];
+      }
+
+      return (JSON.parse(decodeURIComponent(value)) ?? []).map(val => {
         const instance = new ConditionOperator(val);
         return instance.formatApiOperatorToFront();
       });
@@ -157,19 +171,23 @@ class RouteUrlResolver {
   }
 
   private searchModeResolver() {
-    if (['sql', 'ui'].includes(this.query.search_mode)) {
-      return this.query.search_mode;
+    const hasAddition = this.query.keyword?.length;
+    const hasKeyword = this.query.addition?.length;
+    const defValue = ['sql', 'ui'].includes(this.query.search_mode) ? this.query.search_mode : 'ui';
+
+    if (hasAddition && hasKeyword) {
+      return defValue;
     }
 
     if (this.query.keyword?.length) {
       return 'sql';
     }
 
-    if (this.query.additon?.length) {
+    if (this.query.addition?.length) {
       return 'ui';
     }
 
-    return 'ui';
+    return defValue;
   }
 
   private setDefaultResolver() {
@@ -180,6 +198,7 @@ class RouteUrlResolver {
     this.resolver.set('clusterParams', this.objectResolver.bind(this));
     this.resolver.set('timeRange', this.dateTimeRangeResolver.bind(this));
     this.resolver.set('search_mode', this.searchModeResolver.bind(this));
+    this.resolver.set('format', this.timeFormatResolver.bind(this));
 
     // datePicker默认直接获取URL中的 start_time, end_time
     this.resolver.set('datePickerValue', this.datePickerValueResolver.bind(this));
@@ -200,6 +219,10 @@ class RouteUrlResolver {
   }
 }
 
+/**
+ * Store 中的参数解析为URL参数
+ * 用于默认初始化或者解析Store中的参数更新到URL中
+ */
 class RetrieveUrlResolver {
   routeQueryParams;
   storeFieldKeyMap;

@@ -79,6 +79,7 @@ declare global {
     csrf_cookie_name: string;
     cc_biz_id: number | string;
     bk_biz_id: number | string;
+    default_biz_id: number | string;
     space_uid: string;
     Vue?: any;
     i18n: VueI18n;
@@ -118,6 +119,7 @@ declare global {
     bk_bcs_url: string;
     __BK_WEWEB_DATA__: Record<string, any>;
     __POWERED_BY_BK_WEWEB__?: boolean;
+    rawDocument: Document;
     rawWindow: Window;
     token?: string;
     enable_create_chat_group: boolean;
@@ -146,6 +148,10 @@ declare global {
     AJAX_URL_PREFIX: string;
     BK_DOC_URL?: string;
     FEATURE_TOGGLE?: Record<string, 'off' | 'on'>;
+    /*
+     * 灰度业务是否开启故障事件中心
+     */
+    enable_aiops_event_center_biz_list?: number[];
   }
   interface HTMLElement {
     ___zrEVENTSAVED?: Record<string, any>; // echarts zrender instance

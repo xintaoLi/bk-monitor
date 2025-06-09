@@ -9,9 +9,10 @@
   .bk-log-drag {
     position: absolute;
     top: 50%;
-    left: 242px;
+    left: 220px;
     z-index: 100;
-    display: flex;
+    display: none;
+    // display: flex;
     align-items: center;
     justify-items: center;
     width: 6px;
@@ -73,6 +74,22 @@
     .field-select-config {
       .dropdown-trigger-text {
         color: #3a84ff;
+      }
+    }
+  }
+
+  .retrieve-v2-body {
+    .retrieve-v2-content {
+      &::after {
+        width: 1px;
+      }
+
+      .search-bar-wrapper {
+        margin: 0 0 8px 0;
+      }
+
+      .search-result-panel {
+        padding: 0;
       }
     }
   }

@@ -25,8 +25,7 @@
 -->
 
 <script setup>
-  window.__IS_MONITOR_APM__ = true;
-  import { computed, ref, watch, defineProps, onMounted, provide } from 'vue';
+  import { computed, ref, watch, defineProps, provide } from 'vue';
 
   import * as authorityMap from '@/common/authority-map';
   import { handleTransformToTimestamp } from '@/components/time-range/utils';
@@ -37,11 +36,17 @@
   import { isEqual } from 'lodash';
   import { useRoute, useRouter } from 'vue-router/composables';
 
+  import useResizeObserve from '../../../hooks/use-resize-observe';
+  import useScroll from '../../../hooks/use-scroll';
   import SelectIndexSet from '../condition-comp/select-index-set.tsx';
   import { getInputQueryIpSelectItem } from '../search-bar/const.common';
   import SearchBar from '../search-bar/index.vue';
-  import QueryHistory from '../search-bar/query-history.vue';
+  import QueryHistory from '../sub-bar/query-history.vue';
   import SearchResultPanel from '../search-result-panel/index.vue';
+  import RetrieveHelper from '../../retrieve-helper.tsx';
+
+  const GLOBAL_SCROLL_SELECTOR = RetrieveHelper.getScrollSelector();
+
   const props = defineProps({
     indexSetApi: {
       type: Function,
@@ -70,22 +75,35 @@
   const store = useStore();
   const router = useRouter();
   const route = useRoute();
-
   const indexSetParams = computed(() => store.state.indexItem);
-  const routeQueryParams = computed(() => {
-    const { ids, isUnionIndex, search_mode } = store.state.indexItem;
-    const { start_time, end_time, ...retrieveParams } = store.getters.retrieveParams ?? {};
-    const unionList = store.state.unionIndexList;
-    const clusterParams = store.state.clusterParams;
-    return {
-      ...retrieveParams,
-      search_mode,
-      ids,
-      isUnionIndex,
-      unionList,
-      clusterParams,
-    };
-  });
+  const initLoading = ref(true);
+
+  // 解析默认URL为前端参数
+  // 这里逻辑不要动，不做解析会导致后续前端查询相关参数的混乱
+  // store.dispatch('updateIndexItemByRoute', { route, list: [] });
+
+  const setDefaultIndexsetId = () => {
+    if (!route.query.indexId) {
+      const routeParams = store.getters.retrieveParams;
+      const resolver = new RetrieveUrlResolver({
+        ...routeParams,
+        datePickerValue: store.state.indexItem.datePickerValue,
+      });
+      if (store.getters.isUnionSearch) {
+        router.replace({ query: { ...route.query, ...resolver.resolveParamsToUrl() } });
+        return;
+      }
+      if (store.state.indexId) {
+        router.replace({
+          query: {
+            ...route.query,
+            indexId: store.state.indexId,
+            ...resolver.resolveParamsToUrl(),
+          },
+        });
+      }
+    }
+  };
 
   const getApmIndexSetList = async () => {
     store.commit('retrieve/updateIndexSetLoading', true);
@@ -118,6 +136,7 @@
         }
       })
       .finally(() => {
+        initLoading.value = false;
         store.commit('retrieve/updateIndexSetLoading', false);
       });
   };
@@ -128,19 +147,53 @@
   const getIndexSetList = () => {
     if (!props.indexSetApi) return;
     getApmIndexSetList().then(res => {
-      if (!res.length) return;
+      if (!res?.length) return;
       // 拉取完毕根据当前路由参数回填默认选中索引集
-      store.dispatch('updateIndexItemByRoute', { route, list: res }).then(() => {
-        store.dispatch('requestIndexSetFieldInfo').then(() => {
-          store.dispatch('requestIndexSetQuery');
-        });
+      // store.dispatch('updateIndexItemByRoute', { route, list: res }).then(() => {
+      //   setDefaultIndexsetId();
+      //   store.dispatch('requestIndexSetFieldInfo').then(() => {
+      //     store.dispatch('requestIndexSetQuery');
+      //   });
+      // });
+    });
+  };
+
+  const setRouteQuery = query => {
+    if (query) {
+      router.replace({
+        query,
       });
+      return;
+    }
+    const routeQuery = { ...route.query };
+    const { keyword, addition, ip_chooser, search_mode, begin, size } = store.getters.retrieveParams;
+    const resolver = new RetrieveUrlResolver({
+      keyword,
+      addition,
+      ip_chooser,
+      search_mode,
+      begin,
+      size,
+    });
+    Object.assign(routeQuery, resolver.resolveParamsToUrl());
+    router.replace({
+      query: routeQuery,
     });
   };
 
   const handleIndexSetSelected = payload => {
     if (!isEqual(indexSetParams.value.ids, payload.ids) || indexSetParams.value.isUnionIndex !== payload.isUnionIndex) {
-      store.commit('updateUnionIndexList', payload.isUnionIndex ? (payload.ids ?? []) : []);
+      if (payload.isUnionIndex) {
+        setRouteQuery({
+          ...route.query,
+          indexId: undefined,
+          unionList: JSON.stringify(ids),
+          clusterParams: undefined,
+        });
+        return;
+      }
+      setRouteQuery({ ...route.query, indexId: payload.ids[0], unionList: undefined, clusterParams: undefined });
+      store.commit('updateUnionIndexList', payload.isUnionIndex ? payload.ids ?? [] : []);
       store.dispatch('requestIndexSetItemChanged', payload ?? {}).then(() => {
         store.commit('retrieve/updateChartKey');
         store.dispatch('requestIndexSetQuery');
@@ -159,6 +212,8 @@
       foramtAddition.unshift(getInputQueryIpSelectItem(ip_chooser));
     }
 
+    setRouteQuery();
+
     store.commit('updateIndexItemParams', {
       keyword,
       addition: foramtAddition,
@@ -172,27 +227,8 @@
     });
   };
 
-  const setRouteParams = () => {
-    const { ids, isUnionIndex } = routeQueryParams.value;
-    const params = isUnionIndex ? { indexId: undefined } : { indexId: ids?.[0] ?? route.query?.indexId };
-    const query = { ...route.query, ...params };
-    const resolver = new RetrieveUrlResolver({
-      ...routeQueryParams.value,
-      indexId: params.indexId,
-      bizId: String(window.bk_biz_id),
-      datePickerValue: store.state.indexItem.datePickerValue,
-    });
-    Object.assign(query, resolver.resolveParamsToUrl());
-
-    if (!isEqual(query, route.query)) {
-      router.replace({
-        query,
-      });
-    }
-  };
-
   const init = () => {
-    const result = handleTransformToTimestamp(props.timeRange);
+    const result = handleTransformToTimestamp(props.timeRange, store.getters.retrieveParams.format);
     const resolver = new RouteUrlResolver({ route });
     store.commit('updateIndexItem', {
       ...resolver.convertQueryToStore(),
@@ -200,25 +236,17 @@
       end_time: result[1],
       datePickerValue: props.timeRange,
     });
-    store.commit('updateIndexId', '');
-    store.commit('updateUnionIndexList', []);
     getIndexSetList();
   };
-
-  watch(
-    routeQueryParams,
-    () => {
-      setRouteParams();
-    },
-    { deep: true },
-  );
+  init();
 
   watch(
     () => props.timeRange,
     async val => {
       if (!val) return;
+      getIndexSetList();
       store.commit('updateIsSetDefaultTableColumn', false);
-      const result = handleTransformToTimestamp(val);
+      const result = handleTransformToTimestamp(val, store.getters.retrieveParams.format);
       store.commit('updateIndexItemParams', { start_time: result[0], end_time: result[1], datePickerValue: val });
       await store.dispatch('requestIndexSetFieldInfo');
       store.dispatch('requestIndexSetQuery');
@@ -269,13 +297,64 @@
     },
   );
 
-  onMounted(() => {
-    init();
+  const stickyStyle = computed(() => {
+    return {
+      '--offset-search-bar': `${searchBarHeight.value + 8}px`,
+    };
   });
+
+  const contentStyle = computed(() => {
+    return {
+      '--left-width': `0px`,
+    };
+  });
+
+  /** 开始处理滚动容器滚动时，收藏夹高度 */
+
+  // 顶部二级导航高度，这个高度是固定的
+  const subBarHeight = ref(64);
+  const paddingTop = ref(0);
+  // 滚动容器高度
+  const scrollContainerHeight = ref(0);
+
+  useScroll(GLOBAL_SCROLL_SELECTOR, event => {
+    if (event.target) {
+      const scrollTop = event.target.scrollTop;
+      paddingTop.value = scrollTop > subBarHeight.value ? subBarHeight.value : scrollTop;
+    }
+  });
+
+  useResizeObserve(
+    GLOBAL_SCROLL_SELECTOR,
+    entry => {
+      scrollContainerHeight.value = entry.target.offsetHeight;
+    },
+    0,
+  );
+
+  const isStickyTop = computed(() => {
+    if (window.__IS_MONITOR_TRACE__) {
+      return false;
+    }
+    return paddingTop.value === subBarHeight.value;
+  });
+
+  // const isScrollY = computed(() => {
+  //   return !window.__IS_MONITOR_TRACE__
+  // })
+
+  /** * 结束计算 ***/
 </script>
 <template>
-  <div class="retrieve-v2-index">
-    <div class="sub-head">
+  <div
+    :style="stickyStyle"
+    :class="['retrieve-v2-index', { 'scroll-y': true, 'is-sticky-top': isStickyTop }]"
+    v-bkloading="{ isLoading: initLoading }"
+  >
+    <div
+      class="sub-head"
+      v-show="!initLoading"
+    >
       <SelectIndexSet
         :popover-options="{ offset: '-6,10' }"
         @collection="getIndexSetList"
@@ -283,8 +362,12 @@
       ></SelectIndexSet>
       <QueryHistory @change="updateSearchParam"></QueryHistory>
     </div>
-    <div class="retrieve-body">
-      <div class="retrieve-context">
+    <div
+      :style="contentStyle"
+      :class="['retrieve-v2-body']"
+      v-show="!initLoading"
+    >
+      <div class="retrieve-v2-content">
         <SearchBar @height-change="handleHeightChange"></SearchBar>
         <div
           ref="resultRow"

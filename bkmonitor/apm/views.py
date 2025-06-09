@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,6 +7,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 from apm.resources import (
     AppConfigResource,
     ApplicationInfoResource,
@@ -24,13 +24,18 @@ from apm.resources import (
     OperateApmDataIdResource,
     QueryAppByHostInstanceResource,
     QueryAppByTraceResource,
+    QueryBkDataTokenInfoResource,
     QueryBuiltinProfileDatasourceResource,
     QueryDiscoverRulesResource,
+    QueryEbpfProfileResource,
+    QueryEbpfServiceListResource,
     QueryEndpointResource,
     QueryEsMappingResource,
     QueryEsResource,
     QueryEventResource,
     QueryFieldsResource,
+    QueryFieldStatisticsInfoResource,
+    QueryFieldsTopkResource,
     QueryHostInstanceResource,
     QueryLogRelationByIndexSetIdResource,
     QueryMetricDimensionsResource,
@@ -57,6 +62,7 @@ from apm.resources import (
     StopApplicationResource,
     StopApplicationSimpleResource,
     UpdateMetricFieldsResource,
+    QueryFieldStatisticsGraphResource,
 )
 from core.drf_resource.viewsets import ResourceRoute, ResourceViewSet
 
@@ -76,6 +82,7 @@ class ApplicationViewSet(ResourceViewSet):
         ResourceRoute("POST", ApplyDatasourceResource, endpoint="apply_datasource"),
         ResourceRoute("GET", ListApplicationResources, endpoint="list_application"),
         ResourceRoute("GET", ApplicationInfoResource, endpoint="detail_application"),
+        ResourceRoute("GET", QueryBkDataTokenInfoResource, endpoint="query_bk_data_token_info"),
         ResourceRoute("GET", StopApplicationResource, endpoint="stop_application"),
         ResourceRoute("GET", StopApplicationSimpleResource, endpoint="stop_application_simple"),
         ResourceRoute("GET", StartApplicationResource, endpoint="start_application"),
@@ -110,6 +117,9 @@ class ApplicationViewSet(ResourceViewSet):
         ResourceRoute("GET", GetBkDataFlowDetailResource, endpoint="get_bkdata_flow"),
         ResourceRoute("POST", CreateOrUpdateBkdataFlowResource, endpoint="create_or_update_bkdata_flow"),
         ResourceRoute("POST", OperateApmDataIdResource, endpoint="operate_apm_dataid"),
+        ResourceRoute("POST", QueryFieldsTopkResource, endpoint="query_fields_topk"),
+        ResourceRoute("POST", QueryFieldStatisticsInfoResource, endpoint="query_field_statistics_info"),
+        ResourceRoute("POST", QueryFieldStatisticsGraphResource, endpoint="query_field_statistics_graph"),
     ]
 
 
@@ -126,4 +136,6 @@ class ProfilingViewSet(ResourceViewSet):
     resource_routes = [
         ResourceRoute("GET", QueryBuiltinProfileDatasourceResource, endpoint="builtin_profile_datasource"),
         ResourceRoute("GET", QueryProfileServiceDetailResource, endpoint="services_detail"),
+        ResourceRoute("POST", QueryEbpfServiceListResource, endpoint="ebpf_service_list"),
+        ResourceRoute("POST", QueryEbpfProfileResource, endpoint="ebpf_profile"),
     ]

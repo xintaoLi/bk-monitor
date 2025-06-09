@@ -121,6 +121,11 @@
           :disabled="!selectedStorageCluster.enable_hot_warm"
           data-test-id="storageBox_select_selectHotData"
         >
+        <template #trigger>
+            <div class="bk-select-name">
+              {{ formData.allocation_min_days + $t('天') }}
+            </div>
+          </template>
           <template>
             <bk-option
               v-for="(option, index) in hotDataDaysList"
@@ -894,6 +899,15 @@
           }
           data.etl_params = payload;
         }
+        data.alias_settings = data.fields
+          .filter(item => item.query_alias)
+          .map(item => {
+            return {
+              field_name: item.alias_name || item.field_name,
+              query_alias: item.query_alias,
+              path_type: item.field_type,
+            };
+          });
         return data;
       },
       checkStorageReplies() {

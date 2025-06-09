@@ -74,8 +74,13 @@ class UseSegmentProp {
     const eventBoxList = [
       {
         onClick: () => taskEventManager.executeFn('copy'),
-        iconName: 'icon bklog-icon bklog-copy',
+        iconName: 'icon bklog-icon bklog-copy-3',
         text: this.$t('复制'),
+      },
+      {
+        onClick: () => taskEventManager.executeFn('highlight'),
+        iconName: 'icon bklog-icon bklog-highlight',
+        text: this.$t('高亮'),
       },
       {
         onClick: () => {
@@ -121,7 +126,22 @@ class UseSegmentProp {
           iconName: 'bklog-icon bklog-jump',
         },
       },
-    ];
+    ]
+      .filter(item => {
+        if (window?.__IS_MONITOR_TRACE__) {
+          return item.text !== this.$t('新建检索');
+        }
+        return true;
+      })
+      .map(item => {
+        if (window?.__IS_MONITOR_TRACE__) {
+          return {
+            ...item,
+            link: undefined,
+          };
+        }
+        return item;
+      });
 
     return h('div', { class: 'segment-event-icons event-tippy-content', ref: refName }, [
       eventBoxList.map(item =>

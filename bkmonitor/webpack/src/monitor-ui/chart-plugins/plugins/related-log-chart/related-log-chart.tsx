@@ -77,7 +77,7 @@ class RelatedLogChart extends CommonSimpleChart {
   @InjectReactive('customChartConnector') customChartConnector: CustomChartConnector;
 
   empty = true;
-  emptyText = window.i18n.tc('加载中...');
+  emptyText = window.i18n.t('加载中...');
   emptyChart = false;
   /** 关联是否为蓝鲸日志平台 */
   isBkLog = true;
@@ -137,9 +137,9 @@ class RelatedLogChart extends CommonSimpleChart {
    */
   @Debounce(300)
   async getPanelData(start_time?: string, end_time?: string) {
-    this.unregisterOberver();
+    this.unregisterObserver();
     this.handleLoadingChange(true);
-    this.emptyText = window.i18n.tc('加载中...');
+    this.emptyText = window.i18n.t('加载中...');
     this.keyword = this.panel.options?.related_log_chart?.defaultKeyword ?? this.keyword;
     // 先用 log_predicate 接口判断日志类型 蓝鲸日志平台 or 第三方其他日志
     const predicateLogTarget = this.panel.targets.find(item => item.dataType === 'log_predicate');
@@ -168,7 +168,7 @@ class RelatedLogChart extends CommonSimpleChart {
                     const defaultIndexSet = res[0];
                     const { index_set_id: indexSetId } = defaultIndexSet;
                     this.relatedIndexSetId = indexSetId;
-                    this.handleRealtionData(defaultIndexSet, start_time, end_time);
+                    this.handleRelationData(defaultIndexSet, start_time, end_time);
                   }
                 });
             }
@@ -181,7 +181,7 @@ class RelatedLogChart extends CommonSimpleChart {
         .catch(error => {
           this.empty = true;
           this.handleErrorMsgChange(error.msg || error.message);
-          this.emptyText = window.i18n.tc('出错了');
+          this.emptyText = window.i18n.t('出错了');
         })
         .finally(() => {
           this.handleLoadingChange(false);
@@ -189,9 +189,9 @@ class RelatedLogChart extends CommonSimpleChart {
     }
   }
   /** 处理关联信息展示 */
-  handleRealtionData(info, start_time = '', end_time = '') {
+  handleRelationData(info, start_time = '', end_time = '') {
     const { log_type: logType, index_set_id: indexSetId, related_bk_biz_id: relatedBkBizId } = info;
-    if (logType === 'bk_log') {
+    if (logType === 'bk_log' || this.isSimpleChart) {
       this.relatedBkBizId = relatedBkBizId;
       this.updateBarChartData(start_time, end_time);
       this.updateTableData(start_time, end_time);
@@ -233,13 +233,38 @@ class RelatedLogChart extends CommonSimpleChart {
     }
     return formatterFunc;
   }
+
+  /**
+   * @description: 在图表数据没有单位或者单位不一致时则不做单位转换 y轴label的转换用此方法做计数简化
+   * @param {number} num
+   * @return {*}
+   */
+  handleYAxisLabelFormatter(num: number): string {
+    const si = [
+      { value: 1, symbol: '' },
+      { value: 1e3, symbol: 'K' },
+      { value: 1e6, symbol: 'M' },
+      { value: 1e9, symbol: 'G' },
+      { value: 1e12, symbol: 'T' },
+      { value: 1e15, symbol: 'P' },
+      { value: 1e18, symbol: 'E' },
+    ];
+    const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
+    let i: number;
+    for (i = si.length - 1; i > 0; i--) {
+      if (num >= si[i].value) {
+        break;
+      }
+    }
+    return (num / si[i].value).toFixed(3).replace(rx, '$1') + si[i].symbol;
+  }
   /**
    * @desc 更新柱状图数据
    */
   async updateBarChartData(start_time?: string, end_time?: string) {
     this.handleLoadingChange(true);
     try {
-      this.unregisterOberver();
+      this.unregisterObserver();
       const [startTime, endTime] = handleTransformToTimestamp(this.timeRange);
       const params = {
         start_time: start_time ? dayjs.tz(start_time).unix() : startTime,
@@ -306,6 +331,9 @@ class RelatedLogChart extends CommonSimpleChart {
                           splitNumber: 3,
                         },
                         yAxis: {
+                          axisLabel: {
+                            formatter: (v: number) => this.handleYAxisLabelFormatter(v),
+                          },
                           type: 'value',
                           splitNumber: 2,
                           splitLine: {
@@ -365,7 +393,7 @@ class RelatedLogChart extends CommonSimpleChart {
     this.isScrollLoadTableData = !!this.pagination.offset;
     this.handleLoadingChange(true);
     try {
-      this.unregisterOberver();
+      this.unregisterObserver();
 
       let startTime = undefined;
       let endTime = undefined;
@@ -488,7 +516,7 @@ class RelatedLogChart extends CommonSimpleChart {
     const indexSetOption = this.relatedIndexSetList.find(item => item.index_set_id === v);
     if (indexSetOption) {
       this.pagination.offset = 0;
-      this.handleRealtionData(indexSetOption);
+      this.handleRelationData(indexSetOption);
     }
   }
 
@@ -520,21 +548,32 @@ class RelatedLogChart extends CommonSimpleChart {
       return (
         <div class='log-chart-simple'>
           <div class='chart-simple-header'>
-            <div
-              class='left'
-              /*               v-bk-tooltips={{
+            {this.relatedBkBizId ? (
+              <div
+                class='left link-type'
+                /*               v-bk-tooltips={{
                 content: this.$tc('跳转查看详情'),
               }} */
-              onClick={() => this.goLink()}
-            >
-              <span
-                class='name-text'
-                title={this.selectedOptionAlias}
+                onClick={() => this.goLink()}
               >
-                {this.selectedOptionAlias}
-              </span>
-              <span class='icon-monitor icon-fenxiang' />
-            </div>
+                <span
+                  class='name-text'
+                  title={this.selectedOptionAlias}
+                >
+                  {this.selectedOptionAlias}
+                </span>
+                <span class='icon-monitor icon-fenxiang' />
+              </div>
+            ) : (
+              <div class='left'>
+                <span
+                  class='name-text'
+                  title={this.selectedOptionAlias}
+                >
+                  {this.selectedOptionAlias}
+                </span>
+              </div>
+            )}
             <div class='right'>
               {/* <bk-checkbox
                 v-model={this.isFilterError}

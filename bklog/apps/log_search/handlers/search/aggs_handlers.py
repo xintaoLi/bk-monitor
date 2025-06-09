@@ -26,6 +26,7 @@ import operator
 import typing
 from collections import defaultdict
 
+from django.conf import settings
 from elasticsearch_dsl import A, Search
 
 from apps.log_search.constants import TimeFieldTypeEnum, TimeFieldUnitEnum
@@ -172,7 +173,7 @@ class AggsHandlers(AggsBase):
         interval = query_data.get("interval")
 
         # 生成起止时间
-        time_zone = get_local_param("time_zone")
+        time_zone = get_local_param("time_zone", settings.TIME_ZONE)
         start_time, end_time = generate_time_range(
             query_data.get("time_range"), query_data.get("start_time"), query_data.get("end_time"), time_zone
         )
@@ -186,8 +187,8 @@ class AggsHandlers(AggsBase):
         time_field, time_field_type, time_field_unit = SearchHandlerEsquery.init_time_field(index_set_id)
         # https://github.com/elastic/elasticsearch/issues/42270 非date类型不支持timezone, time format也无效
         if time_field_type == TimeFieldTypeEnum.DATE.value:
-            min_value = start_time.timestamp * 1000
-            max_value = end_time.timestamp * 1000
+            min_value = int(start_time.timestamp() * 1000)
+            max_value = int(end_time.timestamp() * 1000)
             date_histogram = A(
                 "date_histogram",
                 field=time_field,
@@ -203,8 +204,8 @@ class AggsHandlers(AggsBase):
                 num = 1
             elif time_field_unit == TimeFieldUnitEnum.MICROSECOND.value:
                 num = 10**6
-            min_value = start_time.timestamp * num
-            max_value = end_time.timestamp * num
+            min_value = int(start_time.timestamp() * num)
+            max_value = int(end_time.timestamp() * num)
             date_histogram = A(
                 "date_histogram",
                 field=time_field,
@@ -214,6 +215,14 @@ class AggsHandlers(AggsBase):
             )
 
         aggs = s.aggs.bucket("group_by_histogram", date_histogram)
+
+        group_field = query_data.get("group_field")
+        if group_field:
+            # 在时间桶的基础上进行分组字段的聚合
+            aggs = aggs.bucket(
+                group_field, A("terms", field=group_field, size=cls.AGGS_BUCKET_SIZE, missing="__miss__")
+            )
+
         cls._build_date_histogram_aggs(aggs, query_data["fields"], query_data.get("size", cls.AGGS_BUCKET_SIZE))
         s = s.extra(size=0)
         query_data.update(s.to_dict())

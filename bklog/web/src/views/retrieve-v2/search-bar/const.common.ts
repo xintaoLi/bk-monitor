@@ -29,7 +29,7 @@
  * @param value
  * @returns
  */
-export const getInputQueryDefaultItem = (value = []) => {
+export const getInputQueryDefaultItem = (value: string[] = []) => {
   return {
     field: '*',
     operator: 'contains match phrase',
@@ -77,3 +77,6 @@ export const FulltextOperatorKey = '*contains match phrase';
 
 // 需要排除的字段
 export const excludesFields = ['__ext', '__module__', ' __set__', '__ipv6__'];
+
+// 无需配置值（Value）的条件列表
+export const withoutValueConditionList = ['does not exists', 'exists', 'is false', 'is true'];

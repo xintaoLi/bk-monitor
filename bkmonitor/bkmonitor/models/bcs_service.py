@@ -44,6 +44,12 @@ class BCSService(BCSBase):
         unique_together = ["bcs_cluster_id", "namespace", "name"]
         index_together = ["bk_biz_id", "bcs_cluster_id"]
 
+    def to_meta_dict(self):
+        return {
+            "service": self.name,
+            "namespace": self.namespace,
+        }
+
     @staticmethod
     def hash_unique_key(bk_biz_id, bcs_cluster_id, namespace, name):
         return BCSService.md5str(
@@ -295,6 +301,7 @@ class BCSService(BCSBase):
 
 
 class BCSServiceLabels(models.Model):
+    id = models.BigAutoField(primary_key=True)
     resource = models.ForeignKey(BCSService, db_constraint=False, on_delete=models.CASCADE)
     label = models.ForeignKey(BCSLabel, db_constraint=False, on_delete=models.CASCADE)
     bcs_cluster_id = models.CharField(verbose_name="集群ID", max_length=128, db_index=True)

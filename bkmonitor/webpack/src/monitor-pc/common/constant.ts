@@ -30,69 +30,69 @@ export const isZh = () => ['zh', 'zhCN', 'zh-cn'].includes(window.i18n.locale);
 // 空间类型对应map
 export const SPACE_TYPE_MAP = {
   bkcc: {
-    name: window.i18n.tc('业务'),
+    name: window.i18n.t('业务'),
     dark: {
       color: '#478EFC',
       backgroundColor: '#2B354D',
     },
     light: {
-      color: '#63656E',
-      backgroundColor: '#CDE8FB',
+      color: '#3A84FF',
+      backgroundColor: '#EDF4FF',
     },
   },
   default: {
-    name: window.i18n.tc('监控空间'),
+    name: window.i18n.t('监控空间'),
     dark: {
       color: '#B3B3B3',
       backgroundColor: '#333333',
     },
     light: {
       color: '#63656E',
-      backgroundColor: '#DEDEDE',
+      backgroundColor: '#F0F1F5',
     },
   },
   bkci: {
-    name: window.i18n.tc('研发项目'),
+    name: window.i18n.t('研发项目'),
     dark: {
       color: '#F85959',
       backgroundColor: '#4C3232',
     },
     light: {
-      color: '#63656E',
-      backgroundColor: '#F8D8D4',
+      color: '#E71818',
+      backgroundColor: '#FFEBEB',
     },
   },
   bcs: {
-    name: window.i18n.tc('容器项目'),
+    name: window.i18n.t('容器项目'),
     dark: {
       color: '#FC943B',
       backgroundColor: '#453921',
     },
     light: {
-      color: '#63656E',
-      backgroundColor: '#FFF2C9',
+      color: '#E38B02',
+      backgroundColor: '#FDEED8',
     },
   },
   paas: {
-    name: window.i18n.tc('蓝鲸应用'),
+    name: window.i18n.t('蓝鲸应用'),
     dark: {
       color: '#2BB950',
       backgroundColor: '#223B2B',
     },
     light: {
-      color: '#63656E',
-      backgroundColor: '#D8EDD9',
+      color: '#14A568',
+      backgroundColor: '#E4FAF0',
     },
   },
   bksaas: {
-    name: window.i18n.tc('蓝鲸应用'),
+    name: window.i18n.t('蓝鲸应用'),
     dark: {
       color: '#2BB950',
       backgroundColor: '#223B2B',
     },
     light: {
-      color: '#63656E',
-      backgroundColor: '#D8EDD9',
+      color: '#14A568',
+      backgroundColor: '#E4FAF0',
     },
   },
 };

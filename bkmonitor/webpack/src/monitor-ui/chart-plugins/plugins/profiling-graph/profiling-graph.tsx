@@ -47,11 +47,12 @@ import {
   TextDirectionType,
   ViewModeType,
 } from '../../typings';
+import { assignUniqueIds } from '../../utils';
 import { CommonSimpleChart } from '../common-simple-chart';
 import ChartTitle from './chart-title/chart-title';
 import DiffChart from './diff-chart/diff-chart';
 import FilterSelect from './filter-select/filter-select';
-import FrameGraph from './flame-graph/flame-graph';
+import FrameGraph from './flame-graph/flame-graph-v2';
 import TableGraph from './table-graph/table-graph';
 import TopoGraph from './topo-graph/topo-graph';
 import TrendChart from './trend-chart/trend-chart';
@@ -67,7 +68,7 @@ interface IProfilingChartProps {
 @Component
 class ProfilingChart extends CommonSimpleChart {
   @Ref() frameGraphRef: InstanceType<typeof FrameGraph>;
-  @Ref() grahWrapperRef: HTMLDivElement;
+  @Ref() graphWrapperRef: HTMLDivElement;
 
   isGraphLoading = false;
   isFirstLoad = true;
@@ -84,10 +85,26 @@ class ProfilingChart extends CommonSimpleChart {
   activeMode: ViewModeType = ViewModeType.Combine;
   textDirection: TextDirectionType = TextDirectionType.Ltr;
   highlightId = -1;
+  highlightName = '';
   filterKeyword = '';
   topoSrc = '';
   dataTypeList: DataTypeItem[] = [];
   dataType = '';
+  aggMethodList: DataTypeItem[] = [
+    {
+      key: 'AVG',
+      name: 'AVG',
+    },
+    {
+      key: 'SUM',
+      name: 'SUM',
+    },
+    {
+      key: 'LAST',
+      name: 'LAST',
+    },
+  ];
+  aggMethod = '';
   /** trend图表数据 */
   trendSeriesData = [];
   trendLoading = false;
@@ -107,7 +124,7 @@ class ProfilingChart extends CommonSimpleChart {
   /** 开启 profiling 请求 loading */
   enableProfilingLoading = false;
   applicationId = -1;
-
+  downloadImgIndex = 0;
   get detailPanel() {
     return new PanelModel({
       title: 'workload',
@@ -166,6 +183,7 @@ class ProfilingChart extends CommonSimpleChart {
       start: (start_time ? dayjs.tz(start_time).unix() : startTime) * 10 ** 6,
       end: (end_time ? dayjs.tz(end_time).unix() : endTime) * 10 ** 6,
       data_type: this.dataType,
+      agg_method: this.aggMethod,
     };
 
     return params;
@@ -180,8 +198,7 @@ class ProfilingChart extends CommonSimpleChart {
       }
       this.handleQuery(start_time, end_time);
     };
-
-    if (this.isFirstLoad) {
+    if (this.isFirstLoad || !this.enableProfiling || !this.isProfilingDataNormal) {
       const [start, end] = handleTransformToTimestamp(this.timeRange);
       const { app_name, service_name } = this.viewOptions.filters as any;
 
@@ -193,7 +210,9 @@ class ProfilingChart extends CommonSimpleChart {
       })
         .then(data => {
           this.enableProfiling = data?.is_enabled_profiling ?? false;
-          this.isProfilingDataNormal = data?.is_profiling_data_normal ?? false;
+          if (this.isFirstLoad) {
+            this.isProfilingDataNormal = data?.is_profiling_data_normal ?? false;
+          }
           this.applicationId = data?.application_id ?? -1;
 
           if (this.enableProfiling && this.isProfilingDataNormal) {
@@ -227,6 +246,7 @@ class ProfilingChart extends CommonSimpleChart {
         if (res?.data_types?.length) {
           this.dataTypeList = res.data_types;
           this.dataType = this.dataTypeList[0].key;
+          this.aggMethod = this.dataTypeList[0]?.default_agg_method || 'AVG';
           this.queryParams = {
             app_name,
             service_name,
@@ -268,15 +288,18 @@ class ProfilingChart extends CommonSimpleChart {
       cancelToken: new CancelToken(c => (this.cancelTableFlameFn = c)),
     })
       .then(data => {
+        // 为数据节点及其子节点分配唯一 ID
+        data?.flame_data?.children && assignUniqueIds(data.flame_data.children);
         if (data && Object.keys(data)?.length) {
           this.unit = data.unit || '';
           this.tableData = data.table_data?.items ?? [];
-          this.flameData = data.flame_data;
+          this.flameData = data.flame_data || [];
           this.empty = false;
           this.emptyText = '';
-        } else {
+        }
+        if (!this.tableData?.length && !this.flameData?.length) {
           this.empty = true;
-          this.emptyText = window.i18n.t('查无数据');
+          this.emptyText = window.i18n.t('暂无数据');
         }
         this.isGraphLoading = false;
       })
@@ -285,6 +308,7 @@ class ProfilingChart extends CommonSimpleChart {
           this.emptyText = '';
           this.isGraphLoading = false;
         }
+        this.empty = true;
       });
   }
   /** 获取拓扑图 */
@@ -310,7 +334,6 @@ class ProfilingChart extends CommonSimpleChart {
       });
   }
   handleTimeRangeChange() {
-    this.isFirstLoad = true;
     this.getPanelData();
   }
   handleTextDirectionChange(val: TextDirectionType) {
@@ -332,7 +355,7 @@ class ProfilingChart extends CommonSimpleChart {
   handleDownload(type: string) {
     switch (type) {
       case 'png':
-        this.frameGraphRef?.handleStoreImg();
+        this.downloadImgIndex += 1;
         break;
       case 'pprof': {
         const params = this.getParams({ export_format: 'pprof' });
@@ -351,11 +374,16 @@ class ProfilingChart extends CommonSimpleChart {
         break;
     }
   }
-  handleDataTypeChange(val) {
-    if (this.dataType === val) return;
-
-    this.dataType = val;
-    this.queryParams.data_type = val;
+  handleDataTypeChange(val, type?: string) {
+    if ([this.dataType, this.aggMethod].includes(val)) return;
+    if (type === 'agg') {
+      this.aggMethod = val;
+    } else {
+      this.dataType = val;
+      // 切换数据类型时，汇聚方法需要切换成后端给的值
+      this.aggMethod = this.dataTypeList.find(item => item.key === val).default_agg_method || 'AVG';
+      this.queryParams.data_type = val;
+    }
     this.getPanelData();
   }
   getUrlParamsString(obj) {
@@ -398,6 +426,7 @@ class ProfilingChart extends CommonSimpleChart {
   handleDateDiffChange(enable) {
     this.enableDateDiff = enable;
     this.setDiffDefaultDate();
+    this.handleQuery();
   }
   handleTrendSeriesData(data) {
     this.trendSeriesData = data;
@@ -408,20 +437,28 @@ class ProfilingChart extends CommonSimpleChart {
   }
 
   setDiffDefaultDate() {
-    if (this.enableDateDiff && this.trendSeriesData.length) {
-      const { datapoints } = this.trendSeriesData[0];
-      const len = datapoints.length;
-      const start = datapoints[0][1];
-      const end = datapoints[len - 1][1];
-      const mid = start + (end - start) / 2;
-      this.diffDate = [
-        [start, mid],
-        [mid, end],
-      ];
+    if (this.enableDateDiff) {
+      if (this.trendSeriesData?.length) {
+        const { datapoints } = this.trendSeriesData[0];
+        const len = datapoints.length;
+        const start = datapoints[0][1];
+        const end = datapoints[len - 1][1];
+        const mid = start + (end - start) / 2;
+        this.diffDate = [
+          [start, mid],
+          [mid, end],
+        ];
+      } else {
+        const [startTime, endTime] = handleTransformToTimestamp(this.timeRange);
+        const mid = startTime + (endTime - startTime) / 2;
+        this.diffDate = [
+          [startTime * 1000, mid * 1000],
+          [mid * 1000, endTime * 1000],
+        ];
+      }
     } else {
       this.diffDate = [];
     }
-    this.handleQuery();
   }
 
   handleBrushEnd(data, type) {
@@ -455,7 +492,7 @@ class ProfilingChart extends CommonSimpleChart {
   }
   handleKeywordChange(v: string) {
     this.filterKeyword = v;
-    this.grahWrapperRef?.scrollTo({
+    this.graphWrapperRef?.scrollTo({
       top: 0,
       behavior: 'instant',
     });
@@ -496,6 +533,23 @@ class ProfilingChart extends CommonSimpleChart {
                     })}
                   </div>
                 </div>
+                <div class='data-type'>
+                  <span>{this.$t('汇聚方法')}</span>
+                  <div class='bk-button-group data-type-list'>
+                    {this.aggMethodList.map(item => {
+                      return (
+                        <bk-button
+                          key={item.key}
+                          class={item.key === this.aggMethod ? 'is-selected' : ''}
+                          size='small'
+                          onClick={() => this.handleDataTypeChange(item.key, 'agg')}
+                        >
+                          {item.name}
+                        </bk-button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div class='link-tips'>
                   <i class='icon-monitor icon-tishi' />
                   <i18n
@@ -506,7 +560,7 @@ class ProfilingChart extends CommonSimpleChart {
                       class='link-text'
                       onClick={() => this.goLink()}
                     >
-                      {this.$t('Profiling 检索')}
+                      {`Profiling ${this.$t('检索')}`}
                     </span>
                   </i18n>
                 </div>
@@ -549,6 +603,7 @@ class ProfilingChart extends CommonSimpleChart {
                 <ChartTitle
                   activeMode={this.activeMode}
                   isCompared={this.queryParams.is_compared}
+                  keyword={this.filterKeyword}
                   textDirection={this.textDirection}
                   onDownload={this.handleDownload}
                   onKeywordChange={this.handleKeywordChange}
@@ -559,7 +614,7 @@ class ProfilingChart extends CommonSimpleChart {
                   <div class='empty-chart'>{this.emptyText}</div>
                 ) : (
                   <div
-                    ref='grahWrapperRef'
+                    ref='graphWrapperRef'
                     class='profiling-graph-content'
                   >
                     {[ViewModeType.Combine, ViewModeType.Table].includes(this.activeMode) && (
@@ -570,29 +625,33 @@ class ProfilingChart extends CommonSimpleChart {
                         data={this.tableData}
                         dataType={this.queryParams.data_type}
                         filterKeyword={this.filterKeyword}
-                        highlightId={this.highlightId}
+                        highlightName={this.highlightName}
                         isCompared={this.queryParams.is_compared}
                         textDirection={this.textDirection}
                         unit={this.unit}
                         onSortChange={this.handleSortChange}
-                        onUpdateHighlightId={id => (this.highlightId = id)}
+                        onUpdateHighlightName={name => {
+                          this.highlightName = name;
+                          this.handleKeywordChange(name);
+                        }}
                       />
                     )}
                     {[ViewModeType.Combine, ViewModeType.Flame].includes(this.activeMode) && (
                       <FrameGraph
-                        ref='frameGraphRef'
                         style={{
                           width: this.activeMode === ViewModeType.Combine ? '50%' : '100%',
                         }}
                         appName={(this.viewOptions as any).app_name}
                         data={this.flameData}
-                        filterKeywords={this.flameFilterKeywords}
-                        highlightId={this.highlightId}
+                        downloadImgIndex={this.downloadImgIndex}
+                        filterKeyword={this.filterKeyword}
                         isCompared={this.queryParams.is_compared}
-                        showGraphTools={false}
                         textDirection={this.textDirection}
                         unit={this.unit}
-                        onUpdateHighlightId={id => (this.highlightId = id)}
+                        onUpdateFilterKeyword={name => {
+                          this.highlightName = name;
+                          this.handleKeywordChange(name);
+                        }}
                       />
                     )}
                     {ViewModeType.Topo === this.activeMode && <TopoGraph topoSrc={this.topoSrc} />}
@@ -600,7 +659,7 @@ class ProfilingChart extends CommonSimpleChart {
                 )}
               </div>
             </div>,
-            <keep-alive key={'keep-aliave'}>
+            <keep-alive key={'keep-alive'}>
               <CommonDetail
                 collapse={this.collapseInfo}
                 maxWidth={500}

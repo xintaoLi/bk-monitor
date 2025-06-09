@@ -17,11 +17,12 @@ from operator import methodcaller
 from django.conf import settings
 from django.db import models
 
-from bkmonitor.utils.cipher import transform_data_id_to_token
 from bkmonitor.utils.common_utils import count_md5
 from bkmonitor.utils.db.fields import JsonField
 from core.drf_resource import api
+from core.errors.api import BKAPIError
 from metadata.models.constants import LOG_REPORT_MAX_QPS
+from utils.redis_client import RedisClient
 
 logger = logging.getLogger("metadata")
 
@@ -182,7 +183,7 @@ class CustomReportSubscription(models.Model):
                 tables=[data_source_table_name],
                 where=["{}.bk_data_id={}.bk_data_id".format(group_table_name, data_source_table_name)],
             )
-            .values("bk_biz_id", "bk_data_id", "token", "max_rate")
+            .values("bk_biz_id", "bk_data_id", "token", "max_rate", "max_future_time_offset")
             .distinct()
         )
         biz_id_to_data_id_config = {}
@@ -190,10 +191,17 @@ class CustomReportSubscription(models.Model):
             logger.info("no custom report config in database")
             return biz_id_to_data_id_config
 
+        # 无效的prometheus上报分组id
+        redis_client = RedisClient.from_envs(prefix="BK_MONITOR_TRANSFER")
+        disabled_ts_group_ids = list(map(int, redis_client.hgetall("bkmonitor:disabled_ts_group").keys()))
+
         for r in result:
             max_rate = int(r.get("max_rate", MAX_DATA_ID_THROUGHPUT))
             if max_rate < 0:
                 max_rate = MAX_DATA_ID_THROUGHPUT
+            max_future_time_offset = int(r.get("max_future_time_offset", MAX_FUTURE_TIME_OFFSET))
+            if max_future_time_offset < 0:
+                max_future_time_offset = MAX_FUTURE_TIME_OFFSET
             # 后续版本计划移除
             # bkmonitorproxy插件
             # bkmonitorproxy_report.conf
@@ -203,7 +211,7 @@ class CustomReportSubscription(models.Model):
                 "version": "v2",
                 "access_token": r["token"],
                 "max_rate": max_rate,
-                "max_future_time_offset": MAX_FUTURE_TIME_OFFSET,
+                "max_future_time_offset": max_future_time_offset,
             }
             if plugin_name == "bk-collector":
                 protocol = cls.get_protocol(r["bk_data_id"])
@@ -228,13 +236,32 @@ class CustomReportSubscription(models.Model):
                             "name": "proxy_validator/common",
                             "type": datatype,
                             "version": "v2",
-                            "max_future_time_offset": MAX_FUTURE_TIME_OFFSET,
+                            "max_future_time_offset": max_future_time_offset,
                         },
                     }
                 else:
+                    from metadata.models.custom_report.time_series import (
+                        TimeSeriesGroup,
+                    )
+
+                    group = TimeSeriesGroup.objects.get(bk_data_id=r["bk_data_id"])
+                    try:
+                        if group.custom_group_id in disabled_ts_group_ids:
+                            continue
+                        group_info = api.monitor.custom_time_series_detail(
+                            bk_biz_id=group.bk_biz_id, time_series_group_id=group.custom_group_id
+                        )
+                    except BKAPIError as e:
+                        logger.warning(
+                            f"[{r['bk_data_id']}]get custom time series group[{group.custom_group_id}] detail error"
+                        )
+                        if e.data.get("code") == 400 and "custom time series table not found" in e.data.get("message"):
+                            redis_client.hset("bkmonitor:disabled_ts_group", str(group.custom_group_id), 1)
+                        continue
+
                     # prometheus格式: bk-collector-application.conf
                     item = {
-                        "bk_data_token": transform_data_id_to_token(r["bk_data_id"]),
+                        "bk_data_token": group_info["access_token"],
                         "bk_biz_id": r["bk_biz_id"],
                         "bk_data_id": r["bk_data_id"],
                         "bk_app_name": "prometheus_report",
@@ -410,7 +437,11 @@ class CustomReportSubscription(models.Model):
                 old_subscription_params_md5 = count_md5(sub_config_obj.config)
                 new_subscription_params_md5 = count_md5(subscription_params)
                 if old_subscription_params_md5 != new_subscription_params_md5:
-                    logger.info("subscription task config has changed, update it.")
+                    logger.info(
+                        "subscription task config has changed, update it."
+                        f"\n【old】: {sub_config_obj.config}"
+                        f"\n【new】: {subscription_params}"
+                    )
                     result = api.node_man.update_subscription(subscription_params)
                     logger.info("update subscription successful, result:{}".format(result))
                     qs.update(config=subscription_params)

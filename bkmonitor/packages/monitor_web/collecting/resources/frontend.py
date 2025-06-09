@@ -149,6 +149,14 @@ class FrontendCollectConfigTargetInfoResource(Resource):
                 table_data.append(
                     {"bk_inst_name": item["bk_inst_name"], "count": item["count"], "labels": item["labels"]}
                 )
+        elif config_detail["target_node_type"] == TargetNodeType.DYNAMIC_GROUP:
+            for item in config_detail["target"]:
+                table_data.append(
+                    {
+                        "bk_inst_name": f"动态分组: {item['name']}",
+                        "count": item["count"],
+                    }
+                )
         else:
             for item in config_detail["target"]:
                 table_data.append(
@@ -198,6 +206,9 @@ class FrontendTargetStatusTopoResource(Resource):
         elif node.get("bk_inst_name"):
             node["name"] = node["bk_inst_name"]
             node["id"] = f"{node['bk_obj_id']}|{node['bk_inst_id']}"
+        elif node.get("dynamic_group_name"):
+            node["name"] = node.pop("dynamic_group_name")
+            node["id"] = node.pop("dynamic_group_id")
         else:
             node["name"] = _("无法识别节点")
 
@@ -210,7 +221,7 @@ class FrontendTargetStatusTopoResource(Resource):
         handle_node = partial(self.handle_node, params["bk_biz_id"])
 
         # 实例处理
-        if config.deployment_config.target_node_type == TargetNodeType.INSTANCE:
+        if config.deployment_config.target_node_type in [TargetNodeType.INSTANCE, TargetNodeType.DYNAMIC_GROUP]:
             for node in topo_tree:
                 handle_node(node, None)
             return topo_tree
@@ -242,11 +253,14 @@ class DeploymentConfigDiffResource(Resource):
     """
 
     class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         id = serializers.IntegerField(required=True, label="采集配置id")
 
     def perform_request(self, validated_request_data):
         try:
-            collect_config = CollectConfigMeta.objects.get(id=validated_request_data["id"])
+            collect_config = CollectConfigMeta.objects.get(
+                bk_biz_id=validated_request_data["bk_biz_id"], id=validated_request_data["id"]
+            )
         except CollectConfigMeta.DoesNotExist:
             raise CollectConfigNotExist({"msg": validated_request_data["id"]})
 

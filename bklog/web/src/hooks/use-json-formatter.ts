@@ -28,12 +28,19 @@ import { Ref } from 'vue';
 import JsonView from '../global/json-view';
 // import jsonEditorTask, { EditorTask } from '../global/utils/json-editor-task';
 import segmentPopInstance from '../global/utils/segment-pop-instance';
+import {
+  getClickTargetElement,
+  optimizedSplit,
+  setPointerCellClickTargetHandler,
+  setScrollLoadCell,
+} from './hooks-helper';
 import UseSegmentPropInstance from './use-segment-pop';
 
 export type FormatterConfig = {
   target: Ref<HTMLElement | null>;
   fields: any[];
   jsonValue: any;
+  field: any;
   onSegmentClick: (args: any) => void;
   options?: Record<string, any>;
 };
@@ -63,22 +70,40 @@ export default class UseJsonFormatter {
     return this.config.fields.find(item => item.field_name === fieldName);
   }
 
-  onSegmentEnumClick(val, isLink) {
+  getFieldNameValue() {
     const tippyInstance = segmentPopInstance.getInstance();
-    const currentValue = tippyInstance.reference.innerText;
-    const valueElement = tippyInstance.reference.closest('.field-value') as HTMLElement;
-    const depth = tippyInstance.reference.closest('[data-depth]')?.getAttribute('data-depth');
+    const target = tippyInstance.reference;
+    let name = target.getAttribute('data-field-name');
+    let value = target.getAttribute('data-field-value');
+    let depth = target.getAttribute('data-field-dpth');
 
-    const fieldName = valueElement?.getAttribute('data-field-name');
-    const activeField = this.getField(fieldName);
+    if (value === undefined) {
+      value = target.textContent;
+    }
+
+    if (name === undefined) {
+      const valueElement = tippyInstance.reference.closest('.field-value') as HTMLElement;
+      name = valueElement?.getAttribute('data-field-name');
+    }
+
+    if (depth === undefined) {
+      depth = target.closest('[data-depth]')?.getAttribute('data-depth');
+    }
+
+    return { value, name, depth };
+  }
+
+  onSegmentEnumClick(val, isLink) {
+    const { name, value, depth } = this.getFieldNameValue();
+    const activeField = this.getField(name);
     const target = ['date', 'date_nanos'].includes(activeField?.field_type)
       ? this.config.jsonValue?.[activeField?.field_name]
-      : currentValue;
+      : value;
 
     const option = {
       fieldName: activeField?.field_name,
       operation: val === 'not' ? 'is not' : val,
-      value: (target ?? currentValue).replace(/<mark>/g, '').replace(/<\/mark>/g, ''),
+      value: target ?? value,
       depth,
     };
 
@@ -91,17 +116,29 @@ export default class UseJsonFormatter {
     return traceIdPattern.test(traceId);
   }
 
-  handleSegmentClick(e, value) {
+  handleSegmentClick(e: MouseEvent, value) {
     if (!value.toString() || value === '--') return;
     const content = this.getSegmentContent(this.keyRef, this.onSegmentEnumClick.bind(this));
     const traceView = content.value.querySelector('.bklog-trace-view')?.closest('.segment-event-box') as HTMLElement;
     traceView?.style.setProperty('display', this.isValidTraceId(value) ? 'inline-flex' : 'none');
-    segmentPopInstance.show(e.target, this.getSegmentContent(this.keyRef, this.onSegmentEnumClick.bind(this)));
+
+    const { offsetX, offsetY } = getClickTargetElement(e);
+    const target = setPointerCellClickTargetHandler(e, { offsetX, offsetY });
+
+    const valueElement = (e.target as HTMLElement).closest('.field-value') as HTMLElement;
+    const fieldName = valueElement?.getAttribute('data-field-name');
+    const depth = valueElement.closest('[data-depth]')?.getAttribute('data-depth');
+
+    target.setAttribute('data-field-value', value);
+    target.setAttribute('data-field-name', fieldName);
+    target.setAttribute('data-field-dpth', depth);
+
+    segmentPopInstance.show(target, this.getSegmentContent(this.keyRef, this.onSegmentEnumClick.bind(this)));
   }
 
   getCurrentFieldRegStr(field: any) {
     /** 默认分词字符串 */
-    const segmentRegStr = ',&*+:;?^=!$<>\'"{}()|[]\\/\\s\\r\\n\\t-';
+    const segmentRegStr = ',&*+:;?^=!$<>\'"{}()|[]\\/\\s\\r\\n\\t';
     if (field.tokenize_on_chars) {
       return field.tokenize_on_chars;
     }
@@ -115,45 +152,6 @@ export default class UseJsonFormatter {
 
   isAnalyzed(field: any) {
     return field?.is_analyzed ?? false;
-  }
-
-  splitParticipleWithStr(str: string, delimiterPattern: string) {
-    if (!str) return [];
-    // 转义特殊字符，并构建用于分割的正则表达式
-    const regexPattern = delimiterPattern
-      .split('')
-      .map(delimiter => `\\${delimiter}`)
-      .join('|');
-
-    // 构建正则表达式以找到分隔符或分隔符周围的文本
-    const regex = new RegExp(`(${regexPattern})`);
-
-    // 先根据高亮标签分割
-    const markSplitRes = str.match(/(<mark>.*?<\/mark>|.+?(?=<mark|$))/gs);
-
-    // 在高亮分割数组基础上再以分隔符分割数组
-    const parts = markSplitRes.reduce((list, item) => {
-      if (/^<mark>.*?<\/mark>$/.test(item)) {
-        list.push(item);
-      } else {
-        const arr = item.split(regex);
-        arr.forEach(i => i && list.push(i));
-      }
-      return list;
-    }, []);
-
-    // 转换结果为对象数组，包含分隔符标记
-    const result = parts
-      .filter(part => part?.length)
-      .map(part => {
-        return {
-          text: part,
-          isNotParticiple: regex.test(part),
-          isMark: /^<mark>.*?<\/mark>$/.test(part),
-        };
-      });
-
-    return result;
   }
 
   escapeString(val: string) {
@@ -176,7 +174,7 @@ export default class UseJsonFormatter {
     const value = this.escapeString(`${content}`);
     if (this.isAnalyzed(field)) {
       // 这里进来的都是开了分词的情况
-      return this.splitParticipleWithStr(value, this.getCurrentFieldRegStr(field));
+      return optimizedSplit(value, this.getCurrentFieldRegStr(field));
     }
 
     return [
@@ -196,40 +194,28 @@ export default class UseJsonFormatter {
 
     if (item.isMark) {
       const mrkNode = document.createElement('mark');
-      mrkNode.innerHTML = item.text.replace(/<mark>/g, '').replace(/<\/mark>/g, '');
+      mrkNode.textContent = item.text.replace(/<mark>/g, '').replace(/<\/mark>/g, '');
       mrkNode.classList.add('valid-text');
       return mrkNode;
     }
 
-    if (!item.isNotParticiple) {
+    if (!item.isNotParticiple && !item.isBlobWord) {
       const validTextNode = document.createElement('span');
       validTextNode.classList.add('valid-text');
-      validTextNode.innerText = item.text;
+      validTextNode.textContent = item.text?.length ? item.text : '""';
       return validTextNode;
     }
 
     const textNode = document.createElement('span');
     textNode.classList.add('others-text');
-    textNode.innerText = item.text;
+    textNode.textContent = item.text?.length ? item.text : '""';
     return textNode;
   }
 
-  creatSegmentNodes = (values: any[]) => {
+  creatSegmentNodes = () => {
     const segmentNode = document.createElement('span');
     segmentNode.classList.add('segment-content');
-    const tagItems = values.slice(0, 500);
-
-    tagItems.forEach(item => {
-      segmentNode.append(this.getChildItem(item));
-    });
-
-    const staticItems = values.slice(500);
-    if (staticItems.length > 0) {
-      const textNode = document.createElement('span');
-      textNode.classList.add('others-text');
-      textNode.innerText = staticItems.map(item => item.text).join('');
-      segmentNode.append(textNode);
-    }
+    segmentNode.classList.add('bklog-scroll-cell');
 
     return segmentNode;
   };
@@ -246,6 +232,17 @@ export default class UseJsonFormatter {
     }
   }
 
+  addWordSegmentClick(root: HTMLElement) {
+    if (!root.hasAttribute('data-word-segment-click')) {
+      root.setAttribute('data-word-segment-click', '1');
+      root.addEventListener('click', e => {
+        if ((e.target as HTMLElement).classList.contains('valid-text')) {
+          this.handleSegmentClick(e, (e.target as HTMLElement).textContent);
+        }
+      });
+    }
+  }
+
   setNodeValueWordSplit(
     target: HTMLElement,
     fieldName,
@@ -253,25 +250,32 @@ export default class UseJsonFormatter {
     textValue?: string,
     appendText?: SegmentAppendText,
   ) {
-    // const fieldName = name.replace(/(^\s*)|(\s*$)/g, '');
-    target.querySelectorAll(valueSelector).forEach(element => {
+    this.addWordSegmentClick(target);
+    target.querySelectorAll(valueSelector).forEach((element: HTMLElement) => {
       if (!element.getAttribute('data-has-word-split')) {
-        const text = textValue ?? (element as HTMLDivElement).innerHTML;
+        const text = textValue ?? element.textContent;
         const field = this.getField(fieldName);
         const vlaues = this.getSplitList(field, text);
         element?.setAttribute('data-has-word-split', '1');
         element?.setAttribute('data-field-name', fieldName);
         element.innerHTML = '';
-        element.append(this.creatSegmentNodes(vlaues));
-        element.addEventListener('click', e => {
-          if ((e.target as HTMLElement).classList.contains('valid-text')) {
-            this.handleSegmentClick(e, (e.target as HTMLElement).innerHTML);
-          }
-        });
+
+        const segmentContent = this.creatSegmentNodes();
+
+        const { setListItem, removeScrollEvent } = setScrollLoadCell(
+          vlaues,
+          element,
+          segmentContent,
+          this.getChildItem,
+        );
+        removeScrollEvent();
+
+        element.append(segmentContent);
+        setListItem(600);
 
         if (appendText) {
           const appendElement = document.createElement('span');
-          appendElement.innerText = appendText.text;
+          appendElement.textContent = appendText.text;
           if (appendText.onClick) {
             appendElement.addEventListener('click', appendText.onClick);
           }
@@ -288,11 +292,10 @@ export default class UseJsonFormatter {
 
   handleExpandNode(args) {
     if (args.isExpand) {
-      const target = args.targetElement as HTMLElement;
-      const rootElement = args.rootElement as HTMLElement;
-
-      const fieldName = (rootElement.parentNode.querySelector('.field-name .black-mark') as HTMLElement)?.innerText;
-      this.setNodeValueWordSplit(target, fieldName, '.bklog-json-field-value');
+      // const target = args.targetElement as HTMLElement;
+      // const rootElement = args.rootElement as HTMLElement;
+      // const fieldName = (rootElement.parentNode.querySelector('.field-name .black-mark') as HTMLElement)?.innerText;
+      // this.setNodeValueWordSplit(target, fieldName, '.bklog-json-field-value');
     }
   }
 
@@ -318,18 +321,40 @@ export default class UseJsonFormatter {
   initEditor(depth) {
     if (this.getTargetRoot()) {
       this.localDepth = depth;
-      this.editor = new JsonView(this.getTargetRoot(), { onNodeExpand: this.handleExpandNode.bind(this), depth });
-      this.editor.initClickEvent();
+      this.editor = new JsonView(this.getTargetRoot(), {
+        onNodeExpand: this.handleExpandNode.bind(this),
+        depth,
+        field: this.config.field,
+        segmentRender: (value: string, rootNode: HTMLElement) => {
+          const vlaues = this.getSplitList(this.config.field, value);
+          const segmentContent = this.creatSegmentNodes();
+          rootNode.append(segmentContent);
+
+          if (!rootNode.classList.contains('bklog-scroll-box')) {
+            rootNode.classList.add('bklog-scroll-box');
+          }
+
+          const { setListItem, removeScrollEvent } = setScrollLoadCell(
+            vlaues,
+            rootNode,
+            segmentContent,
+            this.getChildItem,
+          );
+          removeScrollEvent();
+          setListItem(600);
+        },
+      });
+
+      this.editor.initClickEvent(e => {
+        if ((e.target as HTMLElement).classList.contains('valid-text')) {
+          this.handleSegmentClick(e, (e.target as HTMLElement).textContent);
+        }
+      });
     }
   }
 
   setNodeExpand([currentDepth]) {
     this.editor.expand(currentDepth);
-    const root = this.getTargetRoot();
-    if (root) {
-      const fieldName = (root.querySelector('.field-name .black-mark') as HTMLElement)?.innerText;
-      this.setNodeValueWordSplit(root, fieldName);
-    }
   }
 
   setValue(depth) {
@@ -368,7 +393,7 @@ export default class UseJsonFormatter {
       }
 
       if (target && typeof this.config.jsonValue === 'string') {
-        target.innerHTML = this.config.jsonValue;
+        target.textContent = this.config.jsonValue;
       }
     }
   }

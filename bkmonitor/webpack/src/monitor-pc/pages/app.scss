@@ -36,6 +36,12 @@
   font-size: $font-size-base;
   color: $font-color-base;
 
+  .bk-monitor-navigation {
+    .title-desc {
+      color: #eaebf0;
+    }
+  }
+
   .bk-navigation {
     height: calc(100vh - var(--notice-alert-height)) !important;
 
@@ -60,6 +66,10 @@
       height: 100%;
       font-size: 14px;
       color: #acb5c6;
+      .header-list-item-block {
+        width: 40px;
+        height: 100%;
+      }
 
       @include flex-align(center);
 
@@ -508,10 +518,10 @@
   }
 
   .monitor-footer {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    // position: fixed;
+    // right: 0;
+    // bottom: 0;
+    // left: 0;
     z-index: 999;
     background-color: #f5f7fa;
   }
@@ -559,23 +569,50 @@
 
 .check-version-wrapper {
   z-index: 99999999 !important;
-
-  .bk-dialog-header {
-    padding-top: 0px !important;
+  .bk-notify-icon {
+    display: none !important;
+  }
+  .bk-notify-content-title {
+    color: #313238;
+    font-size: 16px;
+  }
+  .check-version-txt {
+    margin-top: 12px;
+    line-height: 22px;
+    color: #4d4f56;
+  }
+  .check-version-btn {
+    margin-top: 26px;
+    margin-bottom: 6px;
+    .bk-button {
+      &:first-child {
+        margin-right: 8px;
+      }
+      &:last-child {
+        float: right;
+      }
+    }
+  }
+  .check-version-btn-single {
+    text-align: right;
   }
 
-  .bk-dialog-sub-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 46px;
-    padding: 0 !important;
-    margin: 6px 32px 24px !important;
-    background-color: #f5f6fa;
-    border-radius: 2px;
-  }
+  // .bk-dialog-header {
+  //   padding-top: 0px !important;
+  // }
 
-  .bk-dialog-footer {
-    padding-bottom: 24px !important;
-  }
+  // .bk-dialog-sub-header {
+  //   display: flex;
+  //   align-items: center;
+  //   justify-content: center;
+  //   height: 46px;
+  //   padding: 0 !important;
+  //   margin: 6px 32px 24px !important;
+  //   background-color: #f5f6fa;
+  //   border-radius: 2px;
+  // }
+
+  // .bk-dialog-footer {
+  //   padding-bottom: 24px !important;
+  // }
 }

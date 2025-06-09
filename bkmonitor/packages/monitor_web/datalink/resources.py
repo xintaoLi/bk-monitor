@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,18 +7,20 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 import copy
 import json
+import re
 import time
-from collections import OrderedDict
-from datetime import datetime
+from collections import OrderedDict, deque
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Tuple
 
 from django.db.models import Q
 
 from bkmonitor.action.serializers.strategy import UserGroupSlz
 from bkmonitor.models.strategy import UserGroup
+from bkmonitor.utils.request import get_request_tenant_id
 from bkmonitor.utils.user import get_global_user
 from bkmonitor.views import serializers
 from common.log import logger
@@ -163,8 +164,8 @@ class QueryBizByBkBase(Resource):
         @return: 业务ID
         """
         try:
-            real_key = table_id.split('_', 1)[-1].rsplit('.', 1)[0]  # 根据插件规则，将RT转换为对应的plugin_id
-            plugin_meta = CollectorPluginMeta.objects.get(plugin_id=real_key)
+            real_key = table_id.split("_", 1)[-1].rsplit(".", 1)[0]  # 根据插件规则，将RT转换为对应的plugin_id
+            plugin_meta = CollectorPluginMeta.objects.get(bk_tenant_id=get_request_tenant_id(), plugin_id=real_key)
             return plugin_meta.bk_biz_id
         except Exception:  # pylint: disable=broad-except
             return 0
@@ -177,13 +178,16 @@ class BaseStatusResource(Resource):
         self.collect_config: CollectConfigMeta = None
         self.stage: str = None
         self.strategy_map: map[int, DataLinkStrategyInfo] = {}
-        self.strategy_ids: List[int] = []
+        self.strategy_ids: list[int] = []
         self.loader: DatalinkDefaultAlarmStrategyLoader = None
         self._init = False
 
-    def init_data(self, collect_config_id: str, stage: DataLinkStage = None):
+    def init_data(self, bk_biz_id: int, collect_config_id: str, stage: DataLinkStage = None):
+        self.bk_biz_id = bk_biz_id
         self.collect_config_id = collect_config_id
-        self.collect_config: CollectConfigMeta = CollectConfigMeta.objects.get(id=self.collect_config_id)
+        self.collect_config: CollectConfigMeta = CollectConfigMeta.objects.get(
+            id=self.collect_config_id, bk_biz_id=bk_biz_id
+        )
         self.stage = stage
         if self.stage:
             self.loader = DatalinkDefaultAlarmStrategyLoader(
@@ -193,7 +197,7 @@ class BaseStatusResource(Resource):
             self.strategy_ids = list(self.strategy_map.keys())
         self._init = True
 
-    def get_alert_strategies(self) -> Tuple[List[int], List[Dict]]:
+    def get_alert_strategies(self) -> tuple[list[int], list[dict]]:
         """检索告警配置"""
         strategies = [
             resource.strategies.get_strategy_v2(bk_biz_id=self.collect_config.bk_biz_id, id=sid)
@@ -205,13 +209,13 @@ class BaseStatusResource(Resource):
         """获取采集配置描述"""
         return self.strategy_map.get(strategy_id, {}).get("strategy_desc", "")
 
-    def get_strategy_user_groups(self) -> List[UserGroup]:
+    def get_strategy_user_groups(self) -> list[UserGroup]:
         user_groups = []
         for v in self.strategy_map.values():
             user_groups.extend(v["rule"]["user_groups"])
         return UserGroup.objects.filter(id__in=user_groups)
 
-    def search_alert_histogram(self, time_range: int = 3600) -> List[List]:
+    def search_alert_histogram(self, time_range: int = 3600) -> list[list]:
         start_time, end_time = int(time.time() - time_range), int(time.time())
         request_data = {
             "bk_biz_ids": [self.collect_config.bk_biz_id],
@@ -228,9 +232,9 @@ class BaseStatusResource(Resource):
         abnormal_series = [s for s in series if s["name"] == EventStatus.ABNORMAL][0]
         return abnormal_series["data"]
 
-    def get_metrics_json(self) -> List[Dict]:
+    def get_metrics_json(self) -> list[dict]:
         """查询采集插件配置的指标维度信息"""
-        metric_json: List[dict] = copy.deepcopy(self.collect_config.deployment_config.metrics)
+        metric_json: list[dict] = copy.deepcopy(self.collect_config.deployment_config.metrics)
         plugin = self.collect_config.plugin
         # 如果插件id在time_series_group能查到，则可以认为是分表的，否则走原有逻辑
         group_list = api.metadata.query_time_series_group(
@@ -240,7 +244,7 @@ class BaseStatusResource(Resource):
             # 分表模式下，这里table_id都为__default__
             table["table_name"] = table["table_name"] if not group_list else "__default__"
             table["table_id"] = self.get_result_table_id(table["table_name"])
-            metric_names: List[str] = list()
+            metric_names: list[str] = list()
             for field in table["fields"]:
                 if not field["is_active"]:
                     continue
@@ -260,7 +264,7 @@ class BaseStatusResource(Resource):
     def build_alert_query_string(self) -> str:
         query_string = "({strategy}) AND ({collection})".format(
             strategy=" OR ".join(f"strategy_id : {sid}" for sid in self.strategy_ids),
-            collection="tags.bk_collect_config_id: {}".format(self.collect_config_id),
+            collection=f"tags.bk_collect_config_id: {self.collect_config_id}",
         )
         return query_string
 
@@ -269,13 +273,18 @@ class AlertStatusResource(BaseStatusResource):
     """查询数据链路各个阶段的告警状态"""
 
     class RequestSerilizer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
         stage = serializers.ChoiceField(
             required=True, label="告警阶段", choices=[stage.value for stage in list(DataLinkStage)]
         )
 
-    def perform_request(self, validated_request_data: Dict) -> Dict:
-        self.init_data(validated_request_data["collect_config_id"], DataLinkStage(validated_request_data["stage"]))
+    def perform_request(self, validated_request_data: dict) -> dict:
+        self.init_data(
+            validated_request_data["bk_biz_id"],
+            validated_request_data["collect_config_id"],
+            DataLinkStage(validated_request_data["stage"]),
+        )
         if not self.has_strategies():
             return {"has_strategies": False}
         strategies = self.get_alert_strategies()
@@ -301,15 +310,20 @@ class AlertStatusResource(BaseStatusResource):
 
 class UpdateAlertUserGroupsResource(BaseStatusResource):
     class RequestSerilizer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
         stage = serializers.ChoiceField(
             required=True, label="告警阶段", choices=[stage.value for stage in list(DataLinkStage)]
         )
         notice_group_list = serializers.ListField(required=True, child=serializers.IntegerField())
 
-    def perform_request(self, validated_request_data: Dict):
-        self.init_data(validated_request_data["collect_config_id"], DataLinkStage(validated_request_data["stage"]))
-        strategy_tuples: List[Tuple[int, DatalinkStrategy]] = []
+    def perform_request(self, validated_request_data: dict):
+        self.init_data(
+            validated_request_data["bk_biz_id"],
+            validated_request_data["collect_config_id"],
+            DataLinkStage(validated_request_data["stage"]),
+        )
+        strategy_tuples: list[tuple[int, DatalinkStrategy]] = []
         for sid in self.strategy_ids:
             strategy_tuples.append((sid, self.strategy_map.get(sid)))
         self.loader.update_rule_group(
@@ -324,8 +338,10 @@ class CollectingTargetStatusResource(BaseStatusResource):
         bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
 
-    def perform_request(self, validated_request_data: Dict) -> Dict:
-        self.init_data(validated_request_data["collect_config_id"], DataLinkStage.COLLECTING)
+    def perform_request(self, validated_request_data: dict) -> dict:
+        self.init_data(
+            validated_request_data["bk_biz_id"], validated_request_data["collect_config_id"], DataLinkStage.COLLECTING
+        )
 
         instance_status = resource.collecting.collect_instance_status(
             id=self.collect_config_id, bk_biz_id=self.collect_config.bk_biz_id
@@ -352,7 +368,7 @@ class CollectingTargetStatusResource(BaseStatusResource):
                     child["alert_histogram"] = targets_alert_histogram.get(str(child["bk_host_id"]), None)
         return instance_status
 
-    def search_target_alert_histogram(self, targets: List[str], time_range: int = 3600) -> Dict:
+    def search_target_alert_histogram(self, targets: list[str], time_range: int = 3600) -> dict:
         """按照主机维度，检索最近的告警分布，默认取最近一小时"""
         if len(targets) == 0:
             return {"total": [], "targets": {}}
@@ -384,12 +400,12 @@ class CollectingTargetStatusResource(BaseStatusResource):
         search_object.aggs.bucket("init_alert", "filter", {"range": {"begin_time": {"lt": start_time}}}).bucket(
             "targets", "terms", field="event.bk_host_id"
         )
-        logger.info("Search collecting alerts, statement = {}".format(json.dumps(search_object.to_dict())))
+        logger.info(f"Search collecting alerts, statement = {json.dumps(search_object.to_dict())}")
         search_result = search_object[:0].execute()
         # 检索后的数据整理后，按照主机ID分桶存放，启动和结束记录还需要按照时间分桶存放
-        init_alerts: Dict[str, int] = dict()
-        begine_alerts: Dict[str, Dict[int][int]] = dict()
-        end_alerts: Dict[str, Dict[int][int]] = dict()
+        init_alerts: dict[str, int] = dict()
+        begine_alerts: dict[str, dict[int][int]] = dict()
+        end_alerts: dict[str, dict[int][int]] = dict()
         if search_result.aggs:
             for target_bucket in search_result.aggs.init_alert.targets.buckets:
                 init_alerts[target_bucket.key] = target_bucket.doc_count
@@ -410,7 +426,7 @@ class CollectingTargetStatusResource(BaseStatusResource):
 
         # 初始化主机分桶信息，每个分桶里按照时间分桶初始化 0
         ts_buckets = range(start_time, end_time, interval)
-        targets_series: Dict[str, List] = {target: [[ts * 1000, 0] for ts in ts_buckets] for target in targets}
+        targets_series: dict[str, list] = {target: [[ts * 1000, 0] for ts in ts_buckets] for target in targets}
         for target, series in targets_series.items():
             init_cnt = init_alerts.get(target, 0)
             # 以一个主机例子，从最小时间开始迭代，比如初始3个告警，在第一个时间桶遇到2个新增，1个关闭，则最终为 3+2-1=4 个告警，以此类推
@@ -421,7 +437,7 @@ class CollectingTargetStatusResource(BaseStatusResource):
                 item[1] = init_cnt + begine_cnt - end_cnt
                 init_cnt = item[1]
         # 汇总计算总的告警数
-        total_series: List = []
+        total_series: list = []
         for idx, item in enumerate(next(iter(targets_series.values()))):
             ts = item[0]
             cnt = sum(targets_series[target][idx][1] for target in targets)
@@ -440,13 +456,14 @@ class TransferCountSeriesResource(BaseStatusResource):
     """查询数据量曲线，目前只支持分钟级和天级"""
 
     class RequestSerilizer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
         start_time = serializers.IntegerField(required=True, label="开始时间")
         end_time = serializers.IntegerField(required=True, label="结束时间")
         interval_option = serializers.CharField(required=False, label="间隔选项", default=IntervalOption.MINUTE.value)
 
-    def perform_request(self, validated_request_data: Dict):
-        self.init_data(validated_request_data["collect_config_id"])
+    def perform_request(self, validated_request_data: dict):
+        self.init_data(validated_request_data["bk_biz_id"], validated_request_data["collect_config_id"])
         interval_option = IntervalOption(validated_request_data["interval_option"])
         start_time = validated_request_data["start_time"]
         end_time = validated_request_data["end_time"]
@@ -466,7 +483,7 @@ class TransferCountSeriesResource(BaseStatusResource):
                 __name__=~"bkmonitor:{table_id}:.*",
                 bk_collect_config_id="{collect_config_id}"}}[{interval}{unit}])) or vector(0)
             """.format(
-                table_id=table.split('.')[0] if not table.endswith(".__default__") else table,
+                table_id=table.split(".")[0] if not table.endswith(".__default__") else table,
                 collect_config_id=self.collect_config_id,
                 interval=interval,
                 unit=interval_unit,
@@ -496,16 +513,17 @@ class TransferCountSeriesResource(BaseStatusResource):
             "slimit": 500,
             "down_sample_range": "",
         }
-        logger.info("Search transfer metric count, statement = {}".format(json.dumps(query_params)))
+        logger.info(f"Search transfer metric count, statement = {json.dumps(query_params)}")
         return resource.grafana.graph_unify_query(query_params)["series"]
 
 
 class TransferLatestMsgResource(BaseStatusResource):
     class RequestSerilizer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
 
     def perform_request(self, validated_request_data):
-        self.init_data(validated_request_data["collect_config_id"])
+        self.init_data(validated_request_data["bk_biz_id"], validated_request_data["collect_config_id"])
         messages = []
         for table in {t["table_id"] for t in self.get_metrics_json()}:
             messages.extend(self.query_latest_metric_msg(table))
@@ -513,50 +531,131 @@ class TransferLatestMsgResource(BaseStatusResource):
                 return messages[:10]
         return messages
 
-    def query_latest_metric_msg(self, table_id: str, time_range: int = 600) -> List[str]:
-        """查询一个指标最近10分钟的最新数据"""
-        start_time, end_time = int(time.time() - time_range), int(time.time())
-        query_params = {
-            "bk_biz_id": self.collect_config.bk_biz_id,
-            "query_configs": [
-                {
-                    "data_source_label": "prometheus",
-                    "data_type_label": "time_series",
-                    "promql": """
-                    topk(10, {{__name__=~"bkmonitor:{table_id}:.*",
-                     bk_collect_config_id="{bk_collect_config_id}"}})""".format(
-                        table_id=table_id.replace('.', ':'), bk_collect_config_id=self.collect_config_id
-                    ),
-                    "interval": 60,
-                    "alias": "a",
-                }
-            ],
-            "expression": "",
-            "alias": "a",
-            "start_time": start_time,
-            "end_time": end_time,
-            "slimit": 500,
-            "down_sample_range": "",
-        }
-        series = resource.grafana.graph_unify_query(query_params)["series"]
+    def find_timestamps(self, series: dict) -> str:
+        """
+        基于广度优先搜索 (BFS) 快速提取时间值
+        支持任意嵌套层级的 dict/list/tuple 结构
+        返回去重后的时间值列表（保持原始顺序）
+        """
+        logger.info(f"kafka tail series: {series}")
+
+        # 目标键名集合
+        target_keys = {"utctime", "timestamp", "@timestamp"}
+        # 预编译正则提高效率
+        iso8601_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z?$")
+        # 结果集（有序且去重）
+        result = []
+        seen = set()
+        # BFS队列初始化
+        queue = deque([series])
+
+        def _is_valid_time_value(value, iso_pattern) -> bool:
+            """
+            校验时间值是否符合以下格式
+            ```python
+            [
+                # int类型 时间戳
+                1640995200,
+                1640995200000,
+                # str类型 时间戳
+                "1640995200",
+                "1640995200000",
+                # str类型 ISO 8601格式
+                "2023-01-01T00:00:00Z",
+                "2023-01-01 00:00:00",
+                '2025-02-26T09:59:39.407Z',
+            ]
+            ```
+            """
+            if isinstance(value, int):
+                return 1_000_000_000 <= value < 10_000_000_000_000  # 10位 ~ 13位
+            if isinstance(value, str):
+                if value.isdigit():
+                    length = len(value)
+                    if length not in (10, 13):
+                        return False
+                    try:
+                        num = int(value)
+                        return 1_000_000_000 <= num < 10_000_000_000_000
+                    except ValueError:
+                        return False
+                return bool(iso_pattern.match(value))
+
+            return False
+
+        def _add_unique_value(value: str | int, result: list, seen: set):
+            """去重并保持顺序"""
+            if isinstance(value, int):
+                key = ("int", value)
+            else:
+                key = ("str", value.strip().lower())  # 字符串忽略大小写和空格
+            if key not in seen:
+                seen.add(key)
+                result.append(value)
+
+        def convert_to_string(ts):
+            """
+            格式化时间戳
+            示例: 2022-01-01 00:00:00
+            """
+            if isinstance(ts, str):
+                if len(ts) == 10:  # 10位字符串时间戳（秒）
+                    dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+                elif len(ts) == 13:  # 13位字符串时间戳（毫秒）
+                    dt = datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc)
+                else:
+                    if re.match(
+                        r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$", ts
+                    ):  # ISO 8601 格式: %Y-%m-%dT%H:%M:%SZ
+                        dt = datetime.fromisoformat(ts[:-1])  # 去掉最后的 'Z'
+                    else:
+                        dt = datetime.fromisoformat(ts)
+            elif isinstance(ts, int):
+                if len(str(ts)) == 10:  # 10位整数时间戳（秒）
+                    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                elif len(str(ts)) == 13:  # 13位整数时间戳（毫秒）
+                    dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        """
+        广度优先搜索，遍历数据结构，找出符合以下时间戳格式的值, 并保存到 result 中
+        ```
+        [
+            1640995200, 1640995200000,
+            "1640995200","1640995200000",
+            "2023-01-01T00:00:00Z","2023-01-01 00:00:00", "2025-02-26T09:59:39.407Z"
+        ]
+        ```
+        """
+        while queue:
+            current = queue.popleft()
+
+            if isinstance(current, dict):
+                for k, v in current.items():
+                    if k in target_keys:
+                        if _is_valid_time_value(v, iso8601_pattern):
+                            _add_unique_value(v, result, seen)
+                    queue.append(v)
+            elif isinstance(current, (list, tuple)):
+                queue.extend(current)
+
+        logger.info(f"find_timestamps: {result}")
+        return convert_to_string(result[0]) if result else ""
+
+    def query_latest_metric_msg(self, table_id: str, size: int = 10) -> list[dict]:
+        """查询一个指标的最新数据"""
+
+        series: list[dict] = api.metadata.kafka_tail({"table_id": table_id, "size": size})
         msgs = []
         for s in series:
-            metric_name = s["dimensions"]["__name__"]
-            val = s["datapoints"][-1][0]
-            ts = s["datapoints"][-1][1]
-            target = s["target"]
-            # 组装消息
-            msg = "{metric}{target} {val}".format(metric=metric_name, target=target, val=val)
-            # 原始数据拼接
-            raw = s["dimensions"]
-            raw[metric_name] = val
-            raw["time"] = ts
+            time = self.find_timestamps(s)
 
             msgs.append(
                 {
-                    "message": msg,
-                    "time": datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S"),
-                    "raw": raw,
+                    "message": json.dumps(s),
+                    "time": time,
+                    "raw": s,
                 }
             )
         return msgs
@@ -566,11 +665,14 @@ class StorageStatusResource(BaseStatusResource):
     """获取存储状态"""
 
     class RequestSerilizer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(required=True, label="业务ID")
         collect_config_id = serializers.IntegerField(required=True, label="采集配置ID")
 
     def perform_request(self, params):
         try:
-            collect_config = CollectConfigMeta.objects.select_related("plugin").get(id=params["collect_config_id"])
+            collect_config = CollectConfigMeta.objects.get(
+                id=params["collect_config_id"], bk_biz_id=params["bk_biz_id"]
+            )
         except CollectConfigMeta.DoesNotExist:
             return {}
 

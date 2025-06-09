@@ -27,6 +27,7 @@ import { Ref } from 'vue';
 
 import segmentPopInstance from '../global/utils/segment-pop-instance';
 import UseSegmentPropInstance from './use-segment-pop';
+import { getClickTargetElement, optimizedSplit, setPointerCellClickTargetHandler } from './hooks-helper';
 
 export type FormatterConfig = {
   onSegmentClick: (args: any) => void;
@@ -35,6 +36,21 @@ export type FormatterConfig = {
     field: any;
     data: any;
   };
+};
+
+export type WordListItem = {
+  text: string;
+  isMark: boolean;
+  isCursorText: boolean;
+  isBlobWord?: boolean;
+  startIndex?: number;
+  endIndex?: number;
+  left?: number;
+  top?: number;
+  width?: number;
+  renderWidth?: number;
+  split?: WordListItem[];
+  line?: number;
 };
 
 export type SegmentAppendText = { text: string; onClick?: (...args) => void; attributes?: Record<string, string> };
@@ -56,34 +72,22 @@ export default class UseTextSegmentation {
     Object.assign(this.options, cfg.options ?? {});
   }
 
-  getCellClickHandler(e: MouseEvent, value) {
-    const x = e.clientX;
-    const y = e.clientY;
-    let virtualTarget = document.body.querySelector('.bklog-virtual-target') as HTMLElement;
-    if (!virtualTarget) {
-      virtualTarget = document.createElement('span') as HTMLElement;
-      virtualTarget.className = 'bklog-virtual-target';
-      virtualTarget.style.setProperty('position', 'absolute');
-      virtualTarget.style.setProperty('visibility', 'hidden');
-      virtualTarget.style.setProperty('z-index', '-1');
-      document.body.appendChild(virtualTarget);
-    }
-
-    virtualTarget.style.setProperty('left', `${x}px`);
-    virtualTarget.style.setProperty('top', `${y}px`);
-
-    this.handleSegmentClick(virtualTarget, value);
+  getCellClickHandler(e: MouseEvent, value, { offsetY = 0, offsetX = 0 }) {
+    const target = setPointerCellClickTargetHandler(e, { offsetY, offsetX });
+    this.handleSegmentClick(target, value);
   }
 
   getTextCellClickHandler(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains('valid-text')) {
-      this.handleSegmentClick(e.target, (e.target as HTMLElement).innerHTML);
+      const { offsetY, offsetX } = getClickTargetElement(e);
+      const offsetTarget = setPointerCellClickTargetHandler(e, { offsetY, offsetX });
+      this.handleSegmentClick(offsetTarget, (e.target as HTMLElement).textContent);
     }
   }
 
-  getChildNodes() {
+  getChildNodes(forceSplit = false) {
     let start = 0;
-    return this.getSplitList(this.options.field, this.options.content).map(item => {
+    return this.getSplitList(this.options.field, this.options.content, forceSplit).map(item => {
       Object.assign(item, {
         startIndex: start,
         endIndex: start + item.text.length,
@@ -107,10 +111,18 @@ export default class UseTextSegmentation {
     return this.options?.field;
   }
 
+  private getCellValue(target) {
+    if (typeof target === 'string') {
+      return target.replace(/<mark>/g, '').replace(/<\/mark>/g, '');
+    }
+    return target;
+  }
+
   private onSegmentEnumClick(val, isLink) {
     const tippyInstance = segmentPopInstance.getInstance();
     const currentValue = this.clickValue;
     const depth = tippyInstance.reference.closest('[data-depth]')?.getAttribute('data-depth');
+    const isNestedField = tippyInstance.reference.closest('[is-nested-value]')?.getAttribute('is-nested-value');
 
     const activeField = this.getField();
     const target = ['date', 'date_nanos'].includes(activeField?.field_type)
@@ -120,8 +132,9 @@ export default class UseTextSegmentation {
     const option = {
       fieldName: activeField?.field_name,
       operation: val === 'not' ? 'is not' : val,
-      value: (target ?? currentValue).replace(/<mark>/g, '').replace(/<\/mark>/g, ''),
+      value: this.getCellValue(target ?? currentValue),
       depth,
+      isNestedField,
     };
 
     this.onSegmentClick?.({ option, isLink });
@@ -161,46 +174,149 @@ export default class UseTextSegmentation {
     return field?.is_analyzed ?? false;
   }
 
-  // Object.assign(item, { startIndex: start, endIndex: start + (text?.length ?? 0) });
-  private splitParticipleWithStr(str: string, delimiterPattern: string) {
-    if (!str) return [];
-    // 转义特殊字符，并构建用于分割的正则表达式
-    const regexPattern = delimiterPattern
-      .split('')
-      .map(delimiter => `\\${delimiter}`)
-      .join('|');
+  /**
+   * @description: 判断是否为虚拟对象字段, 字段来源：Object对象字段添加为列表字段
+   * @param {any} field
+   * @return {*}
+   */
+  private isVirtualObjField(field: any) {
+    return (field?.is_virtual_obj_node ?? false) && field?.field_type === 'object';
+  }
 
-    // 构建正则表达式以找到分隔符或分隔符周围的文本
-    const regex = new RegExp(`(${regexPattern})`);
+  private isJSONStructure(str: string) {
+    const trimmed = str.trim();
+    const len = trimmed.length;
+    if (len === 0) return false; // 空字符串直接返回
 
-    // 先根据高亮标签分割
-    const markSplitRes = str.match(/(<mark>.*?<\/mark>|.+?(?=<mark|$))/gs);
+    const first = trimmed[0];
+    const last = trimmed[len - 1];
 
-    // 在高亮分割数组基础上再以分隔符分割数组
-    const parts = markSplitRes.reduce((list, item) => {
-      if (/^<mark>.*?<\/mark>$/.test(item)) {
-        const formatValue = item.replace(/<mark>/g, '').replace(/<\/mark>/g, '');
-        list.push({
-          text: formatValue,
-          isMark: true,
-          isCursorText: true,
+    return (first === '{' && last === '}') || (first === '[' && last === ']');
+  }
+
+  private convertJsonStrToObj(str: string) {
+    if (this.isJSONStructure(str)) {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        console.error(e);
+        return str;
+      }
+    }
+
+    return str;
+  }
+
+  private convertVirtaulObjToArray() {
+    const target = this.options.data[this.options.field.field_name] ?? this.convertJsonStrToObj(this.options.content);
+
+    const convertObjToArray = (root: object, isValue = false) => {
+      const result = [];
+
+      if (typeof root === 'object') {
+        if (Array.isArray(root)) {
+          result.push({
+            text: '[',
+            isCursorText: false,
+            isMark: false,
+          });
+          result.push(root.map(child => convertObjToArray(child)));
+          result.push({
+            text: ']',
+            isCursorText: false,
+            isMark: false,
+          });
+
+          result.push({
+            text: ',',
+            isCursorText: false,
+            isMark: false,
+          });
+          return result;
+        }
+
+        result.push({
+          text: '{',
+          isCursorText: false,
+          isMark: false,
         });
-      } else {
-        const arr = item.split(regex);
-        arr.forEach(text => {
-          if (text) {
-            list.push({
-              text,
+
+        Object.entries(root).forEach(([key, value]) => {
+          result.push({
+            text: `"${key}":`,
+            isCursorText: false,
+            isMark: false,
+          });
+
+          if (result.length < 1000) {
+            result.push(...convertObjToArray(value, true));
+          } else {
+            result.push({
+              text: value,
+              isCursorText: false,
               isMark: false,
-              isCursorText: !regex.test(text),
             });
           }
         });
-      }
-      return list;
-    }, []);
 
-    return parts;
+        const lastRow = result.at(-1);
+        if (lastRow?.text === ',') {
+          result.pop();
+        }
+
+        result.push({
+          text: '}',
+          isCursorText: false,
+          isMark: false,
+        });
+
+        result.push({
+          text: ',',
+          isCursorText: false,
+          isMark: false,
+        });
+        return result;
+      }
+
+      /** 检索高亮分词字符串 */
+      const markRegStr = '<mark>(.*?)</mark>';
+      const value = this.escapeString(`${root}`);
+      const formatValue = value.replace(/<mark>/g, '').replace(/<\/mark>/g, '');
+      const isMark = new RegExp(markRegStr).test(value);
+
+      result.push({
+        text: '"',
+        isCursorText: false,
+        isMark: false,
+      });
+
+      result.push({
+        text: formatValue,
+        isCursorText: isValue,
+        isMark,
+      });
+
+      result.push({
+        text: '"',
+        isCursorText: false,
+        isMark: false,
+      });
+
+      result.push({
+        text: ',',
+        isCursorText: false,
+        isMark: false,
+      });
+      return result;
+    };
+
+    const output = convertObjToArray(target);
+    const lastRow = output.at(-1);
+    if (lastRow?.text === ',') {
+      output.pop();
+    }
+
+    return output;
   }
 
   private escapeString(val: string) {
@@ -210,20 +326,26 @@ export default class UseTextSegmentation {
       '&gt;': '>',
       '&quot;': '"',
       '&#x27;': "'",
+      // ' ': '\u2002',
     };
 
     return typeof val !== 'string'
-      ? val
+      ? `${val}`
       : val.replace(RegExp(`(${Object.keys(map).join('|')})`, 'g'), match => map[match]);
   }
 
-  private getSplitList(field: any, content: any) {
+  private getSplitList(field: any, content: any, forceSplit = false) {
     /** 检索高亮分词字符串 */
     const markRegStr = '<mark>(.*?)</mark>';
     const value = this.escapeString(`${content}`);
-    if (this.isAnalyzed(field)) {
+
+    if (this.isVirtualObjField(field)) {
+      return this.convertVirtaulObjToArray();
+    }
+
+    if (this.isAnalyzed(field) || forceSplit) {
       // 这里进来的都是开了分词的情况
-      return this.splitParticipleWithStr(value, this.getCurrentFieldRegStr(field));
+      return optimizedSplit(value, this.getCurrentFieldRegStr(field));
     }
 
     const formatValue = value.replace(/<mark>/g, '').replace(/<\/mark>/g, '');

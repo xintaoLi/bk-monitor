@@ -37,11 +37,13 @@ import {
   registerNode,
 } from '@antv/g6';
 import { addListener, removeListener } from '@blueking/fork-resize-detector';
-import { Loading } from 'bkui-vue';
+import { Loading, Exception } from 'bkui-vue';
 import { incidentTopologyUpstream } from 'monitor-api/modules/incident';
 import { random } from 'monitor-common/utils/utils.js';
 import { debounce } from 'throttle-debounce';
 
+import ErrorImg from '../../../static/img/error.svg';
+import NoDataImg from '../../../static/img/no-data.svg';
 import FailureTopoTooltips from '../failure-topo/failure-topo-tooltips';
 import { NODE_TYPE_SVG } from '../failure-topo/node-type-svg';
 import TopoTooltip from '../failure-topo/topo-tppltip-plugin';
@@ -64,6 +66,10 @@ export default defineComponent({
       type: String,
       default: '0#0.0.0.0',
     },
+    entityName: {
+      type: String,
+      default: '',
+    },
     content: {
       type: String,
       default: '',
@@ -73,7 +79,7 @@ export default defineComponent({
       default: () => {},
     },
   },
-  emits: ['toDetail', 'hideToolTips'],
+  emits: ['toDetail', 'hideToolTips', 'collapseResource'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const graphRef = ref<HTMLElement>(null);
@@ -97,6 +103,12 @@ export default defineComponent({
     const incidentId = useIncidentInject();
     const loading = ref<boolean>(false);
     let graph: Graph;
+    // 右侧画布数据获取检测
+    const exceptionData = ref({
+      showException: true,
+      type: '',
+      msg: '',
+    });
     /** 检测文字长度 */
     const accumulatedWidth = (text, maxWidth = 80) => {
       const context = graph.get('canvas').get('context'); // 获取canvas上下文用于测量文本
@@ -330,6 +342,7 @@ export default defineComponent({
               cursor: 'pointer', // 手势类型
               r: 20, // 圆半径
               ...nodeAttrs.groupAttrs,
+              fill: isRoot ? '#F55555' : nodeAttrs.groupAttrs.fill,
             },
             name: 'resource-node-shape',
           });
@@ -354,6 +367,15 @@ export default defineComponent({
               stroke: 'rgba(5, 122, 234, 1)',
             },
             name: 'resource-node-running',
+          });
+          group.addShape('circle', {
+            attrs: {
+              lineWidth: 0,
+              cursor: 'pointer',
+              r: 27,
+              stroke: '#3a84ff4d',
+            },
+            name: 'topo-node-running-shadow',
           });
           if (aggregated_nodes?.length) {
             group.addShape('rect', {
@@ -395,7 +417,7 @@ export default defineComponent({
               textAlign: 'center',
               textBaseline: 'middle',
               cursor: 'pointer',
-              text: accumulatedWidth(entity.entity_type),
+              text: accumulatedWidth(entity?.properties?.entity_show_type || entity.entity_type),
               fontSize: 10,
               ...nodeAttrs.textNameAttrs,
             },
@@ -432,6 +454,7 @@ export default defineComponent({
             });
           } else if (name === 'running') {
             const runningShape = group.find(e => e.get('name') === 'resource-node-running');
+            const runningShadowShape = group.find(e => e.get('name') === 'topo-node-running-shadow');
             const rootBorderShape = group.find(e => e.get('name') === 'resource-node-root-border');
             if (value) {
               rootBorderShape?.attr({
@@ -440,6 +463,11 @@ export default defineComponent({
               runningShape.attr({
                 lineWidth: 3,
                 r: 24,
+                strokeOpacity: 1,
+              });
+              runningShadowShape.attr({
+                lineWidth: 3,
+                r: 27,
                 strokeOpacity: 1,
               });
             } else {
@@ -451,6 +479,12 @@ export default defineComponent({
                 cursor: 'pointer', // 手势类型
                 r: 22, // 圆半径
                 stroke: 'rgba(5, 122, 234, 1)',
+              });
+              runningShadowShape.attr({
+                lineWidth: 0,
+                cursor: 'pointer',
+                r: 27,
+                stroke: '#3a84ff4d',
               });
             }
           } else if (name === 'dark') {
@@ -746,7 +780,7 @@ export default defineComponent({
                   text: cfg.groupName,
                   fontSize: 12,
                   fontWeight: 400,
-                  fill: '#63656E',
+                  fill: '#979BA5',
                 },
                 name: 'resource-combo-title',
               });
@@ -759,8 +793,7 @@ export default defineComponent({
                 textAlign: 'left',
                 text: cfg.title,
                 fontSize: 12,
-                fontWeight: 700,
-                fill: '#fff',
+                fill: '#EAEBF0',
               },
               name: 'resource-combo-text',
             });
@@ -774,7 +807,7 @@ export default defineComponent({
                   text: cfg.anomaly_count,
                   fontSize: 12,
                   fontWeight: 700,
-                  fill: '#F55555',
+                  fill: '#FF6666',
                 },
                 name: 'resource-combo-text',
               });
@@ -788,7 +821,7 @@ export default defineComponent({
                 text: cfg.subTitle,
                 fontSize: 12,
                 fontWeight: 700,
-                fill: '#979BA5',
+                fill: '#EAEBF0',
               },
               name: 'resource-combo-count-text',
             });
@@ -797,11 +830,22 @@ export default defineComponent({
               attrs: {
                 x: -w / 2 + 80,
                 y: -comboxHeight / 2 - 26,
-                width: 2,
+                width: 1,
                 height: comboxHeight + 40,
-                fill: 'rgba(0, 0, 0, 0.3)',
+                fill: '#14161A',
               },
               name: 'resource-combo-bg',
+            });
+            group.addShape('rect', {
+              zIndex: 100,
+              attrs: {
+                x: -w / 2 - 60,
+                y: comboxHeight / 2 + 14, // 定位在combo底部
+                width: w + 120,
+                height: 1,
+                fill: '#14161A',
+              },
+              name: 'resource-combo-bottom-border',
             });
             return keyShape;
           },
@@ -998,12 +1042,32 @@ export default defineComponent({
     /** 获取数据 */
     const getTopologyUpstream = () => {
       if (!props.entityId) {
+        exceptionData.value.showException = true;
+        exceptionData.value.type = 'noData';
+        exceptionData.value.msg = t('暂无数据');
         return;
       }
-      incidentTopologyUpstream({ id: incidentId.value, entity_id: props.entityId })
+      loading.value = true;
+      incidentTopologyUpstream(
+        { id: incidentId.value, entity_id: props.entityId },
+        {
+          needMessage: false,
+        }
+      )
         .then(res => {
-          loading.value = true;
+          exceptionData.value.showException = false;
           const { ranks, edges } = res;
+          if (ranks.length === 0 && edges.length === 0) {
+            graph?.destroy?.();
+            graph = null;
+            exceptionData.value.showException = true;
+            exceptionData.value.type = 'noData';
+            exceptionData.value.msg =
+              props.entityId.indexOf('Unknown') !== -1 ? t('第三方节点不支持查看从属') : t('暂无数据');
+          } else {
+            exceptionData.value.showException = false;
+          }
+
           const ranksMap = {};
           ranks.forEach(rank => {
             if (ranksMap[rank.rank_category.category_name]) {
@@ -1013,9 +1077,22 @@ export default defineComponent({
             }
           });
           graphData.value = createGraphData(ranksMap, edges);
-          renderGraph();
+          if (!graph) {
+            setTimeout(() => {
+              init();
+              renderGraph();
+            }, 100);
+          } else {
+            renderGraph();
+          }
         })
-        .catch(() => {})
+        .catch(err => {
+          if (err) {
+            exceptionData.value.showException = true;
+            exceptionData.value.type = 'error';
+            exceptionData.value.msg = err.data?.error_details ? err.data.error_details.overview : err.message;
+          }
+        })
         .finally(() => {
           setTimeout(() => {
             loading.value = false;
@@ -1077,6 +1154,7 @@ export default defineComponent({
     };
     /** 画布相关的 */
     const init = () => {
+      if (!graphRef.value) return;
       const { width, height } = graphRef.value.getBoundingClientRect();
       registerCustomNode();
       registerCustomEdge();
@@ -1144,15 +1222,16 @@ export default defineComponent({
           style: {
             cursor: 'pointer',
             lineAppendWidth: 15,
-            endArrow: isInvoke
-              ? {
-                  path: Arrow.triangle(12, 12, 0),
-                  d: 0,
-                  fill: color,
-                  stroke: color,
-                  lineDash: [0, 0],
-                }
-              : false,
+            endArrow:
+              isInvoke || is_anomaly
+                ? {
+                    path: Arrow.triangle(12, 12, 0),
+                    d: 0,
+                    fill: color,
+                    stroke: color,
+                    lineDash: [0, 0],
+                  }
+                : false,
             // fill: isInvoke ? '#F55555' : '#63656E',
             stroke: color,
             lineWidth: is_anomaly ? 2 : 1,
@@ -1243,6 +1322,8 @@ export default defineComponent({
                   e.attr({ x: -maxWidth / 2 - 8 + (model.anomaly_count ? 10 : 0) });
                 } else if (e.get('name') === 'resource-combo-bg') {
                   e.attr({ x: -maxWidth / 2 + 80 });
+                } else if (e.get('name') === 'resource-combo-bottom-border') {
+                  e.attr({ x: -maxWidth / 2 - 60 });
                 } else if (e.get('name') !== 'resource-combo-shape') {
                   e.attr({ x: -maxWidth / 2 - 8 });
                 } else {
@@ -1384,6 +1465,9 @@ export default defineComponent({
         graph.setAutoPaint(true);
         return;
       });
+      nextTick(() => {
+        addListener(graphRef.value as HTMLElement, onResize);
+      });
     };
     /** 窗口宽度变化 */
     function handleResize() {
@@ -1404,15 +1488,38 @@ export default defineComponent({
     const onResize = debounce(300, handleResize);
     onMounted(() => {
       init();
-      nextTick(() => {
-        addListener(graphRef.value as HTMLElement, onResize);
-      });
     });
     onUnmounted(() => {
       graphRef.value && removeListener(graphRef.value as HTMLElement, onResize);
     });
     const handleToDetail = node => {
       emit('toDetail', node);
+    };
+    const handleException = () => {
+      const { type, msg } = exceptionData.value;
+      if (!type && !msg) return '';
+      return (
+        <Exception
+          class='exception-wrap'
+          v-slots={{
+            type: () => (
+              <img
+                class='custom-icon'
+                alt=''
+                src={type === 'noData' ? NoDataImg : ErrorImg}
+              />
+            ),
+          }}
+        >
+          <div style={{ color: type === 'noData' ? '#979BA5' : '#E04949' }}>
+            <div class='exception-title'>{type === 'noData' ? msg : t('查询异常')}</div>
+            {type === 'error' && <div class='exception-desc'>{msg}</div>}
+          </div>
+        </Exception>
+      );
+    };
+    const handleCollapseResource = () => {
+      emit('collapseResource');
     };
     return {
       graphRef,
@@ -1424,6 +1531,10 @@ export default defineComponent({
       handleToDetail,
       loading,
       graph,
+      exceptionData,
+      handleException,
+      handleCollapseResource,
+      t,
     };
   },
   render() {
@@ -1434,10 +1545,31 @@ export default defineComponent({
           color='#292A2B'
           loading={this.loading}
         >
-          <div
-            ref='graphRef'
-            class='graph-wrapper'
-          />
+          <div class='graph-title'>
+            <span class='graph-title_label'>{this.t('从属关系')}</span>
+            {this.entityName && <span class='graph-title_line' />}
+            <span
+              key={this.entityName}
+              class='graph-title_value'
+              v-overflow-tips={{
+                text: this.entityName,
+              }}
+            >
+              {this.entityName}
+            </span>
+
+            <span onClick={this.handleCollapseResource}>
+              <i class='icon-monitor icon-gongneng-shouqi graph-title_icon' />
+            </span>
+          </div>
+          {this.exceptionData.showException ? (
+            this.handleException()
+          ) : (
+            <div
+              ref='graphRef'
+              class='graph-wrapper'
+            />
+          )}
         </Loading>
         <div style='display: none'>
           <FailureTopoTooltips

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -19,8 +18,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 We undertake not to change the open source license (MIT license) applicable to the current version of
 the project delivered to anyone in the future.
 """
+
 import logging
 import time
+
+from django.utils.translation import gettext as _
+from iam.api.client import Client
 
 import settings
 from apps.api import (
@@ -36,7 +39,6 @@ from apps.api import (
 from apps.exceptions import ApiResultError
 from apps.utils.local import activate_request
 from apps.utils.thread import generate_request
-from django.utils.translation import ugettext as _
 from home_application.constants import (
     DEFAULT_BK_DATA_ID,
     DEFAULT_BK_USERNAME,
@@ -44,7 +46,6 @@ from home_application.constants import (
     DEFAULT_PAGE_SIZE,
     DEFAULT_SUBSCRIPTION_ID,
 )
-from iam.api.client import Client
 
 logger = logging.getLogger()
 
@@ -68,7 +69,13 @@ THIRD_PARTY_CHECK_API = {
             "bk_biz_id": settings.BLUEKING_BK_BIZ_ID,
         },
     },
-    "bk_data": {"method": BkDataDatabusApi.get_cleans, "kwargs": {"raw_data_id": DEFAULT_BK_DATA_ID}},
+    "bk_data": {
+        "method": BkDataDatabusApi.get_cleans,
+        "kwargs": {
+            "raw_data_id": DEFAULT_BK_DATA_ID,
+            "bk_biz_id": settings.BLUEKING_BK_BIZ_ID,
+        },
+    },
 }
 
 
@@ -82,7 +89,7 @@ except AttributeError:
     THIRD_PARTY_CHECK_API["paas"] = {"method": BKPAASApi.get_app_info}
 
 
-class ThirdParty(object):
+class ThirdParty:
     @staticmethod
     def call_api(module: str):
         result = {"status": False, "data": None, "message": "", "suggestion": ""}
@@ -108,10 +115,12 @@ class ThirdParty(object):
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f"failed to check {module}, err: {e}")
             result["message"] = str(e)
-            result["suggestion"] = _("确认{module}的域名配置, 若配置无误, 则确认服务是否正常").format(module=module.upper())
+            result["suggestion"] = _("确认{module}的域名配置, 若配置无误, 则确认服务是否正常").format(
+                module=module.upper()
+            )
 
         spend_time = time.time() - start_time
-        result["data"] = "{}ms".format(int(spend_time * 1000))
+        result["data"] = f"{int(spend_time * 1000)}ms"
         return result
 
     @staticmethod
@@ -137,6 +146,6 @@ class ThirdParty(object):
             result["message"] = str(e)
             result["suggestion"] = _("确认IAM的域名配置, 若配置无误, 则确认服务是否正常")
         spend_time = time.time() - start_time
-        result["data"] = "{}ms".format(int(spend_time * 1000))
+        result["data"] = f"{int(spend_time * 1000)}ms"
 
         return result

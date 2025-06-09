@@ -227,7 +227,8 @@ export class DataQuery implements IDataQuery {
   handleCreateFieldsKey(fieldsSort) {
     return fieldsSort.reduce((total, cur, index) => {
       const joiner = !index ? '' : '-';
-      return (total = `${total}${joiner}${cur[1]}`);
+      const result = `${total}${joiner}${cur[1]}`;
+      return result;
     }, '');
   }
   /** 对象生成有序的二维数组 */
@@ -342,7 +343,7 @@ export class PanelModel implements IPanelModel {
   // dashbordId
   dashboardId?: string;
   // 是否正在drag中
-  draging = false;
+  dragging = false;
   // 图表位置
   gridPos!: IGridPos;
   // 组id
@@ -405,8 +406,8 @@ export class PanelModel implements IPanelModel {
     this.collapsed = v;
     this.panels?.length && this.panels.forEach(item => item.updateShow(v));
   }
-  public updateDraging(v: boolean) {
-    this.draging = v;
+  public updateDragging(v: boolean) {
+    this.dragging = v;
   }
   public updateGridPos(v: IGridPos) {
     this.gridPos = {
@@ -542,4 +543,5 @@ export interface IViewOptions {
   matchFields?: Record<string, any>;
   // 策略id 用于hostIntelligenAnomalyRange接口
   strategy_id?: number | string;
+  span_id?: string;
 }

@@ -34,12 +34,14 @@
         <span class="icon bklog-icon bklog-xiazai"></span>
       </div> -->
     <div
-      v-if="!isUnionSearch"
       :class="{ 'operation-icon': true, 'disabled-icon': !queueStatus }"
       data-test-id="fieldForm_div_exportData"
       @mouseenter="handleShowAlarmPopover"
     >
-      <span class="icon bklog-icon bklog-xiazai"></span>
+      <span
+        class="icon bklog-icon bklog-download"
+        style="font-size: 16px"
+      ></span>
     </div>
 
     <div v-show="false">
@@ -138,7 +140,7 @@
               v-for="option in totalFields"
               :id="option.field_name"
               :key="option.field_name"
-              :name="option.field_name"
+              :name="getFieldName(option)"
             >
             </bk-option>
           </bk-select>
@@ -187,9 +189,10 @@
 <script>
   import { blobDownload } from '@/common/util';
   import { mapGetters, mapState } from 'vuex';
-
+  import useFieldNameHook from '@/hooks/use-field-name';
   import exportHistory from './export-history';
   import { axiosInstance } from '@/api';
+  import { BK_LOG_STORAGE } from '@/store/store.type';
 
   export default {
     components: {
@@ -291,6 +294,7 @@
         queueStatus: state => !state.retrieve.isTrendDataLoading,
         totalFields: state => state.indexFieldInfo.fields ?? [],
         visibleFields: state => state.visibleFields ?? [],
+        showFieldAlias: state => state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS],
       }),
       ...mapGetters({
         bkBizId: 'bkBizId',
@@ -310,13 +314,23 @@
         return [];
       },
       routerIndexSet() {
-        return window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId;
+        return window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId;
+      },
+    },
+    watch: {
+      totalCount(val) {
+        if (val < 10000) {
+          this.downloadType = 'sampling';
+        } else if (val < 2000000) {
+          this.downloadType = 'all';
+        } else {
+          this.downloadType = 'quick';
+        }
       },
     },
     beforeUnmount() {
       this.popoverInstance = null;
     },
-
     methods: {
       handleShowAlarmPopover(e) {
         if (this.popoverInstance || !this.queueStatus) return;
@@ -365,8 +379,8 @@
       quickDownload() {
         const { timezone, ...rest } = this.retrieveParams;
         const params = Object.assign(rest, { begin: 0, bk_biz_id: this.bkBizId });
-        const downRequestUrl = `/search/index_set/${this.routerIndexSet}/quick_export/`;
-        const data = {
+        const downRequestUrl = this.isUnionSearch ? `/search/index_set/union_async_export/`: `/search/index_set/${this.routerIndexSet}/quick_export/`;
+        const data  = {
           ...params,
           size: this.totalCount,
           time_range: 'customized',
@@ -374,8 +388,18 @@
           is_desensitize: this.desensitizeRadioType === 'desensitize',
           file_type: this.documentType,
         };
+        if (this.isUnionSearch) {
+          Object.assign(data, {is_quick_export: true, union_configs: this.unionIndexList.map(item => {
+            return {
+              begin: 0,
+              index_set_id: item,
+            };
+          }) });
+        }
         axiosInstance
-          .post(downRequestUrl, data)
+          .post(downRequestUrl, data, {
+            originalResponse: true,
+          })
           .then(res => {
             if (res.result) {
               this.$bkMessage({
@@ -383,7 +407,16 @@
                 ellipsisLine: 2,
                 message: this.$t('任务提交成功，下载完成将会收到邮件通知。可前往下载历史查看下载状态'),
               });
+            } else {
+              this.$bkMessage({
+                theme: 'error',
+                ellipsisLine: 2,
+                message: res.message,
+              });
             }
+          })
+          .catch(err => {
+            console.log(err);
           })
           .finally(() => {
             this.isShowExportDialog = false;
@@ -432,18 +465,27 @@
         const { timezone, ...rest } = this.retrieveParams;
         const params = Object.assign(rest, { begin: 0, bk_biz_id: this.bkBizId });
         const data = { ...params };
+        let downRequestUrl =  this.isUnionSearch ? `retrieve/unionExportAsync` : 'retrieve/exportAsync';
         data.size = this.totalCount;
         data.export_fields = this.submitSelectFiledList;
         data.is_desensitize = this.desensitizeRadioType === 'desensitize';
-
+        if (this.isUnionSearch) {
+          Object.assign(data, {is_quick_export: false, union_configs: this.unionIndexList.map(item => {
+            return {
+              begin: 0,
+              index_set_id: item,
+            };
+          }) });
+        }
         this.exportLoading = true;
-        this.$http
-          .request('retrieve/exportAsync', {
-            params: {
-              index_set_id: this.routerIndexSet,
-            },
+        const requestConfig = this.isUnionSearch
+        ? { data }
+        : {
+            params: { index_set_id: this.routerIndexSet },
             data,
-          })
+          };
+        this.$http
+          .request(downRequestUrl, requestConfig)
           .then(res => {
             if (res.result) {
               this.$bkMessage({
@@ -452,6 +494,9 @@
                 message: this.$t('任务提交成功，下载完成将会收到邮件通知。可前往下载历史查看下载状态'),
               });
             }
+          })
+          .catch(err => {
+            console.log(err);
           })
           .finally(() => {
             this.exportLoading = false;
@@ -470,6 +515,10 @@
       handleCloseDialog() {
         this.showHistoryExport = false;
       },
+      getFieldName(field) {
+        const { getQueryAlias } = useFieldNameHook({ store: this.$store });
+        return getQueryAlias(field);
+      },
     },
   };
 </script>
@@ -485,13 +534,13 @@
     height: 32px;
     margin-left: 10px;
     cursor: pointer;
-    border: 1px solid #c4c6cc;
+    background-color: #f0f1f5;
     border-radius: 2px;
     outline: none;
     transition: boder-color 0.2s;
 
     &:hover {
-      border-color: #979ba5;
+      border-color: #4d4f56;
       transition: boder-color 0.2s;
     }
 
@@ -503,7 +552,7 @@
     .bklog-icon {
       width: 16px;
       font-size: 16px;
-      color: #979ba5;
+      color: #4d4f56;
     }
   }
 

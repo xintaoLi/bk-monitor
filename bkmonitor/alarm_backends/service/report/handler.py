@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,22 +7,23 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-import asyncio
+
 import base64
 import datetime
 import logging
-import os
-import time
 from collections import defaultdict
-from typing import Dict, Tuple
 
 from django.conf import settings
 from django.utils.translation import gettext as _
-from pyppeteer import launch
-from pyppeteer.errors import TimeoutError
 
 from alarm_backends.core.cache.mail_report import MailReportCacheManager
+from alarm_backends.service.report.render.dashboard import (
+    RenderDashboardConfig,
+    generate_dashboard_url,
+    render_dashboard_panel,
+)
 from alarm_backends.service.report.tasks import render_mails
+from bkmonitor.browser import get_or_create_eventloop
 from bkmonitor.iam import ActionEnum, Permission
 from bkmonitor.models import ReportContents, ReportItems
 from bkmonitor.utils.grafana import fetch_panel_title_ids
@@ -34,27 +34,8 @@ from core.drf_resource.exceptions import CustomException
 
 logger = logging.getLogger("bkmonitor.cron_report")
 
-if settings.IS_CONTAINER_MODE:
-    bind = "bk-monitor-api"
-else:
-    bind = f"{os.environ.get('LAN_IP', '0.0.0.0')}:{os.environ.get('BK_MONITOR_KERNELAPI_PORT', '10204')}"
 
-
-def get_or_create_eventloop():
-    """
-    获取或创建事件循环
-    :return: 事件循环
-    """
-    try:
-        return asyncio.get_event_loop()
-    except RuntimeError as ex:
-        if "There is no current event loop in thread" in str(ex) or "Event loop is closed" in str(ex):
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return asyncio.get_event_loop()
-
-
-def split_graph_id(graph_id: str) -> Tuple[str, str, str]:
+def split_graph_id(graph_id: str) -> tuple[str, str, str]:
     """
     分割图表ID
     分为三段，由减号分隔
@@ -72,205 +53,68 @@ def split_graph_id(graph_id: str) -> Tuple[str, str, str]:
     return result.group(1, 4, 5)
 
 
-def chunk_list(list_need_to_chunk: list, per_list_max_length: int):
+def chunk_list(items: list, chunk_size: int):
     """
     对数组进行指定长度的分页
-    :param list_need_to_chunk: 带分页数组
-    :param per_list_max_length: 指定每组长度
+    :param items: 带分页数组
+    :param chunk_size: 指定每组长度
     :return: 分页后的数组
     """
     groups = [[]]
     j_index = 0
-    for index, value in enumerate(list_need_to_chunk):
-        if index != 0 and index % per_list_max_length == 0:
+    for index, value in enumerate(items):
+        if index != 0 and index % chunk_size == 0:
             groups.append([])
             j_index += 1
         groups[j_index].append(value)
     return groups
 
 
-def generate_url(bk_biz_id, dashboard_uid, panel_id, var_bk_biz_ids, begin_time="", end_time=""):
-    """
-    生成图片url
-    :param bk_biz_id: 业务ID
-    :param dashboard_uid: 仪表盘ID
-    :param panel_id: Panel ID
-    :param begin_time: 起始时间
-    :param end_time: 终止时间
-    :return: 图表url
-    """
-    if settings.BK_MONITOR_HOST.endswith("/o/bk_monitorv3/"):
-        path_prefix = "/o/bk_monitorv3/"
-    else:
-        path_prefix = "/"
-
-    if panel_id == "*":
-        url = (
-            f"http://{bind}{path_prefix}grafana/d/{dashboard_uid}/"
-            f"?orgName={bk_biz_id}&from={begin_time}&to={end_time}&kiosk"
-        )
-    else:
-        url = (
-            f"http://{bind}{path_prefix}grafana/d-solo/{dashboard_uid}/"
-            f"?orgName={bk_biz_id}&from={begin_time}&to={end_time}{var_bk_biz_ids}&panelId={panel_id}"
-        )
-    return url
-
-
-async def wait_for_panel_render(page):
-    """
-    等待仪表盘加载完成
-    """
-    start_time = time.time()
-    while True:
-        rendered_panel_count = await page.evaluate("() => { return window.panelsRendered }")
-        panel_count = await page.evaluate(
-            "() => { return document.querySelectorAll('.panel').length "
-            "|| document.querySelectorAll('.panel-container').length }"
-        )
-        if rendered_panel_count is not None and rendered_panel_count >= panel_count:
-            # 等待图表渲染动画完成
-            time.sleep(3)
-            break
-
-        if time.time() - start_time > 60:
-            break
-
-
-async def fetch_images_by_puppeteer(element, browser):
-    """
-    使用puppeteer进行截图
-    """
-    logger.info(f"fetch_images_by_puppeteer: render dashboard {element['url']}")
-    err_msg = []
-    try:
-        # 启动标签页
-        page = await browser.newPage()
-        try:
-            await page.goto(
-                element["url"],
-                {"waitUntil": "networkidle0", "timeout": settings.MAIL_REPORT_FULL_PAGE_WAIT_TIME * 1000},
-            )
-        except TimeoutError:
-            pass
-
-        if element["full_page"]:
-            # 整屏截图，参考https://github.com/grafana/grafana-image-renderer/blob/087ae6e9b25cc1175791448866a3c740c10ce31f/src/browser/browser.ts#L177
-            # 获取仪表盘大小
-            content_selector = "div.react-grid-layout"
-            scroll_div_selector = '[class="scrollbar-view"]'
-            await page.waitForSelector(scroll_div_selector)
-            heights = await page.evaluate(
-                """
-            (scrollDivSelector) => {
-                const dashboardDiv = document.querySelector(scrollDivSelector);
-                return { scroll: dashboardDiv.scrollHeight, client: dashboardDiv.clientHeight }
-            }
-            """,
-                scroll_div_selector,
-            )
-
-            # 滚动页面以加载全部视图
-            scrolls = heights["scroll"] // heights["client"]
-            for i in range(scrolls):
-                await page.evaluate(
-                    """
-                (scrollByHeight, scrollDivSelector) => {
-                    document.querySelector(scrollDivSelector)?.scrollBy(0, scrollByHeight);
-                }
-                """,
-                    heights["client"],
-                    scroll_div_selector,
-                )
-                await page.waitFor(500)
-
-            # 等待图表加载结束
-            await wait_for_panel_render(page)
-            await asyncio.sleep(settings.MAIL_REPORT_FULL_PAGE_WAIT_TIME)
-            await page.evaluate(
-                "(scrollDivSelector) => { document.querySelector(scrollDivSelector)?.scrollTo(0, 0) }",
-                scroll_div_selector,
-            )
-            # 放大页面可视区域
-            await page.setViewport({"width": 1600, "height": heights["scroll"], "deviceScaleFactor": 2})
-        else:
-            pannel_type = "div.panel-solo" if element.get("need_title") else "div.css-kuoxoh-panel-content"
-            content_selector = pannel_type
-            await page.setViewport(element["image_size"])
-            await wait_for_panel_render(page)
-
-        # 截图
-        target = await page.querySelector(content_selector)
-        if not target:
-            err_detail = f"[mail_report] error url: {element['url']}: target: {content_selector} not found"
-            err_msg.append({"tag": element["tag"], "exception_msg": err_detail})
-            raise CustomException(err_detail)
-        img = await target.screenshot(type="jpeg", quality=80)
-        element["base64"] = base64.b64encode(img).decode("utf-8")
-        logger.info(f"fetch_images_by_puppeteer: render img length({len(img)})")
-        await page.close()
-    except CustomException:
-        pass
-    except Exception as e:
-        err_msg.append({"tag": element["tag"], "exception_msg": str(e)})
-        logger.exception(f"[mail_report] error url: {element['url']} fetch_images_by_puppeteer: {e}")
-
-    return element, err_msg
-
-
 async def start_tasks(elements):
     """
     启动浏览器并执行截图任务
     :param elements: panel信息
+    {
+        "bk_biz_id": 2,
+        "dashboard_uid": "xxx",
+        "panel_id": "xxx",
+        "image_size":{
+            "width": width,
+            "height": height
+        },
+        "variables": {"bk_biz_id": ["1", "2", "3"]},
+        "start_time": 1612766359450,
+        "end_time": 1612766359450,
+        "with_panel_title": False,
+    }
     :return: [(element, err_msg)]
     """
-    launcher = None
-    browser = None
-    try_times = 0
-    while not browser and try_times <= 5:
-        try:
-            chrome_path = (
-                os.popen("command -v chromium").readlines() or os.popen("command -v google-chrome").readlines()
-            )
-            if len(chrome_path) > 0:
-                chrome_path = chrome_path[0].strip()
-            else:
-                raise CustomException("[mail_report] Without Chrome, Could not start mail report.")
-
-            browser = await launch(
-                headless=True,
-                executablePath=chrome_path,
-                options={
-                    "args": [
-                        "--disable-dev-shm-usage",
-                        "--disable-infobars",
-                        "--disable-extensions",
-                        "--disable-gpu",
-                        "--mute-audio",
-                        "--disable-bundled-ppapi-flash",
-                        "--hide-scrollbars",
-                    ]
-                },
-            )
-        except Exception as e:
-            if launcher:
-                launcher.proc.kill()
-            logger.exception(f"[mail_report] chrome start fail, will try again, Number: {try_times}, error: {e}")
-            try_times += 1
-
     result = []
     for element in elements:
-        element, err_msg = await fetch_images_by_puppeteer(element, browser)
-        if "base64" not in element:
-            await asyncio.sleep(5)
-            element, err_msg = await fetch_images_by_puppeteer(element, browser)
-        result.append((element, err_msg))
+        err_msg = None
+        config = RenderDashboardConfig(
+            bk_biz_id=element["bk_biz_id"],
+            dashboard_uid=element["dashboard_uid"],
+            panel_id=element["panel_id"],
+            with_panel_title=element["with_panel_title"],
+            width=element["width"] if element["panel_id"] else 1600,
+            height=element["height"],
+            scale=element["scale"],
+            variables=element["variables"],
+            start_time=element["start_time"] // 1000,
+            end_time=element["end_time"] // 1000,
+        )
+        try:
+            img = await render_dashboard_panel(config)
+        except Exception as e:
+            err_msg = {"tag": element["tag"], "exception_msg": str(e)}
+            continue
 
-    try:
-        await browser.close()
-    except Exception as e:
-        logger.exception(f"[mail_report] close browser failed, will try again, msg: {e}")
-        await browser.close()
+        element["base64"] = base64.b64encode(img).decode("utf-8")
+        element["url"] = generate_dashboard_url(config, external=True)
+        logger.info(f"fetch_images_by_puppeteer: render img length({len(img)})")
+
+        result.append((element, err_msg))
 
     return result
 
@@ -278,7 +122,6 @@ async def start_tasks(elements):
 def screenshot_by_uid_panel_id(graph_info, need_title=False):
     """
     根据所需图表信息进行截图
-    :param graph_exporter: 浏览器
     :param graph_info: 图表信息
     [{
         "bk_biz_id": 2,
@@ -288,7 +131,7 @@ def screenshot_by_uid_panel_id(graph_info, need_title=False):
             "width": width,
             "height": height
         },
-        "var_bk_biz_ids": "2,3,4"
+        "var_bk_biz_ids": ["2", "3", "4"],
         "from_time": 1612766359450,
         "to_time": 1612766359450,
         "is_superuser": False
@@ -298,21 +141,18 @@ def screenshot_by_uid_panel_id(graph_info, need_title=False):
 
     elements = []
     for graph in graph_info:
-        # 加载页面
-        url = generate_url(
-            bk_biz_id=graph["bk_biz_id"],
-            dashboard_uid=graph["uid"],
-            panel_id=graph["panel_id"],
-            var_bk_biz_ids=graph["var_bk_biz_ids"],
-            begin_time=graph.get("from_time", ""),
-            end_time=graph.get("to_time", ""),
-        )
         element = {
-            "url": url,
-            "full_page": graph["panel_id"] == "*",
+            "bk_biz_id": graph["bk_biz_id"],
+            "dashboard_uid": graph["uid"],
+            "panel_id": graph["panel_id"] if graph["panel_id"] != "*" else None,
+            "start_time": graph.get("from_time", ""),
+            "end_time": graph.get("to_time", ""),
+            "variables": graph.get("variables", {}),
+            "with_panel_title": need_title,
+            "width": graph["image_size"]["width"],
+            "height": graph["image_size"]["height"],
+            "scale": graph.get("image_size", {}).get("deviceScaleFactor", 2),
             "tag": graph["tag"],
-            "image_size": graph["image_size"],
-            "need_title": need_title,
         }
         elements.append(element)
 
@@ -343,21 +183,22 @@ class ReportHandler:
     报表处理器
     """
 
-    def __init__(self, item_id=None):
+    def __init__(self, bk_tenant_id: str, item_id=None):
         self.image_size_mapper = {
             1: {"width": 800, "height": 270, "deviceScaleFactor": 2},
             2: {"width": 620, "height": 300, "deviceScaleFactor": 2},
         }
         self.item_id = item_id
+        self.bk_tenant_id = bk_tenant_id
 
-    def fetch_receivers(self, item_receivers=None):
+    def fetch_receivers(self, item_receivers: list[dict] | None = None) -> list[str]:
         """
         获取所有需要接收邮件的人
         :return: 接收邮件的名单
         """
         receivers = []
         if not item_receivers:
-            item_receivers = ReportItems.objects.get(pk=self.item_id).receivers
+            item_receivers = ReportItems.objects.get(pk=self.item_id, bk_tenant_id=self.bk_tenant_id).receivers
         groups_data = api.monitor.group_list()
         # 先解析组，再解析人，去掉is_enabled=False的人员
         # 只有开启了订阅的人才需要接收邮件
@@ -515,13 +356,17 @@ class ReportHandler:
                 graph_info = split_graph_id(graph)
                 bk_biz_id, var_bk_biz_ids = self.parse_graph_info(graph_info, is_superuser, user_bizs, receivers)
 
+                variables = {}
+                if graph_info[2] != "*":
+                    variables = {"bk_biz_id": var_bk_biz_ids}
+
                 total_graphs.append(
                     {
                         "bk_biz_id": bk_biz_id,
                         "uid": graph_info[1],
                         "panel_id": graph_info[2],
                         "image_size": self.image_size_mapper.get(content["row_pictures_num"]),
-                        "var_bk_biz_ids": "".join([f"&var-bk_biz_id={i}" for i in var_bk_biz_ids]),
+                        "variables": variables,
                         "tag": graph,
                         "from_time": from_time_stamp,
                         "to_time": to_time_stamp,
@@ -529,10 +374,11 @@ class ReportHandler:
                 )
 
         # 截图
-        logger.info("[mail_report] prepare for screenshot...")
+        logger.info(f"[mail_report] prepare for screenshot {mail_title}...")
         images_files, err_msg = screenshot_by_uid_panel_id(
             total_graphs, need_title=bool(channel_name == ReportItems.Channel.WXBOT)
         )
+        logger.info(f"[mail_report] got screenshot {mail_title}...")
 
         # 渲染邮件模板
         render_args = {}
@@ -547,8 +393,8 @@ class ReportHandler:
         render_args["to_time"] = to_time.strftime("%Y-%m-%d %H:%M:%S")
 
         # 邮件标题后补
-        render_args["mail_title_time"] = f'({from_time.strftime("%Y-%m-%d")} ~ {to_time.strftime("%Y-%m-%d")})'
-        render_args["time_range"] = f'({render_args["from_time"]} ~ {render_args["to_time"]})'
+        render_args["mail_title_time"] = f"({from_time.strftime('%Y-%m-%d')} ~ {to_time.strftime('%Y-%m-%d')})"
+        render_args["time_range"] = f"({render_args['from_time']} ~ {render_args['to_time']})"
 
         render_args["contents"] = []
         render_args["attachments"] = [
@@ -562,7 +408,7 @@ class ReportHandler:
         ]
 
         # 记录图表标题的中间变量
-        panel_names: Dict[Tuple[int, str], Dict[str, str]] = {}
+        panel_names: dict[tuple[int, str], dict[str, str]] = {}
 
         for content in contents:
             graphs = []
@@ -611,7 +457,7 @@ class ReportHandler:
 
                 graph_url = ""
                 if is_link_enabled and settings.REPORT_DASHBOARD_UID not in image_url:
-                    graph_url = image_url.replace(f"http://{bind}", settings.BK_MONITOR_HOST.rstrip("/"))
+                    graph_url = image_url
                 graphs.append(
                     {
                         "graph_tag": graph,
@@ -693,13 +539,13 @@ class ReportHandler:
                         "**图片列表: **\n>{graph_names}\n"
                     )
                     graph_names = [
-                        f"[{graph['title']}]({graph['url']})" if is_link_enabled else graph['title']
+                        f"[{graph['title']}]({graph['url']})" if is_link_enabled else graph["title"]
                         for graph in content["origin_graphs"]
                     ]
                     send_content = content_template.format(
                         title=render_args["mail_title"],
                         time_range=render_args["time_range"],
-                        sub_title=f'[{content["title"]}]({render_args["redirect_url"]})'
+                        sub_title=f"[{content['title']}]({render_args['redirect_url']})"
                         if is_link_enabled
                         else content["title"],
                         content=content["content"],
@@ -710,7 +556,7 @@ class ReportHandler:
                         logger.error("[mail_report] send.wxwork_group content failed, {}".format(response["errmsg"]))
                         failed.append(response["errmsg"])
                 except Exception as error:
-                    logger.error("[mail_report] send.wxwork_group content failed, {}".format(error))
+                    logger.error(f"[mail_report] send.wxwork_group content failed, {error}")
 
                 for graph in content["origin_graphs"]:
                     try:
@@ -721,7 +567,7 @@ class ReportHandler:
                         else:
                             success_count += 1
                     except Exception as error:
-                        logger.error("[mail_report] send.wxwork_group image failed, {}".format(error))
+                        logger.error(f"[mail_report] send.wxwork_group image failed, {error}")
 
             logger.info(
                 f"[mail_report] send_wxbot finished: {render_args['mail_title']},"
@@ -731,7 +577,7 @@ class ReportHandler:
         except Exception as e:
             raise CustomException(f"[mail_report] send_wxbot failed: {e}")
 
-    def parse_users_group(self, all_user_different_graph, receivers, superusers):
+    def parse_users_group(self, bk_tenant_id: str, all_user_different_graph, receivers, superusers):
         """
         发送分组逻辑
         :param all_user_different_graph: 内置图表类型
@@ -748,7 +594,7 @@ class ReportHandler:
                 continue
             user_is_superuser = receiver in superusers
             if all_user_different_graph[BuildInBizType.ALL]:
-                perm_client = Permission(receiver)
+                perm_client = Permission(username=receiver, bk_tenant_id=bk_tenant_id)
                 perm_client.skip_check = False
                 business_list = [
                     biz["bk_biz_id"] for biz in perm_client.filter_space_list_by_action(ActionEnum.VIEW_BUSINESS)
@@ -781,8 +627,10 @@ class ReportHandler:
         """
         渲染HTML并发送邮件入库
         """
-        report_item = ReportItems.objects.get(pk=self.item_id)
-        report_item_contents = list(ReportContents.objects.filter(report_item=self.item_id).values())
+        report_item = ReportItems.objects.get(bk_tenant_id=self.bk_tenant_id, pk=self.item_id)
+        report_item_contents = list(
+            ReportContents.objects.filter(bk_tenant_id=self.bk_tenant_id, report_item=self.item_id).values()
+        )
 
         # 如果选择图表时选了'有权限的业务'
         all_user_different_graph = {
@@ -813,7 +661,12 @@ class ReportHandler:
             if any(all_user_different_graph.values()):
                 # 如果每个用户的图表都不一样
                 # 获取用户的业务列表并分组渲染发送
-                send_groups = self.parse_users_group(all_user_different_graph, receivers, superusers)
+                send_groups = self.parse_users_group(
+                    bk_tenant_id=report_item.bk_tenant_id,
+                    all_user_different_graph=all_user_different_graph,
+                    receivers=receivers,
+                    superusers=superusers,
+                )
                 logger.info(f"[mail_report] groups count: {len(send_groups)}")
                 # 分组渲染发送
                 for biz in send_groups:

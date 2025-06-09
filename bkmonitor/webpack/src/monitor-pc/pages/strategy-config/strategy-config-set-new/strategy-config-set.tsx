@@ -391,7 +391,7 @@ export default class StrategyConfigSet extends tsc<IStrategyConfigSetProps, IStr
   /* 场景智能检测视图参数 */
   multivariateAnomalyDetectionParams = {
     metrics: [],
-    refleshKey: '',
+    refreshKey: '',
   };
   /* 是否开启场景智能检测功能 */
   showMultivariateAnomalyDetection = false;
@@ -1634,7 +1634,7 @@ export default class StrategyConfigSet extends tsc<IStrategyConfigSetProps, IStr
     this.defaultCheckedTarget.target_detail = target;
     if (this.isMultivariateAnomalyDetection) {
       /* refleshKey用于控制图表数据刷新 */
-      this.multivariateAnomalyDetectionParams.refleshKey = random(8);
+      this.multivariateAnomalyDetectionParams.refreshKey = random(8);
     }
   }
 
@@ -1950,7 +1950,7 @@ export default class StrategyConfigSet extends tsc<IStrategyConfigSetProps, IStr
         index_set_id: item.index_set_id,
         query_string: item.keywords_query_string,
         custom_event_name: item.custom_event_name,
-        functions: hasIntelligentDetect ? [] : item.functions,
+        functions: this.isKpiAnomalySdkEnabled || !hasIntelligentDetect ? item.functions : [],
         intelligent_detect: this.id && hasIntelligentDetect ? item.intelligent_detect : undefined,
         time_field: (hasIntelligentDetect ? 'dtEventTimeStamp' : item.time_field) || 'time',
         bkmonitor_strategy_id: item.metric_field || item.bkmonitor_strategy_id,
@@ -2557,7 +2557,7 @@ export default class StrategyConfigSet extends tsc<IStrategyConfigSetProps, IStr
   }
   handleMultivariateAnomalyRefreshView() {
     /* refleshKey用于控制图表数据刷新 */
-    this.multivariateAnomalyDetectionParams.refleshKey = random(8);
+    this.multivariateAnomalyDetectionParams.refreshKey = random(8);
   }
 
   metricDataContent() {

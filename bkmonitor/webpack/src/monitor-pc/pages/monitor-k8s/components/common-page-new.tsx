@@ -27,6 +27,7 @@
 import { Component, Emit, InjectReactive, Prop, Provide, ProvideReactive, Ref, Watch } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
+import { isEqual } from 'lodash';
 import { getSceneView, getSceneViewList } from 'monitor-api/modules/scene_view';
 import bus from 'monitor-common/utils/event-bus';
 import { deepClone, isObject, random } from 'monitor-common/utils/utils';
@@ -75,7 +76,7 @@ import {
   SPLIT_MIN_WIDTH,
   type SearchType,
 } from '../typings';
-import { SETTINGS_POP_ZINDEX } from '../utils';
+import { SETTINGS_POP_Z_INDEX } from '../utils';
 import AlarmTools from './alarm-tools';
 import CommonDetail, { INDEX_LIST_DEFAULT_CONFIG_KEY } from './common-detail';
 import CommonList from './common-list/common-list';
@@ -145,12 +146,15 @@ interface ICommonPageEvent {
 }
 export const MIN_DASHBOARD_PANEL_WIDTH = '640';
 export type ShowModeType = 'dashboard' | 'default' | 'list';
+// 事件tab的query
+export const Event_EXPORT_QUERY_KEYS = ['targets', 'filterMode', 'commonWhere', 'showResidentBtn'];
 const customRouterQueryKeys = [
   'sliceStartTime',
   'sliceEndTime',
   'callOptions',
   // log-retrieve图所需的路由参数
   ...APM_LOG_ROUTER_QUERY_KEYS,
+  ...Event_EXPORT_QUERY_KEYS,
 ];
 @Component({
   components: {
@@ -534,11 +538,11 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
   // 时区
   @ProvideReactive('timezone') timezone: string = getDefaultTimezone();
   // 刷新间隔
-  @ProvideReactive('refleshInterval') refleshInterval = -1;
+  @ProvideReactive('refreshInterval') refreshInterval = -1;
   // 视图变量
   @ProvideReactive('viewOptions') viewOptions: IViewOptions = {};
   // 是否立即刷新
-  @ProvideReactive('refleshImmediate') refleshImmediate = '';
+  @ProvideReactive('refreshImmediate') refreshImmediate = '';
   // 对比的时间
   @ProvideReactive('timeOffset') timeOffset: string[] = [];
   // 对比类型
@@ -628,10 +632,20 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
     }
   }
 
+  @Watch('$route.query')
+  handleRouteQueryChange(val = {}) {
+    for (const key in val) {
+      if (customRouterQueryKeys.includes(key)) {
+        this.customRouteQuery[key] = val[key];
+      }
+    }
+  }
+
   async initData() {
     this.localSceneType = this.sceneType;
     this.loading = true;
-    this.columns = +localStorage.getItem(DASHBOARD_PANEL_COLUMN_KEY) || 2;
+    const storedValue = localStorage.getItem(DASHBOARD_PANEL_COLUMN_KEY);
+    this.columns = storedValue === '0' ? 0 : +storedValue || 2;
     this.filtersReady = false;
     this.selectorReady = false;
     await this.$nextTick();
@@ -697,7 +711,9 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
       } else if (key.match(/^groups/)) {
         this.groups = Array.isArray(val) ? val : [val];
       } else if (!['key'].includes(key)) {
-        if (typeof val === 'string' && /^-?[1-9]?[0-9]*[1-9]+$/.test(val)) {
+        if (customRouterQueryKeys.includes(key)) {
+          this.customRouteQuery[key] = val;
+        } else if (typeof val === 'string' && /^-?[1-9]?[0-9]*[1-9]+$/.test(val)) {
           this[key] = +val;
         } else if (['from', 'to'].includes(key)) {
           // this[key] = Array.isArray(val) ? val : isNaN(+val) ? val : +val;
@@ -748,8 +764,6 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
             this.timezone = val as string;
             updateTimezone(val as string);
           }
-        } else if (customRouterQueryKeys.includes(key)) {
-          this.customRouteQuery[key] = val;
         } else if (key === 'groupByVariables') {
           try {
             this.groupByVariables = JSON.parse(decodeURIComponent(val as string));
@@ -1064,7 +1078,7 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
     if (this.settingsWrapRef?.hasDiff) {
       const res = await new Promise((resolve, reject) => {
         this.$bkInfo({
-          zIndex: SETTINGS_POP_ZINDEX,
+          zIndex: SETTINGS_POP_Z_INDEX,
           title: this.$t('是否放弃本次操作？'),
           confirmFn: () => resolve(true),
           cancelFn: () => reject(false),
@@ -1184,8 +1198,8 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
     this.infoActive = this.isSplitPanel ? false : v;
   }
   // 立刻刷新
-  handleImmediateReflesh() {
-    this.refleshImmediate = random(10);
+  handleImmediateRefresh() {
+    this.refreshImmediate = random(10);
   }
   // 图表布局方式变更
   handleChartChange(layoutId: number) {
@@ -1407,41 +1421,44 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
         groupByVariables: JSON.stringify(this.groupByVariables),
       };
     }
-    this.$router.replace({
-      name: this.$route.name,
-      query: {
-        ...filters,
-        ...this.customRouteQuery,
-        ...groupByVariables,
-        method: this.method,
-        interval: this.interval.toString(),
-        groups: this.groups,
-        dashboardId: this.dashboardId,
-        // timeRange: this.timeRange as string,
-        from: this.timeRange[0],
-        to: this.timeRange[1],
-        timezone: this.timezone,
-        refleshInterval: this.refleshInterval.toString(),
-        // selectorSearchCondition: encodeURIComponent(JSON.stringify(this.selectorSearchCondition)),
-        queryData: queryDataStr,
-        key: random(10),
-        // 详情名称，用于面包屑
-        name: this.$route.query?.name,
-        sceneId: this.sceneId,
-        sceneType: this.localSceneType,
-        queryString: this.queryString,
-        preciseFilter: String(this.isPreciseFilter) /** 是否开启精准过滤 */,
-        compares:
-          this.compareType === 'target' && !!this.compares.targets?.length
-            ? encodeURIComponent(JSON.stringify(this.compares))
-            : undefined /** 目标对比 */,
-        timeOffset:
-          this.compareType === 'time' && !!this.timeOffset.length
-            ? encodeURIComponent(JSON.stringify(this.timeOffset))
-            : undefined /** 时间对比 */,
-        isGroupByLimit: this.isGroupByLimit ? 'true' : 'false',
-      },
-    });
+    const query = {
+      ...filters,
+      ...this.customRouteQuery,
+      ...groupByVariables,
+      method: this.method,
+      interval: this.interval.toString(),
+      groups: this.groups,
+      dashboardId: this.dashboardId,
+      // timeRange: this.timeRange as string,
+      from: this.timeRange[0],
+      to: this.timeRange[1],
+      timezone: this.timezone,
+      refreshInterval: this.refreshInterval.toString(),
+      // selectorSearchCondition: encodeURIComponent(JSON.stringify(this.selectorSearchCondition)),
+      queryData: queryDataStr,
+      key: random(10),
+      // 详情名称，用于面包屑
+      name: this.$route.query?.name,
+      sceneId: this.sceneId,
+      sceneType: this.localSceneType,
+      queryString: this.queryString,
+      preciseFilter: String(this.isPreciseFilter) /** 是否开启精准过滤 */,
+      compares:
+        this.compareType === 'target' && !!this.compares.targets?.length
+          ? encodeURIComponent(JSON.stringify(this.compares))
+          : undefined /** 目标对比 */,
+      timeOffset:
+        this.compareType === 'time' && !!this.timeOffset.length
+          ? encodeURIComponent(JSON.stringify(this.timeOffset))
+          : undefined /** 时间对比 */,
+      isGroupByLimit: this.isGroupByLimit ? 'true' : 'false',
+    };
+    if (!isEqual(query, this.$route.query)) {
+      this.$router.replace({
+        name: this.$route.name,
+        query,
+      });
+    }
   }
   /** 更新viewOptions的值 */
   async handleViewOptionsChange(viewOptions: IViewOptions) {
@@ -1492,8 +1509,8 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
   handleResizeCollapse() {
     this.$nextTick(() => this.collapseRef?.handleContentResize());
   }
-  handleRefleshChange(v: number) {
-    this.refleshInterval = v;
+  handleRefreshChange(v: number) {
+    this.refreshInterval = v;
     this.handleResetRouteQuery();
   }
   handleTimeRangeChange(v: TimeRangeType) {
@@ -1832,11 +1849,12 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
               class='tools-wrap'
               slot='tools'
             >
+              {this.$slots.prependTools}
               <DashboardTools
                 downSampleRange={this.downSampleRange}
                 isSplitPanel={this.isSplitPanel}
                 menuList={this.$slots.buttonGroups ? [] : this.sceneData.dashboardToolMenuList}
-                refleshInterval={this.refleshInterval}
+                refreshInterval={this.refreshInterval}
                 showDownSampleRange={false}
                 showListMenu={!this.readonly && this.localSceneType !== 'overview'}
                 showSplitPanel={this.isShowSplitPanel}
@@ -1844,8 +1862,8 @@ export default class CommonPageNew extends tsc<ICommonPageProps, ICommonPageEven
                 timezone={this.timezone}
                 onDownSampleRangeChange={this.handleDownSampleRangeChange}
                 onFullscreenChange={this.handleFullscreen}
-                onImmediateReflesh={this.handleImmediateReflesh}
-                onRefleshChange={this.handleRefleshChange}
+                onImmediateRefresh={this.handleImmediateRefresh}
+                onRefreshChange={this.handleRefreshChange}
                 onSelectedMenu={this.handleShowSettingModel}
                 onSplitPanelChange={this.handleSplitPanel}
                 onTimeRangeChange={this.handleTimeRangeChange}

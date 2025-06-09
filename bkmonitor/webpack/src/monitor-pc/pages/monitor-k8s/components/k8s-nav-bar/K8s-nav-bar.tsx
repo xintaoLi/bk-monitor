@@ -29,6 +29,7 @@ import { Component as tsc } from 'vue-tsx-support';
 import TemporaryShareNew from '../../../../components/temporary-share/temporary-share';
 import { DEFAULT_TIME_RANGE } from '../../../../components/time-range/utils';
 import DashboardTools from '../dashboard-tools';
+import GotoOldVersion from './goto-old';
 
 import type { TimeRangeType } from '../../../../components/time-range/time-range';
 
@@ -69,22 +70,39 @@ export default class K8sNavBar extends tsc<K8sNavBarProps, K8sNavBarEvent> {
 
   curTimeRange: TimeRangeType = DEFAULT_TIME_RANGE;
 
+  sceneToggle = false;
+
   k8sList = [
     { label: window.i18n.tc('性能'), value: 'performance', icon: 'icon-xingneng1', disabled: false },
-    { label: window.i18n.tc('网络'), value: 'network', icon: 'icon-wangluo', disabled: true },
+    { label: window.i18n.tc('网络'), value: 'network', icon: 'icon-wangluo', disabled: false },
+    { label: window.i18n.tc('容量'), value: 'capacity', icon: 'icon-rongliang', disabled: false },
     { label: window.i18n.tc('存储'), value: 'storage', icon: 'icon-cunchu', disabled: true },
-    { label: window.i18n.tc('容量'), value: 'capacity', icon: 'icon-rongliang', disabled: true },
     { label: window.i18n.tc('事件'), value: 'event', icon: 'icon-shijian2', disabled: true },
     { label: window.i18n.tc('成本'), value: 'cost', icon: 'icon-chengben', disabled: true },
   ];
+
+  get sceneName() {
+    return this.k8sList.find(item => item.value === this.value)?.label;
+  }
 
   get selectItem() {
     return this.k8sList.find(item => item.value === this.value);
   }
 
+  handleGotoOld() {
+    this.$router.push({
+      name: 'k8s',
+      query: {},
+    });
+  }
+
   @Watch('timeRange', { immediate: true })
   onTimeRangeChange(v: TimeRangeType) {
     this.curTimeRange = v;
+  }
+
+  handleSceneToggle(toggle: boolean) {
+    this.sceneToggle = toggle;
   }
 
   @Emit('selected')
@@ -120,11 +138,21 @@ export default class K8sNavBar extends tsc<K8sNavBarProps, K8sNavBarEvent> {
             class='nav-select'
             clearable={false}
             ext-popover-cls='new-k8s-nav-select-popover'
-            prefix-icon={`icon-monitor ${this.selectItem.icon}`}
             searchable={false}
             value={this.value}
             onSelected={this.handleSelected}
+            onToggle={this.handleSceneToggle}
           >
+            <div
+              class='scene-select-trigger'
+              slot='trigger'
+            >
+              <div class='scene-name'>
+                <i class={`icon-monitor scene-icon ${this.selectItem.icon}`} />
+                <span class='name'>{this.sceneName}</span>
+              </div>
+              <span class={`icon-monitor icon-mc-arrow-down ${this.sceneToggle ? 'expand' : ''}`} />
+            </div>
             {this.k8sList.map(item => (
               <bk-option
                 id={item.value}
@@ -138,7 +166,7 @@ export default class K8sNavBar extends tsc<K8sNavBarProps, K8sNavBarEvent> {
             ))}
           </bk-select>
           <TemporaryShareNew
-            icon='icon-copy-link'
+            icon='icon-mc-share'
             navList={this.routeList}
             navMode='share'
           />
@@ -148,20 +176,24 @@ export default class K8sNavBar extends tsc<K8sNavBarProps, K8sNavBarEvent> {
           <DashboardTools
             isSplitPanel={false}
             menuList={[]}
-            refleshInterval={this.refreshInterval}
+            refreshInterval={this.refreshInterval}
             showDownSampleRange={false}
             showFullscreen={false}
             showListMenu={false}
             showSplitPanel={false}
             timeRange={this.timeRange}
             timezone={this.timezone}
-            onImmediateReflesh={this.handleImmediateRefresh}
-            onRefleshChange={this.handleRefreshChange}
+            onImmediateRefresh={this.handleImmediateRefresh}
+            onRefreshChange={this.handleRefreshChange}
             onTimeRangeChange={this.handleTimeRangeChange}
             onTimezoneChange={this.handleTimezoneChange}
           >
             {this.$slots.dashboardTools}
           </DashboardTools>
+          <GotoOldVersion
+            tips={this.$tc('新版容器监控尚未完全覆盖旧版功能，如需可切换到旧版查看')}
+            onClick={this.handleGotoOld}
+          />
         </div>
       </div>
     );

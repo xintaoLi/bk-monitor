@@ -30,6 +30,7 @@
     <div class="retrieve-detail-container">
       <result-header
         ref="resultHeader"
+        :clustering-data="clusteringData"
         :date-picker-value="datePickerValue"
         :index-set-item="indexSetItem"
         :is-as-iframe="isAsIframe"
@@ -37,7 +38,6 @@
         :retrieve-params="retrieveParams"
         :show-retrieve-condition="showRetrieveCondition"
         :timezone="timezone"
-        :clustering-data="clusteringData"
         @close-retrieve-condition="closeRetrieveCondition"
         @date-picker-change="retrieveWhenDateChange"
         @open="openRetrieveCondition"
@@ -157,17 +157,17 @@
                 </div>
                 <field-filter
                   ref="fieldFilterRef"
-                  :index-set-item="indexSetItem"
-                  :retrieve-params="retrieveParams"
-                  :sort-list="sortList"
+                  :date-picker-value="datePickerValue"
                   :field-alias-map="fieldAliasMap"
+                  :index-set-item="indexSetItem"
                   :parent-loading="tableLoading"
+                  :retrieve-params="retrieveParams"
+                  :retrieve-search-number="retrieveSearchNumber"
                   :show-field-alias="showFieldAlias"
+                  :sort-list="sortList"
                   :statistical-fields-data="statisticalFieldsData"
                   :total-fields="totalFields"
                   :visible-fields="visibleFields"
-                  :date-picker-value="datePickerValue"
-                  :retrieve-search-number="retrieveSearchNumber"
                   @fields-updated="handleFieldsUpdated"
                   @select-fields-config="handleSelectFieldsConfig"
                 />
@@ -296,7 +296,11 @@
     getStorageIndexItem,
   } from '@/common/util';
   import AuthContainerPage from '@/components/common/auth-container-page';
+  // #if MONITOR_APP !== 'apm' && MONITOR_APP !== 'trace'
   import LogIpSelector from '@/components/log-ip-selector/log-ip-selector';
+  // #else
+  // #code const LogIpSelector = () => null;
+  // #endif
   import indexSetSearchMixin from '@/mixins/indexSet-search-mixin';
   import tableRowDeepViewMixin from '@/mixins/table-row-deep-view-mixin';
   import axios from 'axios';
@@ -310,12 +314,13 @@
   import AddCollectDialog from './collect/add-collect-dialog';
   import CollectIndex from './collect/collect-index';
   import SelectIndexSet from './condition-comp/select-index-set.tsx';
+  import FieldFilter from './field-filter-comp';
   import NoIndexSet from './result-comp/no-index-set';
   import ResultHeader from './result-comp/result-header';
   import ResultMain from './result-comp/result-main';
   import SearchComp from './search-comp';
   import SettingModal from './setting-modal/index.vue';
-  import FieldFilter from './field-filter-comp';
+  import { BK_LOG_STORAGE } from '@/store/store.type';
 
   const CancelToken = axios.CancelToken;
   const currentTime = Math.floor(new Date().getTime() / 1000);
@@ -392,7 +397,7 @@
         sortList: [], // 排序字段
         notTextTypeFields: [], // 字段类型不为 text 的字段
         fieldAliasMap: {},
-        showFieldAlias: localStorage.getItem('showFieldAlias') === 'true',
+        showFieldAlias: this.$store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS],
         tookTime: 0, // 耗时
         tableData: {}, // 表格结果
         bkmonitorUrl: false, // 监控主机详情地址
@@ -598,13 +603,19 @@
     },
     mounted() {
       window.bus.$on('retrieveWhenChartChange', this.retrieveWhenChartChange);
-    },
-    // beforeUnmount() {
-    //   updateTimezone();
-    //   this.$store.commit('updateUnionIndexList', []);
-    //   window.bus.$off('retrieveWhenChartChange', this.retrieveWhenChartChange);
 
-    // },
+      const bkBizId = this.$store.state.bkBizId;
+      const spaceUid = this.$store.state.spaceUid;
+
+      this.$router.replace({
+        query: {
+          bizId: bkBizId,
+          spaceUid: spaceUid,
+          ...this.$route.query,
+        },
+      });
+    },
+
     beforeDestroy() {
       this.isInDestroy = true;
       updateTimezone();
@@ -955,7 +966,7 @@
         //     addition: []
         // })
         // 过滤相关
-        const tempList = handleTransformToTimestamp(this.datePickerValue);
+        const tempList = handleTransformToTimestamp(this.datePickerValue, this.$store.getters.retrieveParams.format);
         this.retrieveParams = {
           bk_biz_id: this.$store.state.bkBizId,
           ...DEFAULT_RETRIEVE_PARAMS,
@@ -983,7 +994,7 @@
        * @desc 时间选择组件返回时间戳格式转换
        */
       formatTimeRange() {
-        const tempList = handleTransformToTimestamp(this.datePickerValue);
+        const tempList = handleTransformToTimestamp(this.datePickerValue, this.$store.getters.retrieveParams.format);
         Object.assign(this.retrieveParams, {
           start_time: tempList[0],
           end_time: tempList[1],
@@ -1020,7 +1031,7 @@
         return target ? target.field_type : '';
       },
       // 添加过滤条件
-      addFilterCondition(field, operator, value, isLink = false) {
+      async addFilterCondition(field, operator, value, isLink = false) {
         const isExist = this.additionIsExist({ field, operator, value });
         // 已存在相同条件
         if (isExist) {
@@ -1033,7 +1044,7 @@
         if (!isLink) {
           this.retrieveParams.addition.splice(startIndex, 0, newAddition);
           this.$refs.searchCompRef.pushCondition(field, mapOperator, value);
-          this.$refs.searchCompRef.setRouteParams();
+          await this.$refs.searchCompRef.setRouteParams({}, false, null, true);
           this.retrieveLog();
         } else {
           this.additionLinkOpen([newAddition]);
@@ -1685,8 +1696,9 @@
        */
       async handleFieldsUpdated(displayFieldNames, showFieldAlias, isRequestFields = true) {
         if (showFieldAlias !== undefined) {
-          this.showFieldAlias = showFieldAlias;
-          window.localStorage.setItem('showFieldAlias', showFieldAlias);
+          // bklog\web\src\views\retrieve\result-comp\fields-setting.vue 中修改别名配置
+          this[BK_LOG_STORAGE.SHOW_FIELD_ALIAS] = showFieldAlias;
+          this.$store.commit('updateStorage', { showFieldAlias });
         }
         await this.$nextTick();
         if (!isRequestFields) {
@@ -1738,7 +1750,7 @@
           // 更新联合查询的begin
           const unionConfigs = this.unionIndexList.map(item => ({
             begin: this.isTablePagination
-              ? (this.catchUnionBeginList.find(cItem => String(cItem?.index_set_id) === item)?.begin ?? 0)
+              ? this.catchUnionBeginList.find(cItem => String(cItem?.index_set_id) === item)?.begin ?? 0
               : 0,
             index_set_id: item,
           }));

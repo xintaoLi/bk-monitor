@@ -21,6 +21,9 @@ class DataLinkKind(Enum):
     DATABUS = "Databus"
     CONDITIONALSINK = "ConditionalSink"
     SINK = "Sink"
+    VMSTORAGE = "VmStorage"
+    ELASTICSEARCH = "ElasticSearch"
+    DORIS = "Doris"
 
     choices_labels = (
         (DATAID, "dataids"),
@@ -29,6 +32,9 @@ class DataLinkKind(Enum):
         (DATABUS, "databuses"),
         (CONDITIONALSINK, "conditionalsinks"),
         (SINK, "sinks"),
+        (VMSTORAGE, "vmstorages"),
+        (ELASTICSEARCH, "elasticsearchs"),
+        (DORIS, "dorises"),
     )
 
     @classmethod
@@ -87,3 +93,8 @@ DEFAULT_METRIC_TRANSFORMER_FORMAT = "bkmonitor_standard_v2"
 
 # 针对数据源名称需要替换的正则
 MATCH_DATA_NAME_PATTERN = r"[\u4e00-\u9fa5\.\!\:\*\+\?\^\$\{\}\[\]\(\)\|\\]"
+
+
+BKBASE_NAMESPACE_BK_MONITOR = "bkmonitor"
+BKBASE_NAMESPACE_BK_LOG = "bklog"
+BKBASE_NAMESPACE_BK_APM = "bkapm"

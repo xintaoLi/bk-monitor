@@ -7,13 +7,14 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
+import datetime
 import functools
 import gzip
 import hashlib
 import itertools
 import json
 import logging
-from typing import Optional, Tuple, Union
 
 from django.http import HttpResponse
 from django.utils import timezone
@@ -30,6 +31,7 @@ from apm_web.profile.constants import (
     BUILTIN_APP_NAME,
     DEFAULT_EXPORT_FORMAT,
     DEFAULT_SERVICE_NAME,
+    EBPF_PROFILING_APP_PREFIX,
     EXPORT_FORMAT_MAP,
     LARGE_SERVICE_MAX_QUERY_SIZE,
     NORMAL_SERVICE_MAX_QUERY_SIZE,
@@ -38,6 +40,7 @@ from apm_web.profile.constants import (
     CallGraphResponseDataMode,
 )
 from apm_web.profile.diagrams import get_diagrammer
+from apm_web.profile.diagrams.ebpf_converter import EbpfConverter
 from apm_web.profile.diagrams.tree_converter import TreeConverter
 from apm_web.profile.doris.converter import DorisProfileConverter
 from apm_web.profile.doris.querier import APIParams, APIType, ConverterType, Query
@@ -100,9 +103,6 @@ class ProfileUploadViewSet(ProfileBaseViewSet):
 
         data = uploaded.read()
         md5 = hashlib.md5(data).hexdigest()
-        exist_record = ProfileUploadRecord.objects.filter(bk_biz_id=validated_data["bk_biz_id"], file_md5=md5).first()
-        if exist_record:
-            raise ValueError(_(f"已上传过相同文件，名称：{exist_record.file_name}({exist_record.origin_file_name})"))
 
         # 上传文件到 bkrepo, 上传文件失败，不记录，不执行异步任务
         try:
@@ -155,14 +155,45 @@ class ProfileUploadViewSet(ProfileBaseViewSet):
             filter_params["app_name"] = validated_data.get("app_name")
         if validated_data.get("origin_file_name"):
             filter_params["origin_file_name"] = validated_data.get("origin_file_name")
-        if validated_data.get("service_name "):
+        if validated_data.get("service_name"):
             filter_params["service_name"] = validated_data.get("service_name")
-        queryset = ProfileUploadRecord.objects.filter(**filter_params)
+
+        # 过滤掉过期的文件 (过期文件在 bkbase 中已查不到不需要显示)
+        datasource = api.apm_api.query_builtin_profile_datasource()
+        last_retention = datetime.datetime.now() - datetime.timedelta(days=datasource["retention"])
+        queryset = ProfileUploadRecord.objects.filter(**filter_params, uploaded_time__gte=last_retention).order_by(
+            "-uploaded_time"
+        )
         return Response(data=ProfileUploadRecordSLZ(queryset, many=True).data)
 
 
 class ProfileQueryViewSet(ProfileBaseViewSet):
     """Profile Query viewSet"""
+
+    @staticmethod
+    def ebpf_query(
+        bk_biz_id: int,
+        app_name: str,
+        service_name: str,
+        start: int,
+        end: int,
+        sample_type: str,
+        converter: ConverterType | None = None,
+    ) -> TreeConverter:
+        """
+        获取 ebpf profile 数据
+        """
+        profile_data = api.apm_api.query_ebpf_profile(
+            app_name=app_name,
+            bk_biz_id=bk_biz_id,
+            service_name=service_name,
+            start=start,
+            data_type=sample_type,
+            end=end,
+        )
+        ebpf_converter = EbpfConverter()
+        ebpf_converter.convert(raw=profile_data, data_type=sample_type)
+        return ebpf_converter
 
     @staticmethod
     def query(
@@ -172,16 +203,18 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         start: int,
         end: int,
         result_table_id: str,
-        extra_params: Optional[dict] = None,
+        extra_params: dict | None = None,
         api_type: APIType = APIType.QUERY_SAMPLE_BY_JSON,
-        profile_id: Optional[str] = None,
-        filter_labels: Optional[dict] = None,
+        profile_id: str | None = None,
+        filter_labels: dict | None = None,
         dimension_fields: str = None,
         data_type: str = None,
         sample_type: str = None,
         order: str = None,
-        converter: Optional[ConverterType] = None,
-    ) -> Union[DorisProfileConverter, TreeConverter, dict]:
+        agg_method: str = None,
+        agg_interval: int = 60,
+        converter: ConverterType | None = None,
+    ) -> DorisProfileConverter | TreeConverter | dict:
         """
         获取 profile 数据
         """
@@ -195,7 +228,9 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         if api_type in [APIType.QUERY_SAMPLE_BY_JSON, APIType.SELECT_COUNT]:
             # query_sample / select_count 接口需要传递 dimension_fields 参数
             if not dimension_fields:
-                dimension_fields = ",".join(["type", "service_name", "period_type", "period", "sample_type"])
+                dimension_fields = ",".join(
+                    ["dtEventTimeStamp", "type", "service_name", "period_type", "period", "sample_type"]
+                )
             extra_params["dimension_fields"] = dimension_fields
 
         if filter_labels:
@@ -217,9 +252,9 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
                 extra_params["order"] = {"expr": order.replace("-", ""), "sort": sort}
             else:
                 if api_type == APIType.QUERY_SAMPLE_BY_JSON:
-                    # 如果没有排序并且为 query_sample_by_json 类型 那么增加排序字段 t1.stacktrace_id 保持接口返回数据一致
+                    # 如果没有排序并且为 query_sample_by_json 类型 那么增加排序字段 dtEventTimeStamp,t1.stacktrace_id 保持接口返回数据一致
                     extra_params.setdefault("order", {})
-                    extra_params["order"] = {"expr": "t1.stacktrace_id", "sort": "asc"}
+                    extra_params["order"] = {"expr": "dtEventTimeStamp,t1.stacktrace_id", "sort": "desc"}
 
         if "profile_id" in extra_params.get("label_filter", {}):
             retry_handler = functools.partial(
@@ -263,7 +298,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
                 c.convert(r)
             elif converter == ConverterType.Tree:
                 c = TreeConverter()
-                c.convert(r)
+                c.convert(r, agg_method, agg_interval)
             else:
                 raise ValueError(f"不支持的 Profiling 转换器: {converter}")
         except Exception as e:  # noqa
@@ -274,7 +309,8 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
     @classmethod
     def get_essentials(cls, validated_data: dict) -> dict:
         """获取 app_name,service_name,bk_biz_id,result_table_id"""
-
+        is_ebpf = False
+        result_table_id = ""
         # storing data in 2 ways:
         # - global storage, bk_biz_id/space_id level
         # - application storage, application level
@@ -285,17 +321,23 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
             bk_biz_id = builtin_datasource["bk_biz_id"]
             result_table_id = builtin_datasource["result_table_id"]
         else:
-            bk_biz_id = validated_data["bk_biz_id"]
             app_name = validated_data["app_name"]
+            if validated_data["app_name"].startswith(EBPF_PROFILING_APP_PREFIX):
+                # 如果以 app_name 以 ebpf- 开头，则认为是 ebpf 采集数据 请求参数伪装成 application 格式 并在返回 essential 时增加标识位
+                app_name = validated_data["app_name"][len(EBPF_PROFILING_APP_PREFIX) :]
+                is_ebpf = True
+            bk_biz_id = validated_data["bk_biz_id"]
             service_name = validated_data.get("service_name", DEFAULT_SERVICE_NAME)
-            application_info = cls._examine_application(bk_biz_id, app_name)
-            result_table_id = application_info["profiling_config"]["result_table_id"]
+            if not is_ebpf:
+                application_info = cls._examine_application(bk_biz_id, app_name)
+                result_table_id = application_info["profiling_config"]["result_table_id"]
 
         return {
             "bk_biz_id": bk_biz_id,
             "app_name": app_name,
             "service_name": service_name,
             "result_table_id": result_table_id,
+            "is_ebpf": is_ebpf,
         }
 
     @classmethod
@@ -306,7 +348,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
 
         essentials = cls.get_essentials(data)
         # 根据是否是大应用调整获取的消息条数 避免接口耗时过长
-        if cls.is_large_service(
+        if not essentials["is_ebpf"] and cls.is_large_service(
             essentials["bk_biz_id"], essentials["app_name"], essentials["service_name"], data["data_type"]
         ):
             extra_params = {"limit": {"offset": 0, "rows": LARGE_SERVICE_MAX_QUERY_SIZE}}
@@ -335,24 +377,57 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
             del validate_data["filter_labels"]["end"]
         else:
             start_time, end_time = cls.enlarge_duration(start_time, end_time, offset)
+        if essentials["is_ebpf"]:
+            return cls.ebpf_query(
+                bk_biz_id=essentials["bk_biz_id"],
+                app_name=essentials["app_name"],
+                service_name=essentials["service_name"],
+                start=start_time,
+                end=end_time,
+                sample_type=validate_data["data_type"],
+            )
+        else:
+            return cls.query(
+                bk_biz_id=essentials["bk_biz_id"],
+                app_name=essentials["app_name"],
+                service_name=essentials["service_name"],
+                start=start_time,
+                end=end_time,
+                profile_id=validate_data.get("profile_id"),
+                filter_labels=validate_data.get("filter_labels"),
+                result_table_id=essentials["result_table_id"],
+                sample_type=validate_data["data_type"],
+                agg_method=validate_data["agg_method"],
+                agg_interval=cls.get_agg_interval(start_time, end_time),
+                converter=ConverterType.Tree,
+                extra_params=extra_params,
+            )
 
-        return cls.query(
-            bk_biz_id=essentials["bk_biz_id"],
-            app_name=essentials["app_name"],
-            service_name=essentials["service_name"],
-            start=start_time,
-            end=end_time,
-            profile_id=validate_data.get("profile_id"),
-            filter_labels=validate_data.get("filter_labels"),
-            result_table_id=essentials["result_table_id"],
-            sample_type=validate_data["data_type"],
-            converter=ConverterType.Tree,
-            extra_params=extra_params,
-        )
+    @classmethod
+    def get_services_language(cls, validate_data):
+        from apm_web.handlers.service_handler import ServiceHandler
+
+        options = {
+            "app_name": validate_data.get("app_name"),
+            "bk_biz_id": validate_data.get("bk_biz_id"),
+            "service_name": validate_data.get("service_name"),
+        }
+        try:
+            node_data = ServiceHandler.get_node(**options)
+            service_language = node_data.get("extra_data", {}).get("service_language", "")
+            return service_language
+        except Exception:
+            logger.exception(f"【ProfileQueryViewSet】Failed to query service_language using the parameter {options}.")
+            return ""
 
     @classmethod
     def get_converter_options(cls, validate_data):
-        return {"sort": validate_data.get("sort"), "data_mode": CallGraphResponseDataMode.IMAGE_DATA_MODE}
+        service_language = cls.get_services_language(validate_data)
+        return {
+            "sort": validate_data.get("sort"),
+            "data_mode": CallGraphResponseDataMode.IMAGE_DATA_MODE,
+            "service_language": service_language,
+        }
 
     @classmethod
     def converter_to_data(cls, validate_data, tree_converter):
@@ -369,6 +444,15 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         data = {k: v for diagram_dict in diagram_dicts for k, v in diagram_dict.items()}
         data.update(tree_converter.get_sample_type())
         return data
+
+    @classmethod
+    def get_agg_interval(cls, start, end):
+        """
+        获取聚合周期（规则：5分钟内取秒级聚合，5分钟以上分钟级别聚合）
+        params: start , end  (单位: 毫秒)
+        return: 返回聚合周期(单位：秒)
+        """
+        return 1 if end - start <= 5 * 60 * 1000 else 60
 
     @action(methods=["POST", "GET"], detail=False, url_path="samples")
     @user_visit_record
@@ -390,6 +474,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
                 diff_profile_id=validate_data.get("diff_profile_id"),
                 diff_filter_labels=validate_data.get("diff_filter_labels"),
                 sample_type=validate_data["data_type"],
+                agg_interval=self.get_agg_interval(start, end),
             )
 
             if len(validate_data["diagram_types"]) == 0:
@@ -430,6 +515,8 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
                 filter_labels=validate_data.get("diff_filter_labels"),
                 result_table_id=essentials["result_table_id"],
                 sample_type=validate_data["data_type"],
+                agg_method=validate_data["agg_method"],
+                agg_interval=self.get_agg_interval(diff_start_time, diff_end_time),
                 converter=ConverterType.Tree,
                 extra_params=extra_params,
             )
@@ -482,16 +569,11 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         is_compared=False,
         diff_profile_id=None,
         diff_filter_labels=None,
+        agg_interval=60,
     ):
         """获取时序表数据"""
-
-        if end - start <= 5 * 60 * 1000:
-            # 5 分钟内向秒取整
-            # 向秒取整
-            dimension = "FLOOR(dtEventTimeStamp / 1000) * 1000"
-        else:
-            # 向分钟取整
-            dimension = "FLOOR((dtEventTimeStamp / 1000) / 60) * 60000"
+        interval = agg_interval * 1000
+        dimension = f"FLOOR(dtEventTimeStamp / {interval}) * {interval}"
 
         tendency_data = self.query(
             api_type=APIType.SELECT_COUNT,
@@ -540,10 +622,24 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         return tendency_data, compare_tendency_result
 
     @staticmethod
-    def enlarge_duration(start: int, end: int, offset: int) -> Tuple[int, int]:
+    def enlarge_duration(start: int, end: int, offset: int, min_range: int = 0) -> tuple[int, int]:
+        """
+        params:
+            - start, end: unit microseconds
+            - offset, min_range: unit seconds
+
+        return: unit milliseconds
+        """
         # start & end all in microsecond, so we need to convert it to millisecond
-        start = int(start / 1000 + offset * 1000)
-        end = int(end / 1000 + offset * 1000)
+        start = int(int(start) / 1000 + offset * 1000)
+        end = int(int(end) / 1000 + offset * 1000)
+
+        min_range_milli_seconds = min_range * 1000
+        if min_range_milli_seconds > 0 and end - start < min_range_milli_seconds:
+            # 如果起止时间小于最小范围 min_range，则将整个起止时间各往外延展一半，整体时长增长一个 min_range
+            half_min_range_milli_seconds = int(min_range_milli_seconds / 2)
+            start = start - half_min_range_milli_seconds
+            end = end + half_min_range_milli_seconds
 
         return start, end
 
@@ -585,7 +681,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         service_name = essentials["service_name"]
         result_table_id = essentials["result_table_id"]
 
-        start, end = self.enlarge_duration(validated_data["start"], validated_data["end"], offset=300)
+        start, end = self.enlarge_duration(validated_data["start"], validated_data["end"], offset=0, min_range=3600)
 
         # 因为 bkbase label 接口已经改为返回原始格式的所以这里改成取前 5000条 label 进行提取 key 列表
         results = self.query(
@@ -619,7 +715,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         service_name = essentials["service_name"]
         result_table_id = essentials["result_table_id"]
 
-        start, end = self.enlarge_duration(validated_data["start"], validated_data["end"], offset=300)
+        start, end = self.enlarge_duration(validated_data["start"], validated_data["end"], offset=0, min_range=3600)
         results = self.query(
             api_type=APIType.LABEL_VALUES,
             app_name=app_name,
@@ -677,7 +773,7 @@ class ProfileQueryViewSet(ProfileBaseViewSet):
         )
 
         if not doris_converter:
-            compressed_data = b''
+            compressed_data = b""
         else:
             serialized_data = doris_converter.profile.SerializeToString()
             compressed_data = gzip.compress(serialized_data)

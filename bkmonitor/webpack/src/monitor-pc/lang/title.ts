@@ -29,6 +29,7 @@ export default {
 
   '包括{0}个指标,{1}个维度': 'includes {0} metrics, {1} dimensions',
   '可选图表({num})': 'Optional charts ({num})',
+  可选图表: 'Optional charts',
   '标准化事件-字段映射': 'Standardized Event-Field Mapping',
   业务独享集群: 'Exclusive Cluster',
   关联的处理套餐: 'Associated Alarm Solution',
@@ -156,5 +157,32 @@ export default {
   例如: 'For example',
   // 调用分析
   维度值分布: 'Dimension value distribution',
-  K8S对象: 'K8S object',
+  K8S对象: 'K8s object',
+
+  去重后的字段统计: 'Field statistics after deduplication',
+  '联想到以下 {0} 个收藏：': 'Associated with {0} favorites:',
+  待选列表: 'To be selected list',
+  全部添加: 'Add all',
+  检索内容: 'Retrieval content',
+  分组名称: 'Group name',
+  收藏管理: 'Favorite Management',
+  全部收藏: 'All Favorites',
+  '已选择以下{0}个收藏对象': 'You have selected {0} favorite objects',
+  维度数: 'Dimension number',
+  维度值: 'Dimension value',
+  选择维度信息: 'Select dimension information',
+  已选列表: 'Selected list',
+  全部移除: 'Remove all',
+
+  数值分布直方图: 'Numerical distribution histogram',
+  'TOP 5 时序图': 'TOP 5 Time Series Chart',
+
+  版本更新: 'Version update',
+  刷新页面: 'Refresh page',
+  暂不刷新: 'Do not refresh',
+  查看新特性: 'View new features',
+  '建议「刷新页面」体验新的特性，「暂不刷新」可能会遇到未知异常，可手动刷新解决。':
+    'It is recommended to "refresh the page" to experience the new features. If you choose "Do not refresh", you may encounter unknown exceptions. You can manually refresh to solve the problem.',
+  'Trace 检索': 'Trace Search',
+  'Tracing 检索': 'Tracing Search',
 };

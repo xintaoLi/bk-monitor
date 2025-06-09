@@ -36,6 +36,7 @@ import {
   watch,
 } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
 
 import { Checkbox, Loading, Message, Popover, ResizeLayout, Tab, Switcher } from 'bkui-vue';
 import dayjs from 'dayjs';
@@ -124,8 +125,8 @@ const VIEW_CONTAINER_MIN_HEIGHT = 620; // 详情面板最小高度
 export default defineComponent({
   name: 'TraceDetail',
   props: TraceDetailProps,
-  emits: ['close'],
   setup(props) {
+    const route = useRoute();
     /** 取消请求方法 */
     let searchCancelFn = () => {};
     const { t } = useI18n();
@@ -169,7 +170,7 @@ export default defineComponent({
     const traceMainElem = ref(null);
     const relationTopo = ref(null);
     const statisticsElem = ref(null);
-    const searchBarElem = ref(null);
+    const searchBarElem = ref<InstanceType<typeof SearchBar>>(null);
     const baseMessage = ref<HTMLDivElement>();
     const isbaseMessageWrap = ref<boolean>(false);
     const isSticky = ref<boolean>(false); // 工具栏是否吸顶
@@ -251,7 +252,7 @@ export default defineComponent({
         state.searchKeywords.splice(0, state.searchKeywords.length);
         state.searchKeywords = [];
         state.selectClassifyFilters = {};
-        await (searchBarElem.value as any)?.handleChange([]);
+        await searchBarElem.value?.handleChange([]);
         clearSearch();
         return;
       }
@@ -327,7 +328,7 @@ export default defineComponent({
         state.selectClassifyFilters.app_name = classify.app_name;
       }
       state.isClassifyFilter = true;
-      await (searchBarElem.value as any)?.handleChange([keyword]);
+      await searchBarElem.value?.handleChange([keyword]);
 
       if (state.activePanel === 'statistics') {
         // 统计过滤参数
@@ -335,7 +336,7 @@ export default defineComponent({
           type: classify.type,
           value: classify.type === 'service' ? classify.filter_value : '',
         };
-        (statisticsElem.value as any).handleKeywordFliter(filterDict);
+        (statisticsElem.value as any).handleKeywordFilter(filterDict);
       } else if (['timeline', 'topo'].includes(state.activePanel)) {
         const comps = curViewElem.value;
         const isTopo = state.activePanel === 'topo';
@@ -388,7 +389,7 @@ export default defineComponent({
     const cancelFilter = async () => {
       state.searchKeywords = [];
       state.selectClassifyFilters = {};
-      await (searchBarElem.value as any)?.handleChange([]);
+      await searchBarElem.value?.handleChange([]);
       clearSearch();
     };
     // 搜索结果选择下一个
@@ -408,7 +409,8 @@ export default defineComponent({
       state.matchedSpanIds = 0;
       const comps = curViewElem.value;
       if (state.activePanel === 'statistics') {
-        comps?.handleKeywordFliter(null);
+        searchBarElem.value?.handleChange([]);
+        comps?.handleKeywordFilter(null);
       } else {
         comps?.clearSearch();
         if (state.activePanel === 'topo') {
@@ -437,7 +439,7 @@ export default defineComponent({
           comps?.trackFilter(val);
           break;
         case 'topo':
-          comps?.handleKeywordFliter(val);
+          comps?.handleKeywordFilter(val);
           break;
         case 'statistics':
           {
@@ -448,7 +450,7 @@ export default defineComponent({
                 value: val.toString(),
               };
             }
-            comps?.handleKeywordFliter(filterDict);
+            comps?.handleKeywordFilter(filterDict);
           }
           break;
         default:
@@ -550,6 +552,26 @@ export default defineComponent({
         } else cacheFilterToolsValues.waterFallAndTopo = val;
       }
     };
+
+    /**
+     * @description: 判断checkbox是否禁用
+     * @param kindId 类型ID
+     * @returns { boolean }
+     */
+    const disabledSpanKindById = (kindId: string) => {
+      if (kindId === SOURCE_CATEGORY_EBPF && !traceData.value?.ebpf_enabled) {
+        return true;
+      }
+      return (
+        (state.activePanel === 'statistics' &&
+          traceViewFilters.value.length === 1 &&
+          traceViewFilters.value.includes(kindId)) ||
+        (state.activePanel === 'topo' &&
+          [SOURCE_CATEGORY_EBPF, VIRTUAL_SPAN].includes(kindId) &&
+          topoType.value === ETopoType.service)
+      );
+    };
+
     // 回到顶部操作
     const handleBackTop = () => {
       document.querySelector('.trace-detail-wrapper')?.scrollTo({ top: 0 });
@@ -608,6 +630,7 @@ export default defineComponent({
         clearCrossApp();
       }
     );
+
     watch(
       () => traceData.value,
       () => {
@@ -617,6 +640,18 @@ export default defineComponent({
         clearCompareParams();
         nextTick(() => handleResize());
         compareSelect.value?.handleCancelCompare();
+      },
+      { deep: true }
+    );
+
+    watch(
+      () => traceData.value.span_classify,
+      val => {
+        if (val && route.query?.incident_query) {
+          const data = val.filter(f => f.type === 'error');
+          // 只有从故障详情页跳转过来才会触发
+          handleSelectFilters(data[0]);
+        }
       },
       { deep: true }
     );
@@ -741,7 +776,7 @@ export default defineComponent({
      * @param _keys
      */
     async function handleServiceTopoClickItem(_keys) {
-      await (searchBarElem.value as any)?.handleChange([]);
+      await searchBarElem.value?.handleChange([]);
       clearSearch();
     }
     async function handleChangeEnableTimeALignment(v: boolean) {
@@ -814,18 +849,19 @@ export default defineComponent({
       handleTopoChangeType,
       handleServiceTopoClickItem,
       handleChangeEnableTimeALignment,
+      disabledSpanKindById,
+      t,
     };
   },
 
   render() {
-    const { isInTable, appName } = this.$props;
     const { trace_id: traceId, trace_info: traceInfo, span_classify: spanClassify } = this.traceData;
     const isStatisticsPanel = this.activePanel === 'statistics';
 
     return (
       <Loading
         ref='traceDetailElem'
-        class={`trace-detail-wrapper is-fix ${isInTable ? 'is-table-detail' : ''} ${this.isSticky ? 'is-sticky' : ''}`}
+        class={`trace-detail-wrapper is-fix ${this.isInTable ? 'is-table-detail' : ''} ${this.isSticky ? 'is-sticky' : ''}`}
         loading={this.isLoading}
         zIndex={99999}
       >
@@ -840,8 +876,9 @@ export default defineComponent({
         )} */}
         {!this.isInTable && (
           <TraceDetailHeader
-            appName={appName}
-            traceId={traceId}
+            appName={this.appName}
+            hasFullscreen={false}
+            traceId={this.traceID || traceId}
           />
         )}
 
@@ -850,11 +887,11 @@ export default defineComponent({
           class={['base-message', { 'is-wrap': this.isbaseMessageWrap }]}
         >
           <div class='message-item'>
-            <span>{this.$t('产生时间')}</span>
+            <span>{this.t('产生时间')}</span>
             <span>{dayjs.tz(traceInfo?.product_time / 1e3).format('YYYY-MM-DD HH:mm:ss')}</span>
           </div>
           <div class='message-item'>
-            <span>{this.$t('总耗时')}</span>
+            <span>{this.t('总耗时')}</span>
             <span>{formatDuration(traceInfo?.trace_duration)}</span>
             {traceInfo?.time_error && [
               this.enabledTimeAlignment ? (
@@ -870,7 +907,7 @@ export default defineComponent({
                   default: () => <span class='icon-monitor icon-tips' />,
                   content: () => (
                     <div class='trace-duration-pop'>
-                      <span style='color: #313238'>{this.$t('时间校准')}</span>
+                      <span style='color: #313238'>{this.t('时间校准')}</span>
                       <Switcher
                         modelValue={this.enabledTimeAlignment}
                         size='small'
@@ -878,7 +915,7 @@ export default defineComponent({
                         onChange={this.handleChangeEnableTimeALignment}
                       />
                       <span class='icon-monitor icon-hint' />
-                      {this.$t('开启时间校准，可同步服务所在时钟')}
+                      {this.t('开启时间校准，可同步服务所在时钟')}
                     </div>
                   ),
                 }}
@@ -888,19 +925,19 @@ export default defineComponent({
             ]}
           </div>
           <div class='message-item'>
-            <span>{this.$t('耗时分布')}</span>
+            <span>{this.t('耗时分布')}</span>
             <span>{`${formatDuration(traceInfo?.min_duration)} - ${formatDuration(traceInfo?.max_duration)}`}</span>
           </div>
           <div class='message-item'>
-            <span>{this.$t('服务数')}</span>
+            <span>{this.t('服务数')}</span>
             <span>{this.serviceCount}</span>
           </div>
           <div class='message-item'>
-            <span>{this.$t('层级数')}</span>
+            <span>{this.t('层级数')}</span>
             <span>{this.spanDepth}</span>
           </div>
           <div class='message-item'>
-            <span>{this.$t('span总数')}</span>
+            <span>{this.t('span总数')}</span>
             <span>{this.traceTree?.spans?.length}</span>
           </div>
         </div>
@@ -1043,7 +1080,7 @@ export default defineComponent({
                 }`}
               >
                 <span class={`label ${isStatisticsPanel ? 'is-required' : ''}`}>
-                  {`${isStatisticsPanel ? this.$t('分组') : this.$t('显示')}`}
+                  {`${isStatisticsPanel ? this.t('分组') : this.t('显示')}`}
                 </span>
                 :
                 <Checkbox.Group
@@ -1054,26 +1091,26 @@ export default defineComponent({
                   {this.filterToolList.map((kind, index) => (
                     <Checkbox
                       key={index}
-                      disabled={
-                        (this.activePanel === 'statistics' &&
-                          this.traceViewFilters.length === 1 &&
-                          this.traceViewFilters.includes(kind.id)) ||
-                        (this.activePanel === 'topo' &&
-                          [SOURCE_CATEGORY_EBPF, VIRTUAL_SPAN].includes(kind.id) &&
-                          this.topoType === ETopoType.service)
-                      }
+                      disabled={this.disabledSpanKindById(kind.id)}
                       label={kind.id}
                       size='small'
                     >
                       {/* 增加特殊过滤类型说明 */}
                       <Popover
                         key={kind.id}
-                        content={kind.desc}
                         disabled={!kind.desc}
                         placement='top'
-                        popoverDelay={[500, 0]}
+                        popoverDelay={[500, 50]}
                       >
-                        <span>{kind.label}</span>
+                        {{
+                          default: () => <span>{kind.label}</span>,
+                          content: () => {
+                            if (kind.id !== SOURCE_CATEGORY_EBPF) {
+                              return kind.desc;
+                            }
+                            return this.traceData?.ebpf_enabled ? kind.desc : kind.disabledDesc;
+                          },
+                        }}
                       </Popover>
                     </Checkbox>
                   ))}
@@ -1136,9 +1173,10 @@ export default defineComponent({
                   <div class='statistics-container'>
                     <StatisticsTable
                       ref='statisticsElem'
-                      appName={appName}
+                      appName={this.appName}
                       compareTraceID={this.compareTraceID}
-                      traceId={traceId}
+                      traceId={this.traceID || traceId}
+                      onClearKeyword={() => this.clearSearch()}
                       onUpdate:loading={this.contentLoadingChange}
                     />
                   </div>
@@ -1146,12 +1184,12 @@ export default defineComponent({
                 {/* 火焰图 */}
                 {this.activePanel === 'flame' && (
                   <FlameGraphV2
-                    appName={appName}
+                    appName={this.appName}
                     diffTraceId={this.compareTraceID}
                     filterKeywords={this.filterKeywords}
                     filters={this.traceViewFilters}
                     textDirection={this.ellipsisDirection}
-                    traceId={traceId}
+                    traceId={this.traceID || traceId}
                     onDiffTraceSuccess={this.updateCompareStatus}
                     onShowSpanDetail={this.handleShowSpanDetails}
                     onUpdate:loading={this.contentLoadingChange}
@@ -1159,9 +1197,9 @@ export default defineComponent({
                 )}
                 {this.activePanel === 'sequence' && (
                   <SequenceGraph
-                    appName={appName}
+                    appName={this.appName}
                     filters={this.traceViewFilters}
-                    traceId={traceId}
+                    traceId={this.traceID || traceId}
                     onShowSpanDetail={this.handleShowSpanDetails}
                     onSpanListChange={this.handleSpanListFilter}
                     onUpdate:loading={this.contentLoadingChange}

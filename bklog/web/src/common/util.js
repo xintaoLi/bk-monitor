@@ -513,7 +513,7 @@ export function formatDate(val, isTimzone = true, formatMilliseconds = false) {
  */
 export function formatDateNanos(val) {
   // dayjs不支持纳秒 从符串中提取毫秒之后的纳秒部分
-  const nanoseconds = val.slice(23, -1);
+  const nanoseconds = `${val}`.slice(23, -1);
 
   // 使用dayjs解析字符串到毫秒 包含时区处理
   const dateTimeToMilliseconds = dayjs(val).tz(window.timezone).format('YYYY-MM-DD HH:mm:ss.SSS');
@@ -530,9 +530,10 @@ export function formatDateNanos(val) {
 /**
  * 格式化文件大小
  * @param {Number | String} size
+ * @param {boolean} dropFractionIfInteger - 如果为 true，整数不保留小数
  * @return {String}
  */
-export function formatFileSize(size) {
+export function formatFileSize(size, dropFractionIfInteger = false) {
   const value = Number(size);
   if (size && !isNaN(value)) {
     const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB', 'BB'];
@@ -544,7 +545,8 @@ export function formatFileSize(size) {
         index = index + 1;
       }
     }
-    return `${k.toFixed(2)}${units[index]}`;
+    const formattedSize = dropFractionIfInteger && k % 1 === 0 ? k.toFixed(0) : k.toFixed(2);
+    return `${formattedSize}${units[index]}`;
   }
   return '0';
 }
@@ -575,7 +577,6 @@ export function readBlobResponse(response) {
 export function readBlobRespToJson(resp) {
   return readBlobResponse(resp).then(resText => Promise.resolve(JSONBigNumber.parse(resText)));
 }
-
 export function bigNumberToString(value) {
   // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
   return (value || {})._isBigNumber ? (value.toString().length < 16 ? Number(value) : value.toString()) : value;
@@ -629,7 +630,7 @@ export const random = (n, str = 'abcdefghijklmnopqrstuvwxyz0123456789') => {
  * @param {*} val 文本
  * @param {*} alertMsg 弹窗文案
  */
-export const copyMessage = (val, alertMsg) => {
+export const copyMessage = (val, alertMsg = undefined) => {
   try {
     const input = document.createElement('input');
     input.setAttribute('value', val);
@@ -637,7 +638,9 @@ export const copyMessage = (val, alertMsg) => {
     input.select();
     document.execCommand('copy');
     document.body.removeChild(input);
-    window.mainComponent.messageSuccess(alertMsg ? alertMsg : window.mainComponent.$t('复制成功'));
+    window.mainComponent.messageSuccess(
+      alertMsg ? alertMsg ?? window.mainComponent.$t('复制失败') : window.mainComponent.$t('复制成功'),
+    );
   } catch (e) {
     console.warn(e);
   }
@@ -665,14 +668,16 @@ export const base64Decode = str => {
 };
 
 export const makeMessage = (message, traceId) => {
+  const id = (traceId ?? '').split('-')[1] ?? '';
+
   const resMsg = `
-    ${traceId || '--'} ：
+    ${id || '--'} ：
     ${message}
   `;
   message &&
     console.log(`
   ------------------【日志】------------------
-  【TraceID】：${traceId}
+  【TraceID】：${id}
   【Message】：${message}
   ----------------------------------------------
   `);
@@ -889,6 +894,16 @@ export const parseTableRowData = (
           break;
         }
 
+        // 这里用于处理nested field
+        if (Array.isArray(data)) {
+          data = data
+            .map(item =>
+              parseTableRowData(item, keyArr.slice(index).join('.'), fieldType, isFormatDate, emptyCharacter),
+            )
+            .filter(item => item !== emptyCharacter);
+          break;
+        }
+
         if (data[item]) {
           data = data[item];
         } else {
@@ -913,8 +928,8 @@ export const parseTableRowData = (
     return formatDateNanos(data) || emptyCharacter;
   }
 
-  if (Array.isArray(data)) {
-    return data.toString();
+  if (Array.isArray(data) && !data.length) {
+    return emptyCharacter;
   }
 
   if (typeof data === 'object' && data !== null) {
@@ -1153,6 +1168,7 @@ export const formatNumberWithRegex = number => {
   return parts.join('.');
 };
 /** 上下文，实时日志高亮颜色 */
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const contextHighlightColor = [
   {
     dark: '#FFB401',
@@ -1219,4 +1235,73 @@ export const getHaveValueIndexItem = indexList => {
   return (
     indexList.find(item => !item.tags.map(item => item.tag_id).includes(4))?.index_set_id || indexList[0].index_set_id
   );
+};
+
+export const isNestedField = (fieldKeys, obj) => {
+  if (!obj) {
+    return false;
+  }
+
+  if (fieldKeys.length > 1) {
+    if (obj[fieldKeys[0]] !== undefined && obj[fieldKeys[0]] !== null) {
+      if (typeof obj[fieldKeys[0]] === 'object') {
+        if (Array.isArray(obj[fieldKeys[0]])) {
+          return true;
+        }
+
+        return isNestedField(fieldKeys.slice(1), obj[fieldKeys[0]]);
+      }
+
+      return false;
+    }
+
+    if (obj[fieldKeys[0]] === undefined) {
+      return isNestedField([`${fieldKeys[0]}.${fieldKeys[1]}`, ...fieldKeys.slice(2)], obj);
+    }
+  }
+
+  return false;
+};
+
+/**
+ * 下载文件
+ * @param url 资源地址
+ * @param name 资源名称
+ */
+export const downFile = (url, name = '') => {
+  const element = document.createElement('a');
+  element.setAttribute('class', 'bklog-v3-popover-tag');
+  element.setAttribute('href', url.replace(/^https?:/gim, location.protocol));
+  element.setAttribute('download', name);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+};
+
+/**
+ * 根据json字符串下载json文件
+ * @param jsonStr json字符串
+ */
+export const downJsonFile = (jsonStr, name = 'json-file.json') => {
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const href = window.URL.createObjectURL(blob);
+  downFile(href, name);
+};
+
+/**
+ * 获取当前操作系统
+ */
+export const getOs = () => {
+  const userAgent = navigator.userAgent;
+  const isMac = userAgent.includes('Macintosh');
+  const isWin = userAgent.includes('Windows');
+  return isMac ? 'macos' : isWin ? 'windows' : 'unknown';
+};
+
+/**
+ * 获取当前操作系统的控制键盘文案
+ */
+export const getOsCommandLabel = () => {
+  return getOs() === 'macos' ? 'Cmd' : 'Ctrl';
 };

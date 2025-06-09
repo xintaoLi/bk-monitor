@@ -13,7 +13,9 @@ import json
 import os
 from typing import Dict, List, Optional, Set
 
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
+
 from monitor_web.models.scene_view import SceneViewModel
 
 BUILTIN_SCENES = {
@@ -25,7 +27,7 @@ BUILTIN_SCENES = {
 _BUILTIN_VIEWS: Optional[Dict[str, Dict]] = None
 
 
-def get_builtin_processors():
+def get_builtin_processors() -> List["BuiltinProcessor"]:
     """
     内置视图处理器
     """
@@ -34,6 +36,7 @@ def get_builtin_processors():
     from .collect import CollectBuiltinProcessor
     from .custom_event import CustomEventBuiltinProcessor
     from .custom_metric import CustomMetricBuiltinProcessor
+    from .custom_metric_v2 import CustomMetricV2BuiltinProcessor
     from .host import HostBuiltinProcessor
     from .kubernetes import KubernetesBuiltinProcessor
     from .observation_scene import ObservationSceneBuiltinProcessor
@@ -46,6 +49,7 @@ def get_builtin_processors():
         ObservationSceneBuiltinProcessor,
         CollectBuiltinProcessor,
         CustomEventBuiltinProcessor,
+        CustomMetricV2BuiltinProcessor,
         CustomMetricBuiltinProcessor,
         ApmBuiltinProcessor,
         AlertBuiltinProcessor,
@@ -136,7 +140,6 @@ class BuiltinProcessor(metaclass=abc.ABCMeta):
 
 
 class NormalProcessorMixin:
-
     SCENE_ID = None
     builtin_views: Dict = None
 
@@ -149,7 +152,9 @@ class NormalProcessorMixin:
             cls.builtin_views[filename] = cls._read_builtin_view_config(filename)
 
     @classmethod
-    def create_default_views(cls, bk_biz_id: int, scene_id: str, view_type: str, existed_views):
+    def create_default_views(
+        cls, bk_biz_id: int, scene_id: str, view_type: str, existed_views: QuerySet[SceneViewModel]
+    ):
         cls.load_builtin_views()
 
         builtin_view_ids = {v.split("-", 1)[-1] for v in cls.builtin_views if v.startswith(f"{scene_id}-")}
@@ -205,7 +210,6 @@ def get_view_config(view: SceneViewModel, params: Dict = None) -> Dict:
 
 
 def list_processors_view(scene_id: str, views: List[SceneViewModel], params: dict):
-
     for generator in get_builtin_processors():
         if generator.is_builtin_scene(scene_id) and generator.is_custom_view_list():
             return generator.list_view_list(scene_id, views, params)

@@ -108,7 +108,7 @@ export default class SelectIndexSet extends tsc<object> {
     {
       name: 'history',
       icon: 'bklog-icon bklog-lishijilu',
-      label: window.mainComponent.$t('历史记录'),
+      label: window.mainComponent.$t('历史查询'),
     },
     {
       name: 'favorite',
@@ -164,16 +164,16 @@ export default class SelectIndexSet extends tsc<object> {
   }
 
   get indexId() {
-    if (window.__IS_MONITOR_APM__) {
-      return String(this.$route.query.indexId);
+    if (window.__IS_MONITOR_COMPONENT__) {
+      return String(this.$store.state.indexId || this.$route.query.indexId);
     } else {
       return String(this.$route.params.indexId);
     }
   }
 
   get routeParamIndexId() {
-    if (window.__IS_MONITOR_APM__) {
-      return String(this.$route.query.indexId);
+    if (window.__IS_MONITOR_COMPONENT__) {
+      return String(this.$store.state.indexId || this.$route?.query?.indexId);
     } else {
       return String(this.$route.params.indexId);
     }
@@ -310,7 +310,7 @@ export default class SelectIndexSet extends tsc<object> {
     }
     const unionHeight = this.isTagHave2Rows ? '222px' : '248px';
     return {
-      height: isUnion ? unionHeight : '314px',
+      height: isUnion ? unionHeight : '390px',
     };
   }
 
@@ -381,17 +381,40 @@ export default class SelectIndexSet extends tsc<object> {
       sort_list: [],
     };
     if (payload.items.length === 1 && !payload.addition.length && !payload.keyword) {
-      if (payload.items[0].query_string) {
+      if (payload.items[0]?.query_string) {
         payload.keyword = payload.items[0].query_string;
         payload.search_mode = 'sql';
         payload.addition = [];
-      } else if (payload.items[0].addition) {
+      } else if (payload.items[0]?.addition) {
         payload.addition = payload.items[0].addition;
         payload.search_mode = 'ui';
         payload.keyword = '';
       }
     }
     return payload;
+  }
+
+  mounted() {
+    window.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  beforeDestroy() {
+    window.removeEventListener('keydown', this.handleKeyDown);
+  }
+
+  handleKeyDown(event) {
+    // 检查是否按下了 ⌘/⌘/Ctrl + O 或 Cmd + O
+    const isCtrlO = event.ctrlKey && event.key === 'o';
+    const isCmdO = event.metaKey && event.key === 'o';
+
+    if (isCtrlO || isCmdO) {
+      event.preventDefault();
+      if (this.isShowSelectPopover) {
+        this.selectInputRef.close();
+      } else {
+        this.selectInputRef.show();
+      }
+    }
   }
 
   /** 判断当前索引集是否有权限 */
@@ -444,7 +467,7 @@ export default class SelectIndexSet extends tsc<object> {
         this.indexSearchType = 'single';
         this.selectTagCatchIDList = this.indexId ? [this.indexId] : [];
       }
-      // #if APP !== 'apm'
+      // #if MONITOR_APP !== 'apm' && MONITOR_APP !== 'trace'
       // 获取多选收藏
       this.getMultipleFavoriteList();
       // 获取单选或多选历史记录列表
@@ -497,12 +520,16 @@ export default class SelectIndexSet extends tsc<object> {
       }
     });
     const element = document.querySelector('#union-tag-box');
-    this.resizeObserver.observe(element);
+    if (element) {
+      this.resizeObserver.observe(element);
+    }
   }
 
   unobserveResizeGroupStyle() {
     const element = document.querySelector('#union-tag-box');
-    this.resizeObserver.unobserve(element);
+    if (element) {
+      this.resizeObserver.unobserve(element);
+    }
     this.resizeObserver = null;
     this.isTagHave2Rows = false;
   }
@@ -556,7 +583,7 @@ export default class SelectIndexSet extends tsc<object> {
           },
         })
         .then(() => {
-          if (window.__IS_MONITOR_APM__) {
+          if (window.__IS_MONITOR_COMPONENT__) {
             this.$emit('collection');
           } else {
             this.$store.dispatch('retrieve/getIndexSetList', { spaceUid: this.spaceUid, isLoading: false });
@@ -782,6 +809,9 @@ export default class SelectIndexSet extends tsc<object> {
    * @param {Boolean} isForceRequest 是否强制请求
    */
   getIndexSetHistoryList(queryType: IndexSetType = 'single', isForceRequest = false) {
+    if (window?.__IS_MONITOR_TRACE__) {
+      return;
+    }
     // 判断当前历史记录数组是否需要请求
     const isShouldQuery = queryType === 'single' ? !!this.aloneHistory.length : !!this.multipleHistory.length;
     // 判断是否需要更新历史记录
@@ -843,23 +873,26 @@ export default class SelectIndexSet extends tsc<object> {
     const labelFilter = () => {
       return (
         <div
-          class={['label-filter', { 'not-label': !this.labelSelectList.length }]}
+          class={['label-filter', 'custom-btn', { 'not-label': !this.labelSelectList.length }]}
           v-en-class='en-label-btn'
         >
-          <div class='select-type-btn'>
-            {this.typeBtnSelectList.map(item => (
-              <div
-                class={{ active: this.indexSearchType === item.id }}
-                onClick={() => this.handleClickSetType(item.id as IndexSetType)}
-              >
-                {item.label}
-              </div>
-            ))}
-          </div>
+          {!window?.__IS_MONITOR_TRACE__ && (
+            <div class='select-type-btn'>
+              {this.typeBtnSelectList.map(item => (
+                <div
+                  class={{ active: this.indexSearchType === item.id }}
+                  onClick={() => this.handleClickSetType(item.id as IndexSetType)}
+                >
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          )}
           {!!this.labelSelectList.length && (
             <div class='label-tag-container'>
               <div
                 ref='tagBox'
+                style={{ color: '#4D4F56' }}
                 class='tag-box'
               >
                 {this.showLabelSelectList().map(item => (
@@ -934,16 +967,21 @@ export default class SelectIndexSet extends tsc<object> {
             <div class='top-clear'>
               <span>{`${this.historyListNum}/10`}</span>
               <span
+                style={{ color: '#4D4F56' }}
                 class='clear-btn'
                 onClick={e => this.handleDeleteHistory(null, e, true)}
               >
-                <i class='bklog-icon bklog-brush' />
+                <i
+                  style={{ fontSize: '14px', marginTop: '1px' }}
+                  class='bklog-icon bklog-saoba'
+                />
                 <span>{this.$t('清空')}</span>
               </span>
             </div>
           )}
           {this.isAloneType ? (
             <ul
+              style={{ color: '#4D4F56' }}
               class='history-alone-list'
               v-bkloading={{ isLoading: this.historyLoading }}
             >
@@ -1011,12 +1049,12 @@ export default class SelectIndexSet extends tsc<object> {
       );
     };
     const favoriteAndHistory = () => {
-      if (window.__IS_MONITOR_APM__) return null;
+      if (window?.__IS_MONITOR_COMPONENT__ || window?.__IS_MONITOR_TRACE__) return null;
       return (
         <div class='favorite-and-history'>
           <bk-tab
             active={this.activeTab}
-            type='unborder-card'
+            type='card'
             on-tab-change={this.handleTabChange}
           >
             {this.tabPanels.map((panel, index) => (
@@ -1038,108 +1076,111 @@ export default class SelectIndexSet extends tsc<object> {
         </div>
       );
     };
-    const selectIndexContainer = () => (
-      <div
-        ref='selectIndexBox'
-        class='select-index-container'
-        v-show={!!this.selectedItemList.length && !this.isAloneType}
-      >
-        <div class='title'>
-          <div class='index-select'>
-            <i18n
-              style='color: #979BA5;'
-              path='已选择{0}个索引集'
-            >
-              {this.selectedItemList.length}
-            </i18n>
-            {this.isOverSelect && <span class='over-select'>{this.$t('每次最多可选择20项')}</span>}
-          </div>
-          <bk-popover
-            ref='favoritePopover'
-            ext-cls='new-favorite-popover'
-            tippy-options={{
-              ...this.tippyOptions,
-              appendTo: () => this.selectIndexBoxRef,
-            }}
-            disabled={!!this.multipleFavoriteSelectID}
-            placement='bottom-start'
-          >
-            <span class='favorite-btn'>
-              <i
-                class={[
-                  !!this.multipleFavoriteSelectID ? 'bklog-icon bklog-lc-star-shape' : 'log-icon bk-icon icon-star',
-                ]}
-              />
-              <span>{this.$t('收藏该组合')}</span>
-            </span>
-            <div slot='content'>
-              <bk-form
-                ref='checkInputForm'
-                style={{ width: '100%' }}
-                labelWidth={0}
-                {...{
-                  props: {
-                    model: this.verifyData,
-                    rules: this.rules,
-                  },
-                }}
-              >
-                <bk-form-item property='favoriteName'>
-                  <span style='color: #63656E;'>{this.$t('收藏名称')}</span>
-                  <bk-input
-                    vModel={this.verifyData.favoriteName}
-                    clearable
-                    onEnter={() => this.handleClickFavoritePopoverBtn('add')}
-                  />
-                </bk-form-item>
-              </bk-form>
-              <div class='operate-button'>
-                <bk-button
-                  text
-                  onClick={() => this.handleClickFavoritePopoverBtn('add')}
-                >
-                  {this.$t('确认收藏')}
-                </bk-button>
-                <bk-button
-                  text
-                  onClick={() => this.handleClickFavoritePopoverBtn('cancel')}
-                >
-                  {this.$t('取消')}
-                </bk-button>
-              </div>
-            </div>
-          </bk-popover>
-        </div>
+    const selectIndexContainer = () => {
+      if (window?.__IS_MONITOR_TRACE__) return null;
+      return (
         <div
-          id='union-tag-box'
-          class='index-tag-box'
+          ref='selectIndexBox'
+          class='select-index-container'
+          v-show={!!this.selectedItemList.length && !this.isAloneType}
         >
-          {this.selectedItemList.map(item => (
-            <bk-tag
-              style='background: #FAFBFD;'
-              type='stroke'
-              closable
-              onClose={() => this.handleCloseSelectTag(item)}
+          <div class='title'>
+            <div class='index-select'>
+              <i18n
+                style='color: #979BA5;'
+                path='已选择{0}个索引集'
+              >
+                {this.selectedItemList.length}
+              </i18n>
+              {this.isOverSelect && <span class='over-select'>{this.$t('每次最多可选择20项')}</span>}
+            </div>
+            <bk-popover
+              ref='favoritePopover'
+              ext-cls='new-favorite-popover'
+              tippy-options={{
+                ...this.tippyOptions,
+                appendTo: () => this.selectIndexBoxRef,
+              }}
+              disabled={!!this.multipleFavoriteSelectID}
+              placement='bottom-start'
             >
-              <span class='tag-name'>
-                {item.isNotVal && <i class='not-val' />}
-                <span
-                  class='title-overflow'
-                  v-bk-overflow-tips
-                >
-                  {item.indexName}
-                </span>
+              <span class='favorite-btn'>
+                <i
+                  class={[
+                    !!this.multipleFavoriteSelectID ? 'bklog-icon bklog-lc-star-shape' : 'log-icon bk-icon icon-star',
+                  ]}
+                />
+                <span>{this.$t('收藏该组合')}</span>
               </span>
-            </bk-tag>
-          ))}
+              <div slot='content'>
+                <bk-form
+                  ref='checkInputForm'
+                  style={{ width: '100%' }}
+                  labelWidth={0}
+                  {...{
+                    props: {
+                      model: this.verifyData,
+                      rules: this.rules,
+                    },
+                  }}
+                >
+                  <bk-form-item property='favoriteName'>
+                    <span style='color: #63656E;'>{this.$t('收藏名称')}</span>
+                    <bk-input
+                      vModel={this.verifyData.favoriteName}
+                      clearable
+                      onEnter={() => this.handleClickFavoritePopoverBtn('add')}
+                    />
+                  </bk-form-item>
+                </bk-form>
+                <div class='operate-button'>
+                  <bk-button
+                    text
+                    onClick={() => this.handleClickFavoritePopoverBtn('add')}
+                  >
+                    {this.$t('确认收藏')}
+                  </bk-button>
+                  <bk-button
+                    text
+                    onClick={() => this.handleClickFavoritePopoverBtn('cancel')}
+                  >
+                    {this.$t('取消')}
+                  </bk-button>
+                </div>
+              </div>
+            </bk-popover>
+          </div>
+          <div
+            id='union-tag-box'
+            class='index-tag-box'
+          >
+            {this.selectedItemList.map(item => (
+              <bk-tag
+                style='background: #FAFBFD;'
+                type='stroke'
+                closable
+                onClose={() => this.handleCloseSelectTag(item)}
+              >
+                <span class='tag-name'>
+                  {item.isNotVal && <i class='not-val' />}
+                  <span
+                    class='title-overflow'
+                    v-bk-overflow-tips
+                  >
+                    {item.indexName}
+                  </span>
+                </span>
+              </bk-tag>
+            ))}
+          </div>
         </div>
-      </div>
-    );
+      );
+    };
     const indexHandDom = item => {
       if (this.isAloneType) {
-        return !window.__IS_MONITOR_APM__ ? (
+        return !window.__IS_MONITOR_COMPONENT__ ? (
           <span
-            class={[item.is_favorite ? 'bklog-icon bklog-lc-star-shape' : 'log-icon bk-icon icon-star']}
+            class={[item.is_favorite ? 'bklog-icon bklog-lc-star-shape' : 'log-icon bk-icon icon-star no-show-star']}
             onClick={e => this.handleCollection(item, e)}
           />
         ) : undefined;
@@ -1156,7 +1197,7 @@ export default class SelectIndexSet extends tsc<object> {
       return (
         <div
           style={this.groupListStyle}
-          class='group-list'
+          class='group-list custom-group'
         >
           {this.renderOptionList.map(group => (
             <bk-option-group
@@ -1165,7 +1206,10 @@ export default class SelectIndexSet extends tsc<object> {
               scopedSlots={{
                 'group-name': () => {
                   return group.name && group.children.length ? (
-                    <div class='group-title'>
+                    <div
+                      style={{ color: '#4D4F56' }}
+                      class='group-title'
+                    >
                       <span>{group.name}</span>
                       <span>{group.children[0].no_data_check_time}</span>
                     </div>
@@ -1191,6 +1235,7 @@ export default class SelectIndexSet extends tsc<object> {
                         {indexHandDom(item)}
                         {item.isNotVal && <i class='not-val' />}
                         <span
+                          style={{ color: '#4D4F56' }}
                           class='index-name'
                           onMouseenter={e => this.handleHoverIndexName(e, item)}
                         >
@@ -1259,11 +1304,11 @@ export default class SelectIndexSet extends tsc<object> {
         clearable={false}
         data-test-id='dataQuery_div_indexSetSelect'
         display-tag={!this.isAloneType}
-        ext-popover-cls='retrieve-index-select-popover'
+        ext-popover-cls='retrieve2-index-select-popover'
         placeholder={this.placeholderText}
         popover-min-width={600}
         popover-options={{ boundary: 'window', ...(this.popoverOptions ?? {}) }}
-        scroll-height={400}
+        scroll-height={440}
         multiple
         searchable
         onSelected={this.handleSelectIndex}

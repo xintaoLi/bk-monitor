@@ -26,12 +26,13 @@
 
 import { Component, Prop, Emit, Ref, ModelSync, Watch } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
-
+import useFieldNameHook from '@/hooks/use-field-name';
 import { From } from 'bk-magic-vue';
 
 import $http from '../../../../../../api';
 import { formatDate } from '../../../../../../common/util';
 import { handleTransformToTimestamp } from '../../../../../../components/time-range/utils';
+import { BK_LOG_STORAGE } from '../../../../../../store/store.type';
 
 import './filter-rule.scss';
 
@@ -94,18 +95,21 @@ export default class FilterRule extends tsc<IProps> {
       return true;
     return false;
   }
-
+  get showFieldAlias() {
+    return this.$store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS];
+  }
+  // 优先展示选中字段名
   get filterSelectList() {
+    const { getConcatenatedFieldName } = useFieldNameHook({ store: this.$store });
     return this.totalFields
       .filter(item => !/^__dist/.test(item.field_name) && item.field_type !== '__virtual__')
       .map(el => {
-        const { field_name: id, field_alias: alias } = el;
-        return { id, name: alias ? `${id}(${alias})` : id };
+        return getConcatenatedFieldName(el);
       });
   }
 
   get indexId() {
-    return window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId;
+    return window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId;
   }
 
   @Watch('formData.filter_rules', { deep: true })
@@ -136,17 +140,17 @@ export default class FilterRule extends tsc<IProps> {
   }
   async queryValueList(fields = []) {
     if (!fields.length) return;
-    const tempList = handleTransformToTimestamp(this.datePickerValue);
+    const tempList = handleTransformToTimestamp(this.datePickerValue, this.$store.getters.retrieveParams.format);
     try {
       const res = await $http.request('retrieve/getAggsTerms', {
         params: {
-          index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId,
+          index_set_id: window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId,
         },
         data: {
           keyword: this.retrieveParams?.keyword ?? '*',
           fields,
-          start_time: formatDate(tempList[0] * 1000),
-          end_time: formatDate(tempList[1] * 1000),
+          start_time: formatDate(tempList[0]),
+          end_time: formatDate(tempList[1]),
         },
       });
       this.formData.filter_rules.forEach(item => {

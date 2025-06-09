@@ -25,6 +25,7 @@
  * IN THE SOFTWARE.
  */
 import { type PropType, defineComponent, getCurrentInstance, ref, watch, inject, type Ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { OverflowTitle, Popover } from 'bkui-vue';
 import { Message } from 'bkui-vue';
@@ -66,8 +67,9 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['viewResource', 'FeedBack', 'toDetail', 'toDetailSlider', 'toDetailTab'],
+  emits: ['viewResource', 'FeedBack', 'toDetail', 'toDetailSlider', 'toDetailTab', 'toTracePage'],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const bkzIds = inject<Ref<string[]>>('bkzIds');
     /** 当前点击的线和边 */
     const activeEdge = ref(null);
@@ -255,30 +257,28 @@ export default defineComponent({
     const handleToDetail = node => {
       emit('toDetail', node);
     };
-
     /** 不同类型的路由跳转逻辑处理 */
     const typeToLinkHandle = {
       BcsPod: {
-        path: () => '/k8s',
+        title: 'pod详情页',
+        path: () => '/k8s-new',
         beforeJumpVerify: () => true,
-        query: node => ({
-          dashboardId: 'pod',
-          sceneId: 'kubernetes',
-          sceneType: 'detail',
-          queryData: JSON.stringify({
-            page: 1,
-            selectorSearch: [
-              {
-                keyword: node.entity?.dimensions?.pod_name ?? '',
-              },
-            ],
-          }),
-          'filter-pod_name': node.entity?.dimensions?.pod_name ?? '',
-          'filter-namespace': node.entity?.dimensions?.namespace ?? '',
-          'filter-bcs_cluster_id': node.entity?.dimensions?.cluster_id ?? '',
-        }),
+        query: node => {
+          const { namespace, pod_name, cluster_id } = node.entity?.dimensions || {};
+          const filterBy = {
+            namespace: namespace ? [namespace] : [],
+            pod: pod_name ? [pod_name] : [],
+          };
+          return {
+            sceneId: 'kubernetes',
+            activeTab: 'detail',
+            cluster: cluster_id ?? '',
+            filterBy: JSON.stringify(filterBy),
+          };
+        },
       },
       BkNodeHost: {
+        title: '主机详情页',
         path: node => `/performance/detail/${node.entity?.dimensions?.bk_host_id}`,
         beforeJumpVerify: node => !!node.entity?.dimensions?.bk_host_id,
         query: node => ({
@@ -288,6 +288,7 @@ export default defineComponent({
         }),
       },
       APMService: {
+        title: '服务详情页',
         path: () => '/apm/service/',
         beforeJumpVerify: node => !!node.entity?.dimensions?.apm_service_name,
         query: node => ({
@@ -327,6 +328,7 @@ export default defineComponent({
       const baseUrl = bkzIds.value[0] ? `${origin}${pathname}?bizId=${bkzIds.value[0]}` : '';
       window.open(`${baseUrl}#${linkHandleByType?.path(node)}?${queryString.toString()}`, timestamp.toString());
     };
+
     /** 拷贝操作 */
     const handleCopy = (text: string) => {
       copyText(text);
@@ -335,16 +337,30 @@ export default defineComponent({
         message: i18n.t('复制成功'),
       });
     };
+
     /** 详情侧滑 */
     const goDetailSlider = node => {
       emit('toDetailSlider', node);
     };
+
+    /** 跳转trace详情页，高亮对应span */
+    const handleViewSpan = node => {
+      emit('toTracePage', node.entity, 'traceDetail');
+    };
+
+    /** 跳转trace详情页，打开对应span详情 */
+    const handleViewSpanDetail = node => {
+      emit('toTracePage', node.entity, 'spanDetail');
+    };
+
     /** 告警详情 */
     const goDetailTab = node => {
       emit('toDetailTab', node);
     };
+
     return {
       popover,
+      typeToLinkHandle,
       activeNode,
       hide,
       activeEdge,
@@ -358,6 +374,9 @@ export default defineComponent({
       handleCopy,
       goDetailSlider,
       goDetailTab,
+      handleViewSpan,
+      handleViewSpanDetail,
+      t,
     };
   },
   render() {
@@ -398,10 +417,10 @@ export default defineComponent({
                 />
               </span>
             </span>
-            {node?.entity?.entity_type}(
+            {node?.entity?.properties?.entity_category}(
             <OverflowTitle
               key={node?.entity?.entity_id}
-              class='node-name'
+              class={['node-name', this.canJumpByType(node) && 'node-link-name']}
               type='tips'
             >
               <span onClick={this.handleToLink.bind(this, node)}>{node?.entity?.entity_name || '--'}</span>
@@ -409,7 +428,7 @@ export default defineComponent({
             ）
             {(node?.entity.is_root || node.is_feedback_root) && (
               <span class={['node-root-icon', node.is_feedback_root ? 'node-root-feedback-icon' : false]}>
-                {this.$t('根因')}
+                {this.t('根因')}
               </span>
             )}
           </div>
@@ -434,7 +453,7 @@ export default defineComponent({
       const { is_anomaly, edge_type, events } = this.activeEdge;
       const ebpfCall = edge_type === 'ebpf_call';
       const directionReverse = (direction || events[0]?.direction) === 'reverse';
-      const eventText = this.$t(ebpfCall ? '调用关系' : '从属关系');
+      const eventText = this.t(ebpfCall ? '调用关系' : '从属关系');
       /** 流动线创建 */
       const renderSvg = () => {
         return (
@@ -568,11 +587,21 @@ export default defineComponent({
           onClick={() => clickFn && this[`handle${clickFn}`](node)}
         >
           {needIcon && (
-            <i class={['icon-monitor', 'btn-icon', clickFn === 'FeedBack' ? feedbackRootIcon : 'icon-ziyuantuopu']} />
+            <i
+              class={[
+                'icon-monitor',
+                'btn-icon',
+                clickFn === 'FeedBack'
+                  ? feedbackRootIcon
+                  : clickFn === 'ViewSpan'
+                    ? 'icon-fenxiang'
+                    : 'icon-ziyuantuopu',
+              ]}
+            />
           )}
           <span
             class='btn-text'
-            v-overflowTitle
+            v-overflow-tips
             onClick={this.handleToDetail.bind(this, node)}
           >
             {name}
@@ -696,17 +725,13 @@ export default defineComponent({
     const createNodeToolTip = (node: ITopoNode) => {
       const isShowRootText = node.is_feedback_root || node?.entity?.is_root;
       const bgColor = node?.entity?.is_root ? '#EA3636' : '#FF9C01';
-      const { groupAttrs } = getNodeAttrs(this.model);
       return (
         <div class='node-tooltip'>
           <div class='node-tooltip-header'>
-            <span
-              style={{ backgroundColor: groupAttrs.fill }}
-              class='item-source'
-            >
+            <span class='item-source'>
               <i
                 style={{
-                  color: '#fff',
+                  color: '#F55555',
                 }}
                 class={[
                   'icon-monitor',
@@ -715,19 +740,28 @@ export default defineComponent({
                 ]}
               />
             </span>
-            <OverflowTitle
+            <div
               key={node?.entity?.entity_id}
               class={['header-name', this.canJumpByType(node) && 'header-pod-name']}
-              type='tips'
+              v-bk-tooltips={{
+                disabled: !this.canJumpByType(node),
+                content: (
+                  <div>
+                    <div>{node?.entity?.entity_name}</div>
+                    <br />
+                    {this.t(`点击前往：${this.typeToLinkHandle[node?.entity?.entity_type]?.title ?? '主机详情页'}`)}
+                  </div>
+                ),
+              }}
             >
               <span onClick={this.handleToLink.bind(this, node)}>{node?.entity?.entity_name}</span>
-            </OverflowTitle>
+            </div>
             <span
               class='icon-btn'
               onClick={this.handleCopy.bind(this, node?.entity?.entity_name)}
             >
               <i class={['icon-monitor', 'btn-icon', 'icon-mc-copy-fill']} />
-              {this.$t('复制')}
+              {this.t('复制')}
             </span>
             {isShowRootText && (
               <span
@@ -736,46 +770,60 @@ export default defineComponent({
                 }}
                 class='root-mark'
               >
-                {truncateText(this.$t('根因'), 28, 11, 'PingFangSC-Medium')}
+                {truncateText(this.t('根因'), 28, 11, 'PingFangSC-Medium')}
               </span>
             )}
-            {this.showViewResource &&
-              createCommonIconBtn(
-                this.$t('查看从属'),
-                {
-                  marginLeft: '16px',
-                },
-                true,
-                node,
-                'ViewResource'
-              )}
-            {this.showViewResource &&
-              node.is_feedback_root &&
-              createCommonIconBtn(
-                this.$t('取消反馈根因'),
-                {
-                  marginLeft: '16px',
-                },
-                true,
-                node,
-                'FeedBack'
-              )}
-            {this.showViewResource &&
-              !node.is_feedback_root &&
-              !node?.entity?.is_root &&
-              createCommonIconBtn(
-                this.$t('反馈新根因'),
-                {
-                  marginLeft: '16px',
-                },
-                true,
-                node,
-                'FeedBack'
-              )}
+            <div class='node-tooltip-header-icon-wrap'>
+              {this.showViewResource &&
+                node.entity.rank.rank_category.category_name !== 'third_party' &&
+                createCommonIconBtn(
+                  this.t('查看从属'),
+                  {
+                    marginLeft: '16px',
+                  },
+                  true,
+                  node,
+                  'ViewResource'
+                )}
+              {isShowRootText &&
+                node.entity.rca_trace_info?.abnormal_traces?.length > 0 &&
+                createCommonIconBtn(
+                  this.t('查看Span'),
+                  {
+                    marginLeft: '16px',
+                  },
+                  true,
+                  node,
+                  'ViewSpan'
+                )}
+              {this.showViewResource &&
+                node.is_feedback_root &&
+                createCommonIconBtn(
+                  this.t('取消反馈根因'),
+                  {
+                    marginLeft: '16px',
+                  },
+                  true,
+                  node,
+                  'FeedBack'
+                )}
+              {this.showViewResource &&
+                !node.is_feedback_root &&
+                !node?.entity?.is_root &&
+                createCommonIconBtn(
+                  this.t('反馈新根因'),
+                  {
+                    marginLeft: '16px',
+                  },
+                  true,
+                  node,
+                  'FeedBack'
+                )}
+            </div>
           </div>
           <div class='node-tooltip-content'>
             {node.alert_display.alert_name &&
-              createCommonForm(`${this.$t('包含告警')}：`, () => (
+              createCommonForm(`${this.t('包含告警')}：`, () => (
                 <>
                   <span
                     class='flex-label'
@@ -804,6 +852,7 @@ export default defineComponent({
                               {
                                 marginRight: '4px',
                                 marginLeft: '4px',
+                                color: '#699DF4',
                               },
                               false
                             ),
@@ -815,19 +864,35 @@ export default defineComponent({
                   )}
                 </>
               ))}
-            {createCommonForm(`${this.$t('分类')}：`, () => (
+            {isShowRootText &&
+              node.entity?.rca_trace_info?.abnormal_message &&
+              createCommonForm(`${this.t('异常信息')}：`, () => (
+                <div
+                  class='except-info'
+                  onClick={this.handleViewSpanDetail.bind(this, node)}
+                >
+                  <OverflowTitle
+                    class='except-text'
+                    type='tips'
+                  >
+                    <span>{node.entity.rca_trace_info.abnormal_message}</span>
+                  </OverflowTitle>
+                  <i class='icon-monitor except-icon icon-fenxiang' />
+                </div>
+              ))}
+            {createCommonForm(`${this.t('分类')}：`, () => (
               <>{node.entity.rank.rank_category.category_alias}</>
             ))}
-            {createCommonForm(`${this.$t('节点类型')}：`, () => (
-              <>{node.entity.entity_type}</>
+            {createCommonForm(`${this.t('节点类型')}：`, () => (
+              <>{node?.entity?.properties?.entity_category || node.entity.rank_name}</>
             ))}
-            {createCommonForm(`${this.$t('所属业务')}：`, () => (
+            {createCommonForm(`${this.t('所属业务')}：`, () => (
               <>
-                [{node.bk_biz_id}] {node.bk_biz_name}
+                {node.bk_biz_name} (#{node.bk_biz_id})
               </>
             ))}
             {node.entity?.tags?.BcsService &&
-              createCommonForm(`${this.$t('所属服务')}：`, () => <>{node.entity.tags.BcsService.name}</>)}
+              createCommonForm(`${this.t('所属服务')}：`, () => <>{node.entity.tags.BcsService.name}</>)}
           </div>
         </div>
       );

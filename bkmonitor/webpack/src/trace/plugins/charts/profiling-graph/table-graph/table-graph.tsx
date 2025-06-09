@@ -35,15 +35,15 @@ import {
   shallowRef,
   watch,
 } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { Exception } from 'bkui-vue';
-import { getHashVal } from 'monitor-ui/chart-plugins/plugins/profiling-graph/flame-graph/utils';
 import { sortTableGraph } from 'monitor-ui/chart-plugins/plugins/profiling-graph/table-graph/utils';
 import {
   type ProfileDataUnit,
   parseProfileDataTypeValue,
 } from 'monitor-ui/chart-plugins/plugins/profiling-graph/utils';
-import { ColorTypes } from 'monitor-ui/chart-plugins/typings';
+import { getSpanColorByName } from 'monitor-ui/chart-plugins/typings';
 
 import type { DirectionType } from '../../../../typings';
 import type {
@@ -118,6 +118,7 @@ export default defineComponent({
     let intersectionObserver: IntersectionObserver = null;
     const renderTableData = shallowRef([]);
     const hiddenLoading = ref(false);
+    const { t } = useI18n();
     watch(
       () => props.data,
       (val: ProfilingTableItem[]) => {
@@ -151,9 +152,7 @@ export default defineComponent({
                 : true
             )
             .map(item => {
-              const palette = Object.values(ColorTypes);
-              const colorIndex = getHashVal(item.name) % palette.length;
-              const color = palette[colorIndex];
+              const color = getSpanColorByName(item.name);
               return {
                 ...item,
                 color,
@@ -205,7 +204,7 @@ export default defineComponent({
           sortType.value = 'asc';
           sortKey.value = col.id;
       }
-      emit('sortChange', sortKey);
+      emit('sortChange', sortKey.value);
       getTableData();
       tableColumns.value = tableColumns.value.map(item => {
         return {
@@ -306,6 +305,7 @@ export default defineComponent({
       tabelLoadingRef,
       hiddenLoading,
       renderTableData,
+      t,
     };
   },
   render() {
@@ -393,7 +393,7 @@ export default defineComponent({
                 <td colspan='3'>
                   <Exception
                     class='empty-table-exception'
-                    description={this.$t('搜索为空')}
+                    description={this.t('搜索为空')}
                     scene='part'
                     type='search-empty'
                   />
@@ -410,7 +410,7 @@ export default defineComponent({
                   }}
                   class='table-loading'
                 >
-                  {this.$t('加载中...')}
+                  {this.t('加载中...')}
                 </div>
               </td>
             </tr>
@@ -440,9 +440,9 @@ export default defineComponent({
                   ? [
                       <thead key={1}>
                         <th />
-                        <th>{this.$t('当前')}</th>
-                        <th>{this.$t('参照')}</th>
-                        <th>{this.$t('差异')}</th>
+                        <th>{this.t('当前')}</th>
+                        <th>{this.t('参照')}</th>
+                        <th>{this.t('差异')}</th>
                       </thead>,
                     ]
                   : [

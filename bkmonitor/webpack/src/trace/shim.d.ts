@@ -24,6 +24,9 @@
  * IN THE SOFTWARE.
  */
 
+import 'vue/dist/vue.d.ts';
+import 'vue/jsx.d.ts';
+
 import type i18n from './i18n/i18n';
 import type { IBizItem, ISpaceItem } from './typings';
 import type { Dayjs } from 'dayjs';
@@ -59,6 +62,7 @@ declare global {
     graph_watermark: boolean;
     // 以下为日志全局变量配置
     mainComponent: any;
+    traceLogComponent: any;
     AJAX_URL_PREFIX: string;
     BK_DOC_URL?: string;
     FEATURE_TOGGLE?: Record<string, 'off' | 'on'>;

@@ -40,7 +40,7 @@ import OverseasLogo from '../components/overseas-logo/overseas-logo';
 import introduce from '../common/introduce';
 import UserConfigMixin from '../mixins/userStoreConfig';
 import { isAuthority } from '../router/router';
-import { GLOAB_FEATURE_LIST, type IRouteConfigItem, getRouteConfig } from '../router/router-config';
+import { GLOBAL_FEATURE_LIST, type IRouteConfigItem, getRouteConfig } from '../router/router-config';
 import { SET_NAV_ROUTE_LIST } from '../store/modules/app';
 import type { IOverseasConfig, ISpaceItem } from '../types';
 import { useCheckVersion } from './check-version';
@@ -62,6 +62,7 @@ import './app.scss';
 // import NoticeComponent from '@blueking/notice-component-vue2';
 import '@blueking/notice-component-vue2/dist/style.css';
 import GlobalConfigMixin from '../mixins/globalConfig';
+import aiWhaleStore from '../store/modules/ai-whale';
 const changeNoticeRouteList = [
   'strategy-config-add',
   'strategy-config-edit',
@@ -80,7 +81,6 @@ const userConfigModal = new UserConfigMixin();
 const globalConfigModal = new GlobalConfigMixin();
 const NEW_UER_GUDE_KEY = 'NEW_UER_GUDE_KEY';
 const OVERSEAS_SITES_MENU = 'OVERSEAS_SITES_MENU';
-const AI_USER_LIST = 'AI_USER_LIST';
 const STORE_USER_MENU_KEY = 'USER_STORE_MENU_KEY';
 const ERROR_PAGE_ROUTE_NAME = 'error-exception';
 export const WATCH_SPACE_STICKY_LIST = 'WATCH_SPACE_STICKY_LIST'; /** 监听空间置顶列表数据事件key */
@@ -99,12 +99,13 @@ if (currentLang === 'en') {
 export default class App extends tsc<object> {
   @Ref('navHeader') navHeaderRef: HTMLDivElement;
   @Ref('headerDropdownMenu') headerDropdownMenuRef: { hide: () => void };
+  @ProvideReactive('needMenu') needMenu = true;
   routeList = getRouteConfig();
   showBizList = false;
   keyword = '';
   localMenuList = [];
   footerHtml = '';
-  needMenu = false;
+
   menuToggle = false;
   noticeStepList: IStepItem[] = [];
   needNewUserGuide = false;
@@ -114,18 +115,21 @@ export default class App extends tsc<object> {
   headerNav = 'home';
   headerNavChange = true;
   overseaGlobalList: IOverseasConfig[] = [];
-  enableAiAssistant = false; // 是否显示AI智能助手
   menuStore = '';
   hideNavCount = 0;
-  spacestickyList: string[] = []; /** 置顶的空间列表 */
+  spaceStickyList: string[] = []; /** 置顶的空间列表 */
   headerSettingShow = false;
   userStoreRoutes: IRouteConfigItem[] = [];
   showAlert = false; // 是否展示跑马灯
   // 全局设置弹窗
   globalSettingShow = false;
-  @ProvideReactive('toggleSet') toggleSet: boolean = localStorage.getItem('navigationToogle') === 'true';
+  @ProvideReactive('toggleSet') toggleSet: boolean = localStorage.getItem('navigationToggle') === 'true';
   @ProvideReactive('readonly') readonly: boolean = !!window.__BK_WEWEB_DATA__?.readonly || !!getUrlParam('readonly');
   routeViewKey = random(10);
+  // 是否显示AI智能助手
+  get enableAiAssistant() {
+    return aiWhaleStore.enableAiAssistant;
+  }
   get bizId() {
     return this.$store.getters.bizId;
   }
@@ -161,12 +165,12 @@ export default class App extends tsc<object> {
     if (this.$route.path.includes('exception/403')) this.headerNav = this.$route.query.parentRoute as string;
     if (!this.navActive) {
       list = this.routeList.find(item => item.id === this.headerNav)?.children || [];
-      // ai 设置 enable_aiops为true 则ai设置不展示 fasle 则ai设置页面展示
+      // ai 设置 enable_aiops为true 则ai设置不展示 false 则ai设置页面展示
       list = list.filter(item => !(item.id === 'ai' && !window.enable_aiops));
       return list;
     }
     list = this.routeList.find(item => item.id === this.navActive)?.children || [];
-    // ai 设置 enable_aiops为true 则ai设置不展示 fasle 则ai设置页面展示
+    // ai 设置 enable_aiops为true 则ai设置不展示 false 则ai设置页面展示
     list = list.filter(item => !(item.id === 'ai' && !window.enable_aiops));
     return list;
   }
@@ -215,7 +219,7 @@ export default class App extends tsc<object> {
 
   created() {
     this.handleSetNeedMenu();
-    this.menuToggle = localStorage.getItem('navigationToogle') === 'true';
+    this.menuToggle = localStorage.getItem('navigationToggle') === 'true';
     this.noticeStepList = [
       {
         target: '#head-nav-performance',
@@ -256,7 +260,6 @@ export default class App extends tsc<object> {
     this.handleGetNewUserGuide();
     this.needMenu && this.handleNavHeaderResize();
     this.needMenu && addListener(this.navHeaderRef, this.handleNavHeaderResize);
-    addListener(this.navHeaderRef, this.handleNavHeaderResize);
     this.handleFetchStickyList();
     bus.$on(WATCH_SPACE_STICKY_LIST, this.handleWatchSpaceStickyList);
     process.env.NODE_ENV === 'production' && process.env.APP === 'pc' && useCheckVersion();
@@ -270,7 +273,9 @@ export default class App extends tsc<object> {
   // 一级导航宽度变化时触发自动计算收缩
   handleNavHeaderResize() {
     if (!(this.$refs.NavTools as any)?.$el) return;
-    const minWidth = 772 + (this.$refs.NavTools as any).$el.clientWidth + 2;
+    /** 新版首页无需展示右侧的全站搜索框 */
+    const BASE_MIM_WIDTH = 772;
+    const minWidth = BASE_MIM_WIDTH + (this.$refs.NavTools as any).$el.clientWidth + 2;
     if (this.navHeaderRef?.clientWidth >= minWidth + SPACE_WIDTH) {
       this.hideNavCount = 0;
       return;
@@ -288,7 +293,7 @@ export default class App extends tsc<object> {
    * @param list 空间uid
    */
   handleWatchSpaceStickyList(list: string[]) {
-    this.spacestickyList = list;
+    this.spaceStickyList = list;
   }
   /**
    * 获取置顶列表
@@ -298,7 +303,7 @@ export default class App extends tsc<object> {
       username: this.$store.getters.userName,
     };
     const res = await listStickySpaces(params).catch(() => []);
-    this.spacestickyList = res;
+    this.spaceStickyList = res;
   }
   /**
    * 处理路由面包屑数据
@@ -375,7 +380,7 @@ export default class App extends tsc<object> {
   async handleMenuItemClick(item) {
     let hasRouteChange = this.$route.path !== item.path;
     const isMicroApp = microRouteNameList.includes(item.id);
-    // const isPeddingMicroApp = microRouteNameList.includes((this.$router as any).history?.pending?.name);
+    // const isPendingMicroApp = microRouteNameList.includes((this.$router as any).history?.pending?.name);
     // 屏蔽是微应用 需特殊处理
     if (isMicroApp) {
       hasRouteChange = location.hash !== item.href;
@@ -441,14 +446,14 @@ export default class App extends tsc<object> {
         const hasDashboard = list.some(item => item.uid === dashboardId);
         path = hasDashboard ? `grafana/d/${dashboardId}` : 'grafana/home';
       }
-      this.$store.commit('app/SET_BIZ_CHANGE_PEDDING', path);
+      this.$store.commit('app/SET_BIZ_CHANGE_PENDING', path);
       await this.handleUpdateRoute({ bizId: `${v}` }, promise, path).then(async hasAuth => {
         if (hasAuth) {
           this.routeViewKey = random(10);
         }
       });
       setTimeout(() => {
-        this.$store.commit('app/SET_BIZ_CHANGE_PEDDING', '');
+        this.$store.commit('app/SET_BIZ_CHANGE_PENDING', '');
       }, 32);
     } else if (navId !== this.$route.name || isErrorPage) {
       let newNavId = navId;
@@ -459,15 +464,15 @@ export default class App extends tsc<object> {
       // 所有页面的子路由在切换业务的时候都统一返回到父级页面
       const parentRoute = this.$router.options.routes.find(item => item.name === newNavId);
       if (parentRoute) {
-        this.$store.commit('app/SET_BIZ_CHANGE_PEDDING', parentRoute.name);
+        this.$store.commit('app/SET_BIZ_CHANGE_PENDING', parentRoute.name);
         const hasAuth = await this.handleUpdateRoute({ bizId: `${v}` }, promise);
         hasAuth &&
           this.$router.push({ name: parentRoute.name, params: { bizId: `${v}` } }, () => {
             this.routeViewKey = random(10);
-            this.$store.commit('app/SET_BIZ_CHANGE_PEDDING', '');
+            this.$store.commit('app/SET_BIZ_CHANGE_PENDING', '');
           });
         if (!hasAuth) {
-          this.$store.commit('app/SET_BIZ_CHANGE_PEDDING', '');
+          this.$store.commit('app/SET_BIZ_CHANGE_PENDING', '');
         }
         setTimeout(() => this.$store.commit('app/SET_ROUTE_CHANGE_LOADING', false), 20);
         return;
@@ -477,12 +482,19 @@ export default class App extends tsc<object> {
           this.routeViewKey = random(10);
         }
       });
-    } else if (navId === 'k8s' || navId === 'k8s-new') {
+    } else if (['k8s', 'k8s-new', 'event-retrieval'].includes(navId)) {
       setTimeout(async () => {
         await this.handleUpdateRoute({ bizId: `${v}` }, promise).then(hasAuth => {
           if (hasAuth) {
-            this.routeViewKey = random(10);
-            this.$router.push({ name: navId === 'k8s' ? 'k8s-new' : 'k8s' });
+            let routeName = '';
+            if (navId.startsWith('k8s')) {
+              routeName = this.$store.getters.isEnableK8sV2 ? 'k8s-new' : 'k8s';
+            } else {
+              routeName = 'event-explore';
+            }
+            this.$router.push({ name: routeName, query: {} }).finally(() => {
+              this.routeViewKey = random(10);
+            });
           }
         });
         window.requestIdleCallback(() => introduce.initIntroduce(this.$route));
@@ -504,8 +516,8 @@ export default class App extends tsc<object> {
     const promiseList = [];
     promiseList.push(promise);
     const { authority } = this.$route.meta;
-    const serachParams = new URLSearchParams(params);
-    const newUrl = `${window.location.pathname}?${serachParams.toString()}#${path || this.$route.path}`;
+    const searchParams = new URLSearchParams(params);
+    const newUrl = `${window.location.pathname}?${searchParams.toString()}#${path || this.$route.path}`;
     history.replaceState({}, '', newUrl);
     // 判断页面权限
     let hasAuthority = false;
@@ -542,10 +554,10 @@ export default class App extends tsc<object> {
   }
   handleToggleClick(v: boolean) {
     this.toggleSet = v;
-    localStorage.setItem('navigationToogle', String(v));
+    localStorage.setItem('navigationToggle', String(v));
   }
   handleNoticeDone() {
-    // NEW_UER_GUDE_KEY新手指引字段存储到后台
+    // NEW_UER_GUIDE_KEY新手指引字段存储到后台
     userConfigModal.handleSetUserConfig(NEW_UER_GUDE_KEY, JSON.stringify(['done']));
   }
   handleHeaderNavClick(id: string) {
@@ -605,7 +617,7 @@ export default class App extends tsc<object> {
     this.$router.push(route);
   }
   handleGoStoreRoute(item: IRouteConfigItem) {
-    const globalSetting = GLOAB_FEATURE_LIST.find(set => set.id === item.id);
+    const globalSetting = GLOBAL_FEATURE_LIST.find(set => set.id === item.id);
     (this.$refs.commonHeaderDrop as any)?.hide();
     if (globalSetting) {
       this.handleHeaderSettingShowChange(false);
@@ -641,46 +653,48 @@ export default class App extends tsc<object> {
     this.headerSettingShow = false;
   }
   commonHeader() {
-    return (
-      <bk-dropdown-menu
-        ref='commonHeaderDrop'
-        position-fixed={true}
-      >
-        <div
-          class='header-list-item no-border'
-          slot='dropdown-trigger'
-        >
-          {this.$t('route-常用')}
-          <i class='bk-icon icon-down-shape' />
-        </div>
-        ;
-        <ul
-          class='common-list'
-          slot='dropdown-content'
-        >
-          {this.userStoreRoutes
-            ?.filter(item => item.id)
-            .map(item => (
-              <li
-                key={item.id}
-                class='common-list-item'
-                onClick={() => this.handleGoStoreRoute(item)}
-              >
-                <i class={`${item.icon} list-item-icon`} />
-                {this.$t(item.name.startsWith('route-') ? item.name : `route-${item.name}`)}
-              </li>
-            ))}
-        </ul>
-        <div
-          class='list-append'
-          slot='dropdown-content'
-          onClick={() => this.handleHeaderSettingShowChange(!this.headerSettingShow)}
-        >
-          <i class='bk-icon icon-cog' />
-          {this.$t('管理')}
-        </div>
-      </bk-dropdown-menu>
-    );
+    /** 新版首页后，为了减少页面的跳动：隐藏（但是占位还在） */
+    return <div class='header-list-item-block' />;
+    // return (
+    //   <bk-dropdown-menu
+    //     ref='commonHeaderDrop'
+    //     position-fixed={true}
+    //   >
+    //     <div
+    //       class='header-list-item no-border'
+    //       slot='dropdown-trigger'
+    //     >
+    //       {this.$t('route-常用')}
+    //       <i class='bk-icon icon-down-shape' />
+    //     </div>
+    //     ;
+    //     <ul
+    //       class='common-list'
+    //       slot='dropdown-content'
+    //     >
+    //       {this.userStoreRoutes
+    //         ?.filter(item => item.id)
+    //         .map(item => (
+    //           <li
+    //             key={item.id}
+    //             class='common-list-item'
+    //             onClick={() => this.handleGoStoreRoute(item)}
+    //           >
+    //             <i class={`${item.icon} list-item-icon`} />
+    //             {this.$t(item.name.startsWith('route-') ? item.name : `route-${item.name}`)}
+    //           </li>
+    //         ))}
+    //     </ul>
+    //     <div
+    //       class='list-append'
+    //       slot='dropdown-content'
+    //       onClick={() => this.handleHeaderSettingShowChange(!this.headerSettingShow)}
+    //     >
+    //       <i class='bk-icon icon-cog' />
+    //       {this.$t('管理')}
+    //     </div>
+    //   </bk-dropdown-menu>
+    // );
   }
   handleHeaderSettingShowChange(v: boolean) {
     this.headerSettingShow = v;
@@ -695,12 +709,7 @@ export default class App extends tsc<object> {
     this.overseaGlobalList = await globalConfigModal.handleGetGlobalConfig<IOverseasConfig[]>(OVERSEAS_SITES_MENU);
   }
   async getAiUserConfig() {
-    if (!window.enable_ai_assistant) {
-      this.enableAiAssistant = false;
-      return;
-    }
-    const list: string[] = await globalConfigModal.handleGetGlobalConfig<string[]>(AI_USER_LIST);
-    this.enableAiAssistant = list.includes(window.username);
+    aiWhaleStore.setEnableAiAssistantAction();
   }
 
   render() {
@@ -728,7 +737,7 @@ export default class App extends tsc<object> {
           class='page-wrapper'
           name='noCache'
         />
-        {this.$route.name === 'home' ? (
+        {this.$route.name === 'home' || this.$route.name === 'newHome' ? (
           <div class='monitor-footer'>
             <div
               class='footer-link'
@@ -754,6 +763,7 @@ export default class App extends tsc<object> {
         )}
         <bk-navigation
           class={{
+            'bk-monitor-navigation': true,
             'no-need-menu': !this.needMenu || this.isFullScreen || this.$route.name === 'share',
           }}
           default-open={this.menuToggle}
@@ -761,7 +771,7 @@ export default class App extends tsc<object> {
           navigation-type='top-bottom'
           need-menu={!!this.menuList?.length && this.needMenu && !this.isFullScreen && this.$route.name !== 'share'}
           side-title={this.platformData.name}
-          themeColor='#2c354d'
+          themeColor='#242b3b'
           on-toggle={this.handleToggle}
           on-toggle-click={this.handleToggleClick}
         >
@@ -850,7 +860,7 @@ export default class App extends tsc<object> {
                     bizList={this.bizIdList}
                     isShrink={!this.menuToggle}
                     minWidth={380}
-                    stickyList={this.spacestickyList}
+                    stickyList={this.spaceStickyList}
                     theme='dark'
                     value={+this.bizId}
                     onChange={this.handleBizChange}
@@ -865,7 +875,17 @@ export default class App extends tsc<object> {
                   {...{ props: APP_NAV_COLORS }}
                 >
                   {this.menuList
-                    .filter(item => !item.hidden)
+                    .filter(item => {
+                      if (item.hidden) return false;
+                      if (item.id === 'event-retrieval' || item.id === 'event-explore') {
+                        if (['event-retrieval', 'event-explore'].includes(this.$route.name)) {
+                          return this.$route.name === item.id;
+                        }
+                        if (item.id === 'event-explore') return true;
+                        return false;
+                      }
+                      return true;
+                    })
                     .map(item =>
                       item?.children?.length ? (
                         <bk-navigation-menu-group
@@ -875,8 +895,13 @@ export default class App extends tsc<object> {
                           {item.children
                             .filter(child => !child.hidden)
                             .filter(menu => {
-                              if (menu.id === 'k8s') return !this.$store.getters.isEnableK8sV2;
-                              if (menu.id === 'k8s-new') return this.$store.getters.isEnableK8sV2;
+                              if (menu.id === 'k8s' || menu.id === 'k8s-new') {
+                                if (['k8s', 'k8s-new'].includes(this.$route.name)) {
+                                  return this.$route.name === menu.id;
+                                }
+                                if (this.$store.getters.k8sV2EnableList && menu.id === 'k8s-new') return true;
+                                return false;
+                              }
                               return true;
                             })
                             .map(child => (

@@ -183,6 +183,10 @@
   import Strategy from './components/strategy';
   import { deepClone } from '../../../../common/util';
   import { RetrieveUrlResolver } from '@/store/url-resolver';
+  import useFieldNameHook from '@/hooks/use-field-name';
+
+  import { BK_LOG_STORAGE } from '@/store/store.type';
+
   export default {
     components: {
       DataFingerprint,
@@ -281,6 +285,9 @@
       bkBizId() {
         return this.$store.state.bkBizId;
       },
+      showFieldAlias() {
+        return this.$store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS];
+      },
       isHaveAnalyzed() {
         return this.totalFields.some(item => item.is_analyzed);
       },
@@ -310,7 +317,7 @@
         return this.indexFieldInfo.is_loading || this.isFieldInit;
       },
       routerIndexSet() {
-        return window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId;
+        return window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId;
       },
       getDimensionStr() {
         return this.fingerOperateData.dimensionList.length
@@ -347,7 +354,10 @@
       totalFields: {
         deep: true,
         immediate: true,
-        handler() {
+        handler(newVal, oldVal) {
+          if (newVal === oldVal) {
+            return;
+          }
           // 当前nav为数据指纹且数据指纹开启点击指纹nav则不再重复请求
           this.fingerList = [];
           this.allFingerList = [];
@@ -369,6 +379,9 @@
       },
       isShowClusterStep(v) {
         this.$store.commit('updateStoreIsShowClusterStep', v);
+      },
+      showFieldAlias() {
+        this.filterGroupList();
       },
     },
     methods: {
@@ -587,11 +600,11 @@
        * @desc: 初始化分组select数组
        */
       filterGroupList() {
+        const { getConcatenatedFieldName } = useFieldNameHook({ store: this.$store });
         const filterList = this.totalFields
           .filter(el => el.es_doc_values && !/^__dist_/.test(el.field_name)) // 过滤__dist字段
           .map(item => {
-            const { field_name: id, field_alias: alias } = item;
-            return { id, name: alias ? `${id}(${alias})` : id };
+            return getConcatenatedFieldName(item);
           });
         this.fingerOperateData.groupList = filterList;
       },
@@ -661,7 +674,7 @@
           'retrieve/getClusteringConfigStatus',
           {
             params: {
-              index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId,
+              index_set_id: window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId,
             },
           },
           {
@@ -684,21 +697,37 @@
           this.isFieldInit = false;
         }
       },
+      async onMountedLoad() {
+        if (!this.isClusterActive) {
+          this.isClusterActive = true;
+          await this.confirmClusterStepStatus();
+          if (this.isClickSearch && !this.isInitPage) this.requestFinger();
+          if (!this.isInitPage) {
+            this.$store.commit('updateClusterParams', this.requestData);
+            this.setRouteParams();
+          }
+        }
+      },
+      async onUnMountedLoad() {
+        if (this.isClusterActive) {
+          this.isClusterActive = false;
+          this.$store.commit('updateClusterParams', null);
+          this.setRouteParams();
+          this.stopPolling(); // 停止状态轮询
+        }
+      },
+    },
+    async mounted() {
+      await this.onMountedLoad();
     },
     async activated() {
-      this.isClusterActive = true;
-      await this.confirmClusterStepStatus();
-      if (this.isClickSearch && !this.isInitPage) this.requestFinger();
-      if (!this.isInitPage) {
-        this.$store.commit('updateClusterParams', this.requestData);
-        this.setRouteParams();
-      }
+      await this.onMountedLoad();
     },
     deactivated() {
-      this.isClusterActive = false;
-      this.$store.commit('updateClusterParams', null);
-      this.setRouteParams();
-      this.stopPolling(); // 停止状态轮询
+      this.onUnMountedLoad();
+    },
+    unmounted() {
+      this.onUnMountedLoad();
     },
     beforeDestroy() {
       this.$store.commit('updateClusterParams', null);

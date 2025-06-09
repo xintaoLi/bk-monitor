@@ -53,6 +53,7 @@ import type { INavItem } from 'monitor-pc/pages/monitor-k8s/typings';
 
 import './apm-home.scss';
 import '@blueking/search-select-v3/vue2/vue2.css';
+import { addAccessRecord } from 'monitor-api/modules/overview';
 
 @Component({})
 export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) {
@@ -138,6 +139,10 @@ export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) 
         this.appName = (val || '').toString();
       }
     }
+    // 服务或者应用内点击了apm首页，时间同步
+    if (query.from && query.to) {
+      this.timeRange = [query.from as string, query.to as string];
+    }
   }
 
   /**
@@ -196,6 +201,8 @@ export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) 
       query: {
         ...this.$route.query,
         ...serviceParams,
+        from: this.timeRange[0] || this.$route.query.from, // apm首页缺少from和to导致子页面时间范围选择器不同步
+        to: this.timeRange[1] || this.$route.query.to,
         app_keyword: this.searchCondition || undefined,
         app_name: this.appName,
         profiling_data_status: appSearchParams.profiling_data_status || undefined,
@@ -222,6 +229,27 @@ export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) 
   handleImmediateRefresh() {
     this.getAppList();
     this.refreshKey++;
+  }
+
+  /**
+   * apm 服务埋点
+   * @param item 调整的服务相关参数
+   */
+  handleGotoService(item) {
+    try {
+      const queryString = item.url.split('?')[1];
+      const params = new URLSearchParams(queryString);
+      // 获取 filter-app_name 的值
+      const appName = params.get('filter-app_name');
+      const app = this.appList.find(app => app.app_name === appName);
+      // 新版首页最近使用埋点
+      addAccessRecord({
+        function: 'apm_service',
+        config: { application_id: app.application_id, service_name: item.value },
+      });
+    } catch (error) {
+      console.log('error', error);
+    }
   }
 
   /**
@@ -343,8 +371,8 @@ export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) 
                 isSplitPanel={false}
                 showListMenu={false}
                 timeRange={this.timeRange}
-                onImmediateReflesh={() => this.handleImmediateRefresh()}
-                onRefleshChange={this.handleRefreshChange}
+                onImmediateRefresh={() => this.handleImmediateRefresh()}
+                onRefreshChange={this.handleRefreshChange}
                 onTimeRangeChange={this.handleTimeRangeChange}
               />
               {/* <ListMenu
@@ -504,6 +532,7 @@ export default class AppList extends Mixins(authorityMixinCreate(authorityMap)) 
               authority={this.appData?.permission[authorityMap.VIEW_AUTH]}
               authorityDetail={authorityMap.VIEW_AUTH}
               timeRange={this.timeRange}
+              onGoToServiceByLink={val => this.handleGotoService(val)}
               onRouteUrlChange={this.handleReplaceRouteUrl}
             />
           </div>

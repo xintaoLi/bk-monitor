@@ -23,7 +23,7 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { type PropType, defineComponent, ref, watch } from 'vue';
+import { type PropType, defineComponent, ref, watch, defineExpose } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import { Popover, Slider } from 'bkui-vue';
@@ -315,6 +315,11 @@ export default defineComponent({
         selectionLeft.value = left;
       }
     );
+
+    defineExpose({
+      handleUpdateZoom,
+    });
+
     return {
       MIN_ZOOM,
       showMinimap,
@@ -334,6 +339,7 @@ export default defineComponent({
       onSelectionMouseDown,
       canvasRef,
       selectionRef,
+      t,
     };
   },
   render() {
@@ -352,9 +358,9 @@ export default defineComponent({
                     return (
                       <li key={node.type}>
                         <span class={['circle', node.status, { 'node-tag': isTag }]}>
-                          {isTag ? this.$t('根因') : ''}
+                          {isTag ? this.t('根因') : ''}
                         </span>
-                        <span>{this.$t(node.text)}</span>
+                        <span>{this.t(node.text)}</span>
                       </li>
                     );
                   })}
@@ -363,7 +369,7 @@ export default defineComponent({
                       <span class='info-circle'>
                         <i class={`icon-monitor item-icon ${node.icon}`} />
                       </span>
-                      <span>{this.$t(node.text)}</span>
+                      <span>{this.t(node.text)}</span>
                     </li>
                   ))}
                 </ul>
@@ -373,7 +379,7 @@ export default defineComponent({
               <div
                 class='failure-topo-graph-legend'
                 v-bk-tooltips={{
-                  content: this.$t('显示图例'),
+                  content: this.t('显示图例'),
                   disabled: this.showLegend,
                   boundary: 'parent',
                   extCls: 'failure-topo-graph-tooltip',
@@ -423,7 +429,7 @@ export default defineComponent({
               <div
                 class='failure-topo-graph-legend'
                 v-bk-tooltips={{
-                  content: this.$t('显示小地图'),
+                  content: this.t('显示小地图'),
                   disabled: this.showMinimap,
                   boundary: 'parent',
                   placement: 'bottom',
@@ -471,7 +477,7 @@ export default defineComponent({
         <span class='failure-topo-graph-line' />
         <div
           class='failure-topo-graph-proportion'
-          v-bk-tooltips={{ content: this.$t('重置比例'), boundary: 'parent', extCls: 'failure-topo-graph-tooltip' }}
+          v-bk-tooltips={{ content: this.t('重置比例'), boundary: 'parent', extCls: 'failure-topo-graph-tooltip' }}
           onClick={this.handleResetZoom}
         >
           <i class='icon-monitor icon-mc-restoration-ratio' />

@@ -35,20 +35,23 @@ import { docCookies } from 'monitor-common/utils/utils';
 import LogVersion from '../components/log-version/intex';
 import LogVersionMixin from '../components/log-version/log-version-mixin';
 import DocumentLinkMixin from '../mixins/documentLinkMixin';
-import { GLOAB_FEATURE_LIST, setLocalStoreRoute } from '../router/router-config';
+import { GLOBAL_FEATURE_LIST, setLocalStoreRoute } from '../router/router-config';
 import enIcon from '../static/images/svg/en.svg';
 import zhIcon from '../static/images/svg/zh.svg';
 import type { IMenuItem } from '../types';
 
 // #if APP !== 'external'
-import GlobalSearchModal from './global-search-modal-new';
+// import GlobalSearchModal from './global-search-modal-new';
+import HomeSelect from 'monitor-pc/pages/home/new-home/components/home-select';
 import SettingModal from './setting-modal';
 // #endif
 
 import './nav-tools.scss';
+import { getCmdShortcutKey } from 'monitor-common/utils/navigator';
 
 export const HANDLE_SHOW_SETTING = 'HANDLE_SHOW_SETTING';
 export const HANDLE_HIDDEN_SETTING = 'HANDLE_HIDDEN_SETTING';
+export const HANDLE_MENU_CHANGE = 'HANDLE_MENU_CHANGE';
 interface INavToolsProps {
   show: boolean;
 }
@@ -83,10 +86,14 @@ class NavTools extends DocumentLinkMixin {
   globalSearchShow = false;
   activeSetting = '';
   settingTitle = '';
-  defauleSearchPlaceholder = `${this.$t('全站搜索')} Ctrl + k`;
-  globalSearchPlaceholder = this.defauleSearchPlaceholder;
+  defaultSearchPlaceholder = `${this.$t('全站搜索')}`;
+  globalSearchPlaceholder = this.defaultSearchPlaceholder;
   isShowMyApplyModal = false;
   isShowMyReportModal = false;
+
+  get isHomePage() {
+    return this.$route.name && this.$route.name === 'home';
+  }
 
   // 全局弹窗在路由变化时需要退出
   @Watch('$route.name')
@@ -124,7 +131,7 @@ class NavTools extends DocumentLinkMixin {
         href: window.ce_url,
       },
     ];
-    this.setList = GLOAB_FEATURE_LIST.map(({ name, ...args }) => ({
+    this.setList = GLOBAL_FEATURE_LIST.map(({ name, ...args }) => ({
       name: `route-${name}`,
       ...args,
     }));
@@ -143,11 +150,13 @@ class NavTools extends DocumentLinkMixin {
     document.addEventListener('keydown', this.handleKeyupSearch);
     bus.$on(HANDLE_SHOW_SETTING, this.handleShowSetting);
     bus.$on('handle-keyup-search', this.handleKeyupSearch);
+    bus.$on(HANDLE_MENU_CHANGE, this.handleSet);
     window.addEventListener('blur', this.hidePopoverSetOrHelp);
   }
   beforeDestroy() {
     document.removeEventListener('keydown', this.handleKeyupSearch);
     bus.$off('handle-keyup-search', this.handleKeyupSearch);
+    bus.$off(HANDLE_MENU_CHANGE, this.handleSet);
     window.removeEventListener('blur', this.hidePopoverSetOrHelp);
   }
 
@@ -161,11 +170,16 @@ class NavTools extends DocumentLinkMixin {
    * @description: ctrl+k 打开全站搜索弹窗
    * @param { * } event
    */
-  handleKeyupSearch(event) {
+  handleKeyupSearch(event: KeyboardEvent) {
     if (this.globalSearchShow) return;
-    if (event.ctrlKey && event.keyCode === 75) {
-      event.preventDefault();
-      this.handleGlobalSearchShowChange(true);
+    if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+      if (this.isHomePage) {
+        bus.$emit('handle-keyup-nav', event);
+      } else {
+        event.preventDefault();
+        this.handleGlobalSearch();
+        this.handleGlobalSearchShowChange(true);
+      }
     }
   }
   /**
@@ -175,6 +189,8 @@ class NavTools extends DocumentLinkMixin {
    */
   handleGlobalSearch() {
     this.globalSearchShow = !this.globalSearchShow;
+    /** 展示在顶部导航栏的时候的自动聚焦 */
+    setTimeout(() => (this.$refs.homeSelectModal as any)?.handleInputFocus(), 10);
   }
   /**
    * @description: 帮助列表
@@ -286,10 +302,10 @@ class NavTools extends DocumentLinkMixin {
   handleGlobalSearchShowChange(v: boolean, searchKey?: string) {
     this.globalSearchShow = v;
     // 关闭弹窗时若存在已输入但未搜索的关键字
-    if (searchKey.length) {
+    if (searchKey?.length) {
       this.globalSearchPlaceholder = searchKey;
     } else {
-      this.globalSearchPlaceholder = this.defauleSearchPlaceholder;
+      this.globalSearchPlaceholder = this.defaultSearchPlaceholder;
     }
   }
   /**
@@ -304,14 +320,20 @@ class NavTools extends DocumentLinkMixin {
       <div class='nav-tools'>
         {
           // #if APP !== 'external'
-          <div
-            id='nav-search-bar'
-            class='search-bar'
-            onClick={this.handleGlobalSearch}
-          >
-            <span class='search-text'>{this.globalSearchPlaceholder}</span>
-            <span class='bk-icon icon-search' />
-          </div>
+          /** 新版首页无需展示右侧的全站搜索框 */
+          !this.isHomePage && (
+            <div
+              id='nav-search-bar'
+              class='search-bar'
+              onClick={this.handleGlobalSearch}
+            >
+              <span class='search-text'>{this.globalSearchPlaceholder}</span>
+              {/* <span class='bk-icon icon-search' /> */}
+              <span class='search-bar-keyword'>
+                {this.$t('快捷键')} {getCmdShortcutKey()} + /
+              </span>
+            </div>
+          )
           // #endif
         }
         {
@@ -502,11 +524,17 @@ class NavTools extends DocumentLinkMixin {
             </SettingModal>,
             <keep-alive key='keep-alive'>
               {this.globalSearchShow && (
-                <GlobalSearchModal
-                  ref='globalSearchModal'
+                <HomeSelect
+                  ref='homeSelectModal'
+                  isBarToolShow={true}
                   show={this.globalSearchShow}
                   onChange={this.handleGlobalSearchShowChange}
                 />
+                // <GlobalSearchModal
+                //   ref='globalSearchModal'
+                //   show={this.globalSearchShow}
+                //   onChange={this.handleGlobalSearchShowChange}
+                // />
               )}
             </keep-alive>,
           ]

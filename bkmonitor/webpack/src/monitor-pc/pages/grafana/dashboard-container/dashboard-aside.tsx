@@ -37,6 +37,7 @@ import {
   starDashboard,
   unstarDashboard,
   copyDashboardToFolder,
+  migrateDashboard,
 } from 'monitor-api/modules/grafana';
 import bus from 'monitor-common/utils/event-bus';
 import { Debounce, deepClone, random } from 'monitor-common/utils/utils';
@@ -86,6 +87,7 @@ export enum MoreType {
   fav = 5 /** 收藏 */,
   import = 2 /** 导入 */,
   imports = 3 /** 批量导入 */,
+  migrate = 10 /** 迁移 */,
   rename = 8 /** 重命名 */,
   unfav = 6 /** 取消收藏 */,
 }
@@ -105,6 +107,8 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
   curFormType: FormType = MoreType.dir;
   /** 选中的仪表盘 */
   checked: string = null;
+  /** 复制的仪表盘 */
+  copiedUid: string = null;
   /** 外链数据 */
   linkList: ILinkItem[] = [
     {
@@ -136,7 +140,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
   /** 仪表盘列表 */
   grafanaList: ITreeMenuItem[] = [];
   /** 置顶的空间列表 */
-  spacestickyList: string[] = [];
+  spaceStickyList: string[] = [];
 
   /** 新增操作选项 */
   get addOptions(): IIconBtnOptions[] {
@@ -247,7 +251,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
    * @param list 空间uid
    */
   handleWatchSpaceStickyList(list: string[]) {
-    this.spacestickyList = list;
+    this.spaceStickyList = list;
   }
   /**
    * 获取置顶列表
@@ -257,7 +261,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
       username: this.$store.getters.userName,
     };
     const res = await listStickySpaces(params).catch(() => []);
-    this.spacestickyList = res;
+    this.spaceStickyList = res;
   }
 
   handleMessage(e: any) {
@@ -292,6 +296,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
       id: 99999,
       title: 'Home',
       uid: GRAFANA_HOME_ID,
+      hasPermission: true,
       icon: 'icon-mc-grafana-home',
       isFolder: false,
       isStarred: false,
@@ -306,11 +311,20 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
    */
   handleGrafanaTreeData(list: Array<any>): ITreeMenuItem[] {
     return list.map(item => {
-      const { id, title, dashboards = [], uid = '', isStarred = false, url } = item;
+      const {
+        id,
+        title,
+        dashboards = [],
+        uid = '',
+        isStarred = false,
+        url,
+        has_permission: hasPermission = true,
+      } = item;
       return {
         id,
         title,
         uid,
+        hasPermission,
         isStarred,
         url,
         isFolder: Object.prototype.hasOwnProperty.call(item, 'dashboards'),
@@ -399,6 +413,9 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
         break;
       case MoreType.export:
         this.handleExportDashboard(data);
+        break;
+      case MoreType.migrate:
+        this.handleMigrateDashboard(data.item);
         break;
       default:
         break;
@@ -518,6 +535,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
     this.formData.dir = item?.isGroup && !!item?.isFolder ? item?.id : '';
     this.showAddForm = true;
     this.curFormType = option.id as FormType;
+    this.copiedUid = item.uid;
     this.formData.name = (this.isCopyDashboard && item?.title) || '';
   }
 
@@ -549,6 +567,36 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
     }
     this.loading = false;
   }
+
+  /**
+   * 迁移仪表盘
+   * res.data为空：仪表盘内没有要迁移的旧面板情况
+   * res.data.failed_total > 0： 有部分面板迁移失败
+   * res.data.success_total：迁移成功的面板数量
+   */
+  async handleMigrateDashboard(item: IMoreData['item']) {
+    this.$bkInfo({
+      title: this.$t('确认更新？'),
+      subTitle: this.$t('解决grafana升级后组件兼容性问题，不影响数据'),
+      confirmLoading: true,
+      confirmFn: async () => {
+        try {
+          const res = await migrateDashboard({ dashboard_uid: item.uid, bk_biz_id: this.bizId });
+          const failedTotal = res.failed_total === 0;
+          this.$bkMessage({
+            message: Object.keys(res).length
+              ? this.$t(`更新成功${!failedTotal ? ',部分旧面板更新失败' : ''}`)
+              : this.$t('仪表盘内没有要更新的旧面板'),
+            theme: failedTotal ? 'success' : 'warning',
+          });
+          this.handleFetchGrafanaTree();
+        } catch (error) {
+          this.$bkMessage({ message: error, theme: 'error' });
+        }
+      },
+    });
+  }
+
   /**
    * 新增仪表盘
    */
@@ -570,7 +618,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
    */
   handleCopyDashboard() {
     const params = {
-      dashboard_uid: this.checked,
+      dashboard_uid: this.copiedUid,
       folder_id: this.formData.dir,
     };
     return copyDashboardToFolder(params)
@@ -673,7 +721,7 @@ export default class DashboardAside extends tsc<IProps, IEvents> {
             <BizSelect
               bizList={this.bizIdList}
               minWidth={380}
-              stickyList={this.spacestickyList}
+              stickyList={this.spaceStickyList}
               theme={'dark'}
               value={+this.bizId}
               onChange={this.handleBizChange}

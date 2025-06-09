@@ -29,6 +29,8 @@ import { Component, InjectReactive, Mixins, Prop, Ref, Watch } from 'vue-propert
 import { ofType } from 'vue-tsx-support';
 
 import dayjs from 'dayjs';
+import difference from 'lodash/difference';
+import intersection from 'lodash/intersection';
 import {
   actionDateHistogram,
   actionTopN,
@@ -69,6 +71,7 @@ import EmptyTable from './empty-table';
 import EventChart from './event-chart';
 import AlarmConfirm from './event-detail/alarm-confirm';
 import AlarmDispatch from './event-detail/alarm-dispatch';
+
 // import EventDetailSlider from './event-detail/event-detail-slider';
 import ManualDebugStatus from './event-detail/manual-debug-status';
 import ManualProcess from './event-detail/manual-process';
@@ -92,6 +95,7 @@ import {
 import { INIT_COMMON_FILTER_DATA, getOperatorDisabled } from './utils';
 
 import type { TType as TSliderType } from './event-detail/event-detail-slider';
+
 // import { showAccessRequest } from 'monitor-pc/components/access-request-dialog';
 import type { EmptyStatusOperationType, EmptyStatusType } from 'monitor-pc/components/empty-status/types';
 import type { TimeRangeType } from 'monitor-pc/components/time-range/time-range';
@@ -129,7 +133,7 @@ const allActionFieldList = [
   'strategy_name',
   'operate_target_string',
 ];
-const allIncidentFieldList = ['incident_name', 'status', 'level', 'assignees', 'handlers', 'labels'];
+const allIncidentFieldList = ['status', 'level', 'assignees', 'handlers', 'labels'];
 const isEn = docCookies.getItem(LANGUAGE_COOKIE_KEY) === 'en';
 export const commonAlertFieldMap = {
   status: [
@@ -323,9 +327,9 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
   // 图表的数据时间间隔
   @InjectReactive('timeRange') readonly panelTimeRange!: number;
   // 图表刷新间隔
-  @InjectReactive('refleshInterval') readonly panleRefleshInterval!: number;
+  @InjectReactive('refreshInterval') readonly panleRefleshInterval!: number;
   // 立即刷新图表
-  @InjectReactive('refleshImmediate') readonly panelRefleshImmediate: string;
+  @InjectReactive('refreshImmediate') readonly panelRefleshImmediate: string;
 
   @Ref('filterInput') filterInputRef: FilterInput;
   commonFilterData: ICommonTreeItem[] = INIT_COMMON_FILTER_DATA;
@@ -334,7 +338,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
   timeRange: TimeRangeType = ['now-7d', 'now'] || DEFAULT_TIME_RANGE;
   /* 时区 */
   timezone: string = getDefaultTimezone();
-  refleshInterval = 5 * 60 * 1000;
+  refreshInterval = 5 * 60 * 1000;
   refleshInstance = null;
   allowedBizList = [];
   bizIds = [this.$store.getters.bizId];
@@ -352,6 +356,12 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
   analyzeData = [];
   analyzeFields = ['alert_name', 'metric', 'bk_biz_id', 'duration', 'ip', 'ipv6', 'bk_cloud_id'];
   incidentFieldList = ['incident_name', 'status', 'level', 'assignees', 'handlers', 'labels'];
+  // bk助手链接
+  incidentWxCsLink = '';
+  incidentEmptyData = {
+    path: '',
+    text: '',
+  };
   analyzeTagList: ICommonItem[] = [];
   detailField = '';
   detailFieldData: any = {};
@@ -454,7 +464,6 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
     assignee: [],
     alertIds: [],
   };
-
   // 过滤业务已选择是否为空
   filterSelectIsEmpty = false;
   showPermissionTips = true;
@@ -503,12 +512,12 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
   @Watch('panelRefleshInterval')
   // 数据刷新间隔
   handlePanelRefleshIntervalChange(v: number) {
-    this.handleRefleshChange(v);
+    this.handleRefreshChange(v);
   }
   @Watch('panelRefleshImmediate')
   // 立刻刷新
   handlePanelRefleshImmediateChange(v: string) {
-    if (v) this.handleImmediateReflesh();
+    if (v) this.handleImmediateRefresh();
   }
   @Watch('defaultParams', { immediate: true })
   async handleDefaultParamsChange(v: Record<string, any>) {
@@ -516,7 +525,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       this.routeStateKeyList = [];
       Object.keys(v).forEach(key => (this[key] = v[key]));
       await Promise.all([this.handleGetFilterData(), this.handleGetTableData(true)]);
-      this.handleRefleshChange(this.refleshInterval);
+      this.handleRefreshChange(this.refreshInterval);
     }
   }
   async created() {
@@ -592,7 +601,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
         }
       }
       await Promise.all([vm.handleGetFilterData(), vm.handleGetTableData(true)]);
-      vm.handleRefleshChange(vm.refleshInterval);
+      vm.handleRefreshChange(vm.refreshInterval);
       // 批量弹窗 (batchAction=xxx并且queryString 包含action_id 搜索 则弹出弹窗)
       if (
         [EBatchAction.alarmConfirm, EBatchAction.quickShield].includes(params.batchAction) &&
@@ -607,8 +616,10 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
         });
         vm.handleBatchAlert(params.batchAction);
       } else {
-        // 正常进入告警页情况下不打开详情，只有通过告警通知进入的才展开详情
-        const needShowDetail = !!vm.$route.query.collectId && location.search.includes('specEvent');
+        // 正常进入告警页情况下不打开详情，只有通过告警通知进入的才展开详情（带collectId）
+        // 新版首页搜索跳转过来打开详情(带alertId)
+        const needShowDetail =
+          (!!vm.$route.query.collectId || !!vm.$route.query.alertId) && location.search.includes('specEvent');
         if (needShowDetail) {
           vm.handleFirstShowDetail();
         }
@@ -736,6 +747,14 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       /* 带collectId是事件范围设为近15天 */
       defaultData.timeRange = ['now-30d', 'now'];
     }
+
+    /** 新版首页带alertId跳转事件中心 */
+    if (defaultData.alertId) {
+      defaultData.queryString = defaultData.queryString
+        ? `${defaultData.queryString} AND id : ${defaultData.alertId}`
+        : `id : ${defaultData.alertId}`;
+    }
+
     /** 处理指标参数 */
     if (defaultData.metricId?.length) {
       const metricStr = `metric : (${defaultData.metricId.map(item => `"${item}"`).join(' OR ')})`;
@@ -759,7 +778,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       this.chartKey = random(10);
       await Promise.all([this.handleGetFilterData(), this.handleGetTableData(true)]);
       this.isRouteBack = false;
-      this.handleRefleshChange(this.refleshInterval);
+      this.handleRefreshChange(this.refreshInterval);
     }
   }
   /**
@@ -830,6 +849,8 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       overview,
       total,
       code,
+      greyed_spaces,
+      wx_cs_link,
     } = await incidentList(params, { needRes: true, needMessage: false })
       .then(res => {
         !onlyOverview && (this.filterInputStatus = 'success');
@@ -840,6 +861,8 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
           this.$bkMessage(error_details || { message, theme: 'error' });
         }
         return {
+          wx_cs_link: '',
+          greyed_spaces: [],
           aggs: [],
           incidents: [],
           overview: [],
@@ -847,8 +870,10 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
           code,
         };
       });
+    this.incidentWxCsLink = wx_cs_link;
     return {
       aggs,
+      greyed_spaces,
       list:
         list?.map(item => {
           // 处理记录的具体内容不可直接转换成html
@@ -963,7 +988,6 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       overview,
       total,
       code,
-      enable_aiops_incident,
     } = await incidentOverview(this.handleGetSearchParams(onlyOverview), { needRes: true, needMessage: false })
       .then(res => {
         !onlyOverview && (this.filterInputStatus = 'success');
@@ -974,7 +998,6 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
         //   this.$bkMessage({ message, theme: 'error' });
         // }
         return {
-          enable_aiops_incident: false,
           aggs: [],
           alerts: [],
           overview: [],
@@ -988,7 +1011,6 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       this.handleGetEventCount(ids);
     }
     return {
-      enable_aiops_incident,
       aggs,
       list: list?.map(item => ({
         ...item,
@@ -1254,14 +1276,11 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       this.handleGetSearchFaultList(true),
     ];
     const [{ overview }, { overview: actionOverview }, faultOverviewData] = await Promise.all(filterDataPromise).catch(
-      () => [{ overview: [] }, { overview: [] }, { overview: [], enable_aiops_incident: false }]
+      () => [{ overview: [] }, { overview: [] }, { overview: [] }]
     );
     const faultOverview = faultOverviewData?.overview ?? {};
-    /** 是否打开故障根因 */
-    const { enable_aiops_incident } = faultOverviewData as any;
-    this.commonFilterData = [overview, enable_aiops_incident ? { ...faultOverview } : '', { ...actionOverview }].filter(
-      item => !!item && item.id
-    );
+    this.commonFilterData = [overview, { ...faultOverview }, { ...actionOverview }].filter(item => !!item && item.id);
+
     this.commonFilterLoading = false;
     if (!this.activeFilterId) {
       this.activeFilterId = overview.id;
@@ -1273,8 +1292,8 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
           actionOverview,
           faultOverview,
           ...(overview?.children || []),
-          ...actionOverview.children,
-          ...(enable_aiops_incident && faultOverview.children ? faultOverview.children : []),
+          ...(actionOverview?.children || []),
+          ...(faultOverview.children ? faultOverview.children : []),
         ].find(item => item.id === this.activeFilterId)?.name || '';
       if (!this.activeFilterName) {
         this.activeFilterId = overview.id;
@@ -1340,7 +1359,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
     } else {
       needTopN && (await this.handleGetSearchTopNList(false));
     }
-    const [{ aggs, list, total, code }] = await Promise.all(promiseList);
+    const [{ aggs, list, total, code, greyed_spaces }] = await Promise.all(promiseList);
 
     // 语法错误
     this.filterInputStatus = code !== grammaticalErrorCode ? 'success' : 'error';
@@ -1381,14 +1400,48 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
         this.noDataType = '500';
         this.noDataString = '';
       } else {
-        this.noDataType = this.hasSearchParams ? 'search-empty' : 'empty';
-        if (!this.bizIds?.some(id => [authorityBizId, hasDataBizId].includes(id))) {
-          this.noDataString = this.$t('你当前有 {0} 个业务权限，暂无告警事件', [window.space_list.length]);
-          if (this.searchType === 'incident') {
-            this.noDataString = this.$t('你当前有 {0} 个业务权限，暂无故障', [window.space_list.length]);
+        this.noDataType = this.hasSearchParams
+          ? 'search-empty'
+          : this.searchType === 'incident'
+            ? 'incidentEmpty'
+            : 'empty';
+        /**
+         * 故障错误信息展示
+         * 1. 有权限空间/与我的故障 无数据则根据当前人员是否有开启灰度空间，有：展示当前有多少空间权限， 无：提示开启灰度
+         * 2. 当前已开启灰度空间无数据，不处理
+         * 3. 当前多选空间，存在未灰度空间，则将为灰度空间拼接提示展示
+         */
+        if (this.searchType === 'incident') {
+          this.noDataString = '';
+          if (this.bizIds?.some(id => [authorityBizId, hasDataBizId].includes(id))) {
+            this.noDataString = !greyed_spaces?.length
+              ? 'incidentRenderAssistant'
+              : this.$t('你当前有 {0} 个空间权限，暂无您负责的故障', [window.space_list.length]);
+            this.incidentEmptyData = {
+              text: String(window.space_list.length),
+              path: '你当前有 {count} 个空间权限，暂未开启灰度, 请联系 {link}',
+            };
+          } else {
+            const diffBizIds = difference(this.bizIds, greyed_spaces);
+            if (diffBizIds?.length) {
+              const intersectionBizIds = intersection(this.bizIds, greyed_spaces);
+              const spaces = this.$store.getters.bizList
+                .filter(({ bk_biz_id }) => diffBizIds.includes(bk_biz_id))
+                .map(({ name, space_id }) => `${name} (#${space_id})`);
+              this.incidentEmptyData = {
+                text: spaces.join(','),
+                path: '{count} 空间未开启故障分析功能，请联系 {link}',
+              };
+              this.noDataType = intersectionBizIds.length === 0 ? 'incidentNotEnabled' : this.noDataType;
+              this.noDataString = 'incidentRenderAssistant';
+            }
           }
         } else {
-          this.noDataString = '';
+          if (!this.bizIds?.some(id => [authorityBizId, hasDataBizId].includes(id))) {
+            this.noDataString = this.$t('你当前有 {0} 个业务权限，暂无告警事件', [window.space_list.length]);
+          } else {
+            this.noDataString = '';
+          }
         }
       }
     } else {
@@ -1449,7 +1502,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
       from: 'now-30d',
       to: 'now',
       timezone: getDefaultTimezone(),
-      refleshInterval: 300000,
+      refreshInterval: 300000,
       activePanel: 'list',
       chartInterval: 'auto',
       condition: {},
@@ -1595,6 +1648,9 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
         params: {
           id,
         },
+        query: {
+          activeTab,
+        },
       });
     } else {
       this.detailInfo.id = id;
@@ -1610,26 +1666,26 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
    * @param {number} v 刷新周期
    * @return {*}
    */
-  handleRefleshChange(v: number) {
+  handleRefreshChange(v: number) {
     window.clearInterval(this.refleshInstance);
-    this.refleshInterval = v;
+    this.refreshInterval = v;
     if (v <= 0) return;
     this.refleshInstance = setInterval(() => {
       this.chartKey = random(10);
       this.handleGetFilterData();
       this.handleGetTableData();
-    }, this.refleshInterval);
+    }, this.refreshInterval);
   }
   /**
    * @description: 点击立刻刷新图标触发
    * @param {*}
    * @return {*}
    */
-  handleImmediateReflesh() {
+  handleImmediateRefresh() {
     this.chartKey = random(10);
     this.handleGetFilterData();
     this.handleGetTableData();
-    this.refleshInterval > 0 && this.handleRefleshChange(this.refleshInterval);
+    this.refreshInterval > 0 && this.handleRefreshChange(this.refreshInterval);
   }
   /**
    * @description: 数据间隔改变时触发
@@ -1654,7 +1710,7 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
     this.chartKey = random(10);
     this.handleGetFilterData();
     this.handleGetTableData();
-    this.handleRefleshChange(this.refleshInterval);
+    this.handleRefreshChange(this.refreshInterval);
   }
   handleBizIdsChange(v: number[]) {
     this.bizIds = v;
@@ -2114,6 +2170,12 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
     this.tableLoading = false;
   }
   /**
+   * @description 跳转打开bk助手
+   */
+  handleToBkAssistant() {
+    this.incidentWxCsLink && window.open(this.incidentWxCsLink, '__blank');
+  }
+  /**
    * @description: 告警分析查看详情时触发
    * @param {string} v 查看全部的字段
    * @return {*}
@@ -2480,13 +2542,13 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
             <DashboardTools
               class='header-tools'
               isSplitPanel={this.isSplitPanel}
-              refleshInterval={this.refleshInterval}
+              refreshInterval={this.refreshInterval}
               showListMenu={false}
               timeRange={this.timeRange}
               timezone={this.timezone}
               onFullscreenChange={this.handleFullscreen}
-              onImmediateReflesh={this.handleImmediateReflesh}
-              onRefleshChange={this.handleRefleshChange}
+              onImmediateRefresh={this.handleImmediateRefresh}
+              onRefreshChange={this.handleRefreshChange}
               onSplitPanelChange={this.handleSplitPanel}
               onTimeRangeChange={this.handleTimeRangeChange}
               onTimezoneChange={this.handleTimezoneChange}
@@ -2656,7 +2718,27 @@ class Event extends Mixins(authorityMixinCreate(eventAuth)) {
                       handleOperation={this.handleOperation}
                       onApplyAuth={this.handleCheckAllowedByIds}
                     >
-                      {this.noDataString && <span>{this.noDataString} </span>}
+                      {this.noDataString && (
+                        <span>
+                          {this.noDataString === 'incidentRenderAssistant' ? (
+                            <i18n
+                              slot='title'
+                              path={this.incidentEmptyData.path}
+                            >
+                              <span slot='count'>{this.incidentEmptyData.text}</span>
+                              <span
+                                class='bk-assistant-link'
+                                slot='link'
+                                onClick={this.handleToBkAssistant}
+                              >
+                                {this.$t('BK助手')}
+                              </span>
+                            </i18n>
+                          ) : (
+                            this.noDataString
+                          )}{' '}
+                        </span>
+                      )}
                     </EmptyTable>
                   );
                 })()

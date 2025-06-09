@@ -35,10 +35,12 @@ export interface IEntity {
   aggregated_entites: IEntity[];
   anomaly_score: number;
   anomaly_type: string;
+  rank_name?: string;
   alert_all_recorved: boolean;
   entity_id: string;
   entity_name: string;
   entity_type: string;
+  properties?: Record<string, any>;
   is_anomaly: boolean;
   is_feedback_root: boolean;
   is_root: boolean;
@@ -48,6 +50,15 @@ export interface IEntity {
   tags?: {
     BcsService?: IEntityTag;
     BcsWorkload?: IEntityTag;
+  };
+  observe_time_rage?: {
+    start_at: number | string;
+    end_at: number | string;
+  };
+  rca_trace_info?: {
+    abnormal_message: string;
+    abnormal_traces: Record<string, any>[];
+    abnormal_traces_query: Record<string, any>;
   };
 }
 

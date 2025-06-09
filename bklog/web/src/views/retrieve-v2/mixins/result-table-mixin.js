@@ -35,11 +35,13 @@ import { mapState, mapGetters } from 'vuex';
 
 import OriginalLightHeight from '../result-comp/original-light-height.tsx';
 import TableColumn from '../result-comp/table-column';
-import EmptyView from '../search-result-panel/original-log/empty-view';
-import ExpandView from '../search-result-panel/original-log/expand-view.vue';
-import OperatorTools from '../search-result-panel/original-log/operator-tools';
-import TimeFormatterSwitcher from '../search-result-panel/original-log/time-formatter-switcher';
+import EmptyView from '../components/result-cell-element/empty-view.ts';
+import ExpandView from '../search-result-panel/result-cell-element/expand-view.vue';
+import OperatorTools from '../components/result-cell-element/operator-tools.ts';
+import TimeFormatterSwitcher from '../components/result-cell-element/time-formatter-switcher.tsx';
 import { getConditionRouterParams } from '../search-result-panel/panel-util';
+import useFieldNameHook from '@/hooks/use-field-name';
+import { BK_LOG_STORAGE } from '../../../store/store.type';
 
 export default {
   components: {
@@ -131,7 +133,7 @@ export default {
     ...mapState([
       'isNotVisibleFieldsShow',
       'indexSetQueryResult',
-      'tableLineIsWrap',
+      { tableLineIsWrap: state => state.storage[BK_LOG_STORAGE.TABLE_LINE_IS_WRAP] },
       'indexSetOperatorConfig',
       'indexFieldInfo',
       'indexItem',
@@ -162,7 +164,7 @@ export default {
     getShowTableVisibleFields() {
       this.tableRandomKey = random(6);
       return this.isNotVisibleFieldsShow ? this.fullQuantityFields : this.visibleFields;
-      // return [...(this.tableShowRowIndex ? [{ field_name: '行号', __is_row_index: true }] : []), ...list]
+      // return [...(this[BK_LOG_STORAGE.TABLE_SHOW_ROW_INDEX] ? [{ field_name: '行号', __is_row_index: true }] : []), ...list]
     },
     /** 清空所有字段后所展示的默认字段  顺序: 时间字段，log字段，索引字段 */
     fullQuantityFields() {
@@ -212,7 +214,9 @@ export default {
       return this.$store.state.retrieve.catchFieldCustomConfig;
     },
     indexSetId() {
-      return window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId;
+      return window.__IS_MONITOR_COMPONENT__
+        ? this.$route?.query?.indexId || this.$store.state.indexId
+        : this.$route.params.indexId;
     },
   },
   watch: {
@@ -297,7 +301,8 @@ export default {
       const field = this.getShowTableVisibleFields[fieldIndex];
       const isShowSwitcher = ['date', 'date_nanos'].includes(field?.field_type);
       if (field) {
-        const fieldName = this.showFieldAlias ? this.fieldAliasMap[field.field_name] : field.field_name;
+        const { getQueryAlias } = useFieldNameHook({ store: this.$store });
+        const fieldName = getQueryAlias(field);
         const fieldType = field.field_type;
         const isUnionSource = field?.tag === 'union-source';
         const fieldIcon = this.getFieldIcon(field.field_type);
@@ -448,7 +453,7 @@ export default {
       if (this.apmRelation.is_active) {
         const { app_name: appName, bk_biz_id: bkBizId } = this.apmRelation.extra;
         const path = `/?bizId=${bkBizId}#/trace/home?app_name=${appName}&search_type=accurate&trace_id=${traceId}`;
-        const url = `${window.__IS_MONITOR_APM__ ? location.origin : window.MONITOR_URL}${path}`;
+        const url = `${window.__IS_MONITOR_COMPONENT__ ? location.origin : window.MONITOR_URL}${path}`;
         window.open(url, '_blank');
       } else {
         this.$bkMessage({
@@ -512,7 +517,7 @@ export default {
       return this.tableRowDeepView(row, field.field_name, field.field_type);
     },
     getLimitState(index) {
-      if (this.isLimitExpandView) return false;
+      if (this[BK_LOG_STORAGE.IS_LIMIT_EXPAND_VIEW]) return false;
       return !this.cacheExpandStr.includes(index);
     },
     getOriginTimeShow(data) {

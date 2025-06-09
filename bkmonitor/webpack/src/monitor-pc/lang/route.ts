@@ -33,12 +33,14 @@ export default {
   'route-告警事件': 'Alarms',
   'route-指标检索': 'Metrics',
   'route-日志检索': 'Logs',
+  'route-服务': 'Apm service',
   'route-事件检索': 'Events',
+  'route-事件检索New': 'Events',
   'route-Tracing 检索': 'Traces',
   'route-综合拨测': 'Synthetics',
   'route-APM': 'APM',
   'route-Kubernetes': 'Kubernetes',
-  'route-New K8S': 'New K8S',
+  'route-New K8s': 'New K8s',
   'route-主机监控': 'Hosts',
   'route-自定义场景': 'Customs',
   'route-常用': 'Starred',
@@ -141,6 +143,7 @@ export default {
   'route-Profiling 检索': 'Profiling',
   'route-编辑轮值': 'Edit Rotation',
   'route-新增轮值': 'Add Rotation',
+  'route-故障': 'Incident',
 
   // 功能页面标题
 

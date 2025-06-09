@@ -19,7 +19,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 We undertake not to change the open source license (MIT license) applicable to the current version of
 the project delivered to anyone in the future.
 """
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from apps.exceptions import BaseException, ErrorCode
 
@@ -390,7 +390,7 @@ class FavoriteNotExistException(BaseException):
 
 class FavoriteAlreadyExistException(BaseException):
     ERROR_CODE = "426"
-    MESSAGE = _("收藏名已存在")
+    MESSAGE = _("分组下已存在相同收藏名")
 
 
 class FavoriteVisibleTypeNotAllowedModifyException(BaseException):
@@ -488,6 +488,11 @@ class MultiFieldsErrorException(BaseSearchException):
     MESSAGE = _("跨集群获取字段结果处理异常")
 
 
+class LogSearchException(BaseSearchException):
+    ERROR_CODE = "447"
+    MESSAGE = _("日志检索异常, 原因: {e}")
+
+
 # =================================================
 # 导出
 # =================================================
@@ -511,6 +516,11 @@ class CouldNotFindTemplateException(BaseException):
 class PreCheckAsyncExportException(BaseException):
     ERROR_CODE = "504"
     MESSAGE = _("创建异步导出任务前置检查失败,请检查索引集字段配置")
+
+
+class BKBaseExportException(BaseException):
+    ERROR_CODE = "505"
+    MESSAGE = _("计算平台索引集暂不支持快速下载")
 
 
 # =================================================
@@ -556,6 +566,11 @@ class IndexSetDorisQueryException(BaseException):
 class SQLQueryException(BaseException):
     ERROR_CODE = "1005"
     MESSAGE = _("SQL查询异常: {name}")
+
+
+class SQLParserException(BaseException):
+    ERROR_CODE = "1006"
+    MESSAGE = _("SQL解析异常: {name}")
 
 
 # =================================================

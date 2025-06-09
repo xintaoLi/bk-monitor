@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -19,10 +18,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 We undertake not to change the open source license (MIT license) applicable to the current version of
 the project delivered to anyone in the future.
 """
+
 import markdown
 from django.conf import settings
 from django.db.models import TextChoices
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from apps.utils import ChoicesEnum
 
@@ -46,12 +46,51 @@ FEATURE_TOGGLE_ES_CLUSTER_TYPE = "es_cluster_type_setup"
 
 DEFAULT_RETENTION = 14
 
+# 节点管理支持的cmdb 主机信息
+CC_HOST_FIELDS = [
+    "bk_host_id",
+    "bk_agent_id",
+    "bk_cloud_id",
+    "bk_addressing",
+    "bk_host_innerip",
+    "bk_host_outerip",
+    "bk_host_innerip_v6",
+    "bk_host_outerip_v6",
+    "bk_host_name",
+    "bk_os_type",
+    "bk_os_name",
+    "bk_os_bit",
+    "bk_os_version",
+    "bk_cpu_module",
+    "operator",
+    "bk_bak_operator",
+    "bk_isp_name",
+    "bk_biz_id",
+    "bk_province_name",
+    "bk_state",
+    "bk_state_name",
+    "bk_supplier_account",
+    "bk_cpu_architecture",
+]
+
+# 节点管理支持的cmdb 集群信息
+CC_SCOPE_FIELDS = ["bk_set_id", "bk_module_id", "bk_set_name", "bk_module_name"]
+
+
+class CmdbFieldType(ChoicesEnum):
+    HOST = "host"
+    SCOPE = "scope"
+
+    _choices_labels = ((HOST, _("主机")), (SCOPE, _("集群")))
+
 
 class VisibleEnum(ChoicesEnum):
     # 当前业务可见
     CURRENT_BIZ = "current_biz"
     # 多业务可见
     MULTI_BIZ = "multi_biz"
+    # 当前租户可见
+    CURRENT_TENANT = "current_tenant"
     # 全业务
     ALL_BIZ = "all_biz"
     # 业务属性可见
@@ -60,6 +99,7 @@ class VisibleEnum(ChoicesEnum):
     _choices_labels = (
         (CURRENT_BIZ, _("当前业务")),
         (MULTI_BIZ, _("多业务")),
+        (CURRENT_TENANT, _("当前租户")),
         (ALL_BIZ, _("全业务")),
         (BIZ_ATTR, _("业务属性")),
     )
@@ -221,7 +261,7 @@ DEFAULT_COLLECTOR_LENGTH = 2
 PARSE_FAILURE_FIELD = "__parse_failure"
 
 
-class AsyncStatus(object):
+class AsyncStatus:
     RUNNING = "RUNNING"
     DONE = "DONE"
 
@@ -287,7 +327,7 @@ class CleanProviderEnum(ChoicesEnum):
     )
 
 
-class CollectStatus(object):
+class CollectStatus:
     """
     采集任务状态-结合以下两种状态
     subscription_instance_status.instances[0].status
@@ -310,7 +350,7 @@ class CollectStatus(object):
     UNKNOWN = "UNKNOWN"
 
 
-class LogPluginInfo(object):
+class LogPluginInfo:
     """
     采集插件信息
     """
@@ -319,12 +359,12 @@ class LogPluginInfo(object):
     VERSION = "latest"
 
 
-class ActionStatus(object):
+class ActionStatus:
     START = "START"
     INSTALL = "INSTALL"
 
 
-class RunStatus(object):
+class RunStatus:
     RUNNING = _("部署中")
     SUCCESS = _("正常")
     FAILED = _("失败")
@@ -334,7 +374,7 @@ class RunStatus(object):
     PREPARE = _("准备中")
 
 
-class EtlConfig(object):
+class EtlConfig:
     BK_LOG_TEXT = "bk_log_text"
     BK_LOG_JSON = "bk_log_json"
     BK_LOG_DELIMITER = "bk_log_delimiter"
@@ -345,9 +385,7 @@ class EtlConfig(object):
 class MetadataTypeEnum(ChoicesEnum):
     PATH = "path"
 
-    _choices_labels = (
-        (PATH, _("路径元数据")),
-    )
+    _choices_labels = ((PATH, _("路径元数据")),)
 
 
 class EtlConfigChoices(ChoicesEnum):
@@ -398,13 +436,13 @@ DEFAULT_ES_TRANSPORT = 9300
 DEFAULT_ES_TAGS = ["BK-LOG"]
 
 
-class Environment(object):
+class Environment:
     LINUX = "linux"
     WINDOWS = "windows"
     CONTAINER = "container"
 
 
-class ContainerCollectorType(object):
+class ContainerCollectorType:
     CONTAINER = "container_log_config"
     NODE = "node_log_config"
     STDOUT = "std_log_config"
@@ -436,14 +474,14 @@ class TopoType(ChoicesEnum):
     )
 
 
-class WorkLoadType(object):
+class WorkLoadType:
     DEPLOYMENT = "Deployment"
     DAEMON_SET = "DaemonSet"
     JOB = "Job"
     STATEFUL_SET = "StatefulSet"
 
 
-class LabelSelectorOperator(object):
+class LabelSelectorOperator:
     IN = "In"
     NOT_IN = "NotIn"
     EXISTS = "Exists"
@@ -561,7 +599,7 @@ class ArchiveInstanceType(TextChoices):
     INDEX_SET = "index_set", _("索引集")
 
 
-class ArchiveExpireTime(object):
+class ArchiveExpireTime:
     PERMANENT = _("永久")
 
 
@@ -658,3 +696,42 @@ class KafkaInitialOffsetEnum(ChoicesEnum):
         (OLDEST, _("最旧")),
         (NEWEST, _("最新")),
     )
+
+
+class CollectorBatchOperationType(ChoicesEnum):
+    STOP = "stop"
+    START = "start"
+    MODIFY_STORAGE = "modify_storage"
+
+    _choices_labels = (
+        (STOP, _("停用")),
+        (START, _("启用")),
+        (MODIFY_STORAGE, _("修改存储配置")),
+    )
+
+
+class OTLPProxyHostConfig:
+    """
+    OTLP代理主机配置信息
+    """
+
+    GRPC = "grpc"
+    GRPC_TRACE_PATH = ":4317"
+    HTTP = "http"
+    HTTP_TRACE_PATH = ":4318/v1/logs"
+    HTTP_SCHEME = "http://"
+
+
+RETRIEVE_CHAIN = [
+    "set_itsm_info",
+    "set_split_rule",
+    "set_target",
+    "set_default_field",
+    "set_categorie_name",
+    "complement_metadata_info",
+    "complement_nodeman_info",
+    "fields_is_empty",
+    "deal_time",
+    "add_container_configs",
+    "encode_yaml_config",
+]

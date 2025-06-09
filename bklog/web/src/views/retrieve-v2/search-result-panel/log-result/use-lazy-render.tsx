@@ -23,23 +23,51 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import useResizeObserve from '@/hooks/use-resize-observe';
 import { debounce } from 'lodash';
 
-import { GLOBAL_SCROLL_SELECTOR } from './log-row-attributes';
+import RetrieveHelper from '../../../retrieve-helper';
 
-export default ({ loadMoreFn, container, rootElement }) => {
+import useIntersectionObserver from '../../../../hooks/use-intersection-observer';
+function deepQueryShadowSelector(selector) {
+  // 搜索当前根下的元素
+  const searchInRoot = (root: HTMLElement | ShadowRoot) => {
+    // 尝试直接查找
+    const el = root.querySelector(selector);
+    if (el) return el;
+
+    // 查找当前根下所有可能的 Shadow Host
+    const shadowHosts = Array.from(root.querySelectorAll('*')).filter(el => el.shadowRoot);
+
+    // 递归穿透每个 Shadow Host
+    for (const host of shadowHosts) {
+      const result = searchInRoot(host.shadowRoot);
+      if (result) return result;
+    }
+
+    return null;
+  };
+
+  // 从 document.body 开始搜索
+  return searchInRoot(document.body);
+}
+
+export default ({ loadMoreFn, container, rootElement, refLoadMoreElement }) => {
   // const searchBarHeight = ref(0);
   const offsetWidth = ref(0);
   const scrollWidth = ref(0);
   const scrollDirection = ref('down');
+  const GLOBAL_SCROLL_SELECTOR = RetrieveHelper.getScrollSelector();
 
   // let scrollElementOffset = 0;
   let isComputingCalcOffset = false;
 
   const getScrollElement = () => {
+    if (window.__IS_MONITOR_TRACE__) {
+      return deepQueryShadowSelector(GLOBAL_SCROLL_SELECTOR);
+    }
     return document.body.querySelector(GLOBAL_SCROLL_SELECTOR);
   };
 
@@ -54,30 +82,12 @@ export default ({ loadMoreFn, container, rootElement }) => {
   const calculateOffsetTop = () => {
     if (!isComputingCalcOffset) {
       isComputingCalcOffset = true;
-      // const currentElement = getCurrentElement();
-      // const relativeTo = getScrollElement();
-      // scrollElementOffset = relativeTo.scrollHeight - (currentElement?.scrollHeight ?? 0);
       debounceStopComputing();
     }
   };
 
-  let lastPosition = 0;
-
-  const handleScrollEvent = (event: MouseEvent) => {
-    requestAnimationFrame(() => {
-      const target = event.target as HTMLDivElement;
-      const scrollDiff = target.scrollHeight - (target.scrollTop + target.offsetHeight);
-      if (target.scrollTop > lastPosition && scrollDiff < 80) {
-        loadMoreFn?.();
-      }
-
-      scrollDirection.value = target.scrollTop > lastPosition ? 'down' : 'up';
-      lastPosition = target.scrollTop;
-    });
-  };
-
   const scrollToTop = (top = 0, smooth = true) => {
-    getScrollElement().scrollTo({ left: 0, top: top, behavior: smooth ? 'smooth' : 'instant' });
+    getScrollElement()?.scrollTo({ left: 0, top: top, behavior: smooth ? 'smooth' : 'instant' });
   };
 
   const hasScrollX = computed(() => scrollWidth.value > offsetWidth.value);
@@ -88,12 +98,17 @@ export default ({ loadMoreFn, container, rootElement }) => {
 
   const computeRect = () => {
     const current = getCurrentElement();
-    const scrollElement = getParentContainer() as HTMLElement;
     scrollWidth.value = (current?.scrollWidth ?? 6) - 6;
-    offsetWidth.value = scrollElement?.offsetWidth ?? 0;
+    offsetWidth.value = current?.offsetWidth ?? 0;
   };
 
   const debounceComputeRect = debounce(computeRect, 120);
+
+  useIntersectionObserver(refLoadMoreElement, inter => {
+    if (inter.isIntersecting) {
+      loadMoreFn?.();
+    }
+  });
 
   useResizeObserve(getCurrentElement, () => {
     debounceComputeRect();
@@ -104,12 +119,7 @@ export default ({ loadMoreFn, container, rootElement }) => {
   });
 
   onMounted(() => {
-    getScrollElement()?.addEventListener('scroll', handleScrollEvent);
     calculateOffsetTop();
-  });
-
-  onBeforeUnmount(() => {
-    getScrollElement()?.removeEventListener('scroll', handleScrollEvent);
   });
 
   return {

@@ -38,7 +38,7 @@
         $t('监控数据采集是通过下发监控插件来实现数据采集的全生命周期管理，该功能依赖服务器安装bkmonitorbeat采集器')
       "
       :link-text="$t('采集器安装前往节点管理')"
-      :link-url="`${$store.getters.bkNodemanHost}#/plugin-manager/list`"
+      :link-url="`${$store.getters.bkNodeManHost}#/plugin-manager/list`"
       doc-link="collectorConfigMd"
     />
     <div>
@@ -873,6 +873,7 @@ export default {
         TOPO: '{0}个拓扑节点',
         SERVICE_TEMPLATE: '{0}个服务模板',
         SET_TEMPLATE: '{0}个集群模板',
+        DYNAMIC_GROUP: '{0}个动态分组',
       };
       tableData.forEach(item => {
         if (item.objectTypeEn === 'HOST') {
@@ -883,6 +884,11 @@ export default {
             )}）`;
           } else if (item.nodeType === 'INSTANCE') {
             item.targetString = this.$t('{0}台主机', [item.totalInstanceCount]);
+          } else if (item.nodeType === 'DYNAMIC_GROUP') {
+            item.targetString = `${this.$t(textMap[item.nodeType], [item.targetNodesCount])} （${this.$t(
+              '共{0}台主机',
+              [item.totalInstanceCount]
+            )}）`;
           }
         } else if (item.objectTypeEn === 'SERVICE') {
           if (['SERVICE_TEMPLATE', 'SET_TEMPLATE', 'TOPO'].includes(item.nodeType)) {

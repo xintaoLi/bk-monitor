@@ -286,6 +286,19 @@ export class DataQuery implements IDataQuery {
     }, {});
     return isExist ? result : null;
   }
+  handleCreateComparesSingle(data: object) {
+    const localFieldsSort = this.fieldsSort;
+    let isExist = true;
+    const result = localFieldsSort.reduce((total, cur) => {
+      const [itemKey, filterDictKey] = cur;
+      let value = data?.[itemKey];
+      value === undefined && isExist && (isExist = false);
+      value = isObject(value) ? value.value : value; // 兼容对象结构的value
+      total[filterDictKey] = value;
+      return total;
+    }, {});
+    return isExist ? result : null;
+  }
   /** 生成一个唯一的key */
   handleCreateFieldsKey(fieldsSort) {
     return fieldsSort.reduce((total, cur, index) => {
@@ -426,8 +439,8 @@ export type PanelOption = {
   legend?: ILegendOption;
   unit?: string; // 单位
   precision?: number; // 单位精度
-  is_support_compare: boolean;
-  is_support_group_by: boolean;
+  is_support_compare?: boolean;
+  is_support_group_by?: boolean;
   enable_panels_selector?: boolean;
   child_panels_selector_variables?: {
     id?: string;
@@ -468,7 +481,7 @@ export interface IPanelModel {
   // 图表subTitle
   subTitle?: string;
   // 图标带icon说明
-  descrition?: string;
+  description?: string;
   // 是否折叠
   collapsed?: boolean;
   // 图表数据源
@@ -510,12 +523,12 @@ export class PanelModel implements IPanelModel {
   // dashbordId
   dashboardId?: string;
   // 图标带icon说明
-  descrition!: string;
+  description!: string;
   dimension_panels?: PanelModel[];
   // 维度列表
   dimensions: string[];
   // 是否正在drag中
-  draging = false;
+  dragging = false;
   externalData: Record<string, any>; // 一些额外自定义数据 用于图表
   extra_panels?: PanelModel[];
   // 图表位置
@@ -538,6 +551,8 @@ export class PanelModel implements IPanelModel {
   realHeight = 0;
   // 是否显示
   show?: boolean = true;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  sub_title?: string;
   subTitle!: string;
   // 图表数据源
   targets: DataQuery[];
@@ -726,8 +741,8 @@ export class PanelModel implements IPanelModel {
     this.collapsed = v;
     this.panels?.length && this.panels.forEach(item => item?.updateShow?.(v));
   }
-  public updateDraging(v: boolean) {
-    this.draging = v;
+  public updateDragging(v: boolean) {
+    this.dragging = v;
   }
   public updateGridPos(v: IGridPos) {
     this.gridPos = {

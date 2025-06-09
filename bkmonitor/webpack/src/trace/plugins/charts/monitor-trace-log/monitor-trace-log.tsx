@@ -23,8 +23,22 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { defineComponent, inject, ref, computed, type Ref, onUnmounted, onMounted, nextTick, watch } from 'vue';
+import {
+  defineComponent,
+  inject,
+  ref,
+  computed,
+  type Ref,
+  onUnmounted,
+  onMounted,
+  nextTick,
+  watch,
+  type ComputedRef,
+} from 'vue';
+import { shallowRef } from 'vue';
+import { useI18n } from 'vue-i18n';
 
+import { useTraceExploreStore } from '@/store/modules/explore';
 import {
   MonitorRetrieve as Log,
   initMonitorState,
@@ -36,9 +50,10 @@ import {
 import { Button, Exception } from 'bkui-vue';
 import { serviceRelationList, serviceLogInfo } from 'monitor-api/modules/apm_log';
 
-import { handleTransformToTimestamp, type TimeRangeType } from '../../../components/time-range/utils';
+import { handleTransformToTimestamp } from '../../../components/time-range/utils';
 import { useAppStore } from '../../../store/modules/app';
-import { REFLESH_IMMEDIATE_KEY, REFLESH_INTERVAL_KEY, TIME_RANGE_KEY } from '../../hooks';
+import { useSpanDetailQueryStore } from '../../../store/modules/span-detail-query';
+import { REFRESH_IMMEDIATE_KEY, REFRESH_INTERVAL_KEY, useTimeRangeInject } from '../../hooks';
 
 import './monitor-trace-log.scss';
 import '@blueking/monitor-trace-log/css/main.css';
@@ -46,20 +61,32 @@ window.AJAX_URL_PREFIX = '/apm_log_forward/bklog/api/v1';
 export const APM_LOG_ROUTER_QUERY_KEYS = ['search_mode', 'addition', 'keyword'];
 export default defineComponent({
   name: 'MonitorTraceLog',
-  setup() {
+  setup(props, { emit }) {
+    const { t } = useI18n();
+    const spanDetailQueryStore = useSpanDetailQueryStore();
+    const traceStore = useTraceExploreStore();
     const empty = ref(true);
     const loading = ref(true);
     const bizId = computed(() => useAppStore().bizId || 0);
+
     const serviceName = inject<Ref<string>>('serviceName');
     const appName = inject<Ref<string>>('appName');
-    const timeRange = inject<Ref<TimeRangeType>>(TIME_RANGE_KEY);
-    const refleshImmediate = inject<Ref<string>>(REFLESH_IMMEDIATE_KEY);
-    const refleshInterval = inject<Ref<number>>(REFLESH_INTERVAL_KEY);
+    const refreshImmediate = inject<Ref<string>>(REFRESH_IMMEDIATE_KEY, shallowRef(traceStore.refreshImmediate));
+    const refreshInterval = inject<Ref<number>>(REFRESH_INTERVAL_KEY, shallowRef(traceStore.refreshInterval));
     const spanId = inject<Ref<string>>('spanId', ref(''));
+
     const mainRef = ref<HTMLDivElement>();
+    const customTimeProvider = inject<ComputedRef<string[]>>(
+      'customTimeProvider',
+      computed(() => traceStore.timeRange)
+    );
+    const defaultTimeRange = useTimeRangeInject();
+    const timeRange = computed(() => {
+      // 如果有自定义时间取自定义时间，否则使用默认的 timeRange inject
+      return customTimeProvider.value?.length ? customTimeProvider.value : defaultTimeRange?.value || [];
+    });
 
     let unPropsWatch = null;
-
     async function init() {
       empty.value = true;
       loading.value = true;
@@ -87,6 +114,7 @@ export default defineComponent({
             const { query = {}, params = {} } = c;
             fakeRoute.query = query;
             fakeRoute.params = params;
+            spanDetailQueryStore.queryData = { ...query };
           },
           push: () => {
             return {};
@@ -106,8 +134,8 @@ export default defineComponent({
               props: {
                 indexSetApi,
                 timeRange: timeRange.value,
-                refleshImmediate: refleshImmediate.value,
-                refleshInterval: refleshInterval.value,
+                refreshImmediate: refreshImmediate.value,
+                refreshInterval: refreshInterval.value,
               },
             });
           },
@@ -116,12 +144,12 @@ export default defineComponent({
         app.$route = fakeRoute;
         app._$route = fakeRoute;
         app.$t = (...args) => i18n.t(...args);
-        unPropsWatch = watch([timeRange, refleshImmediate, refleshInterval], () => {
+        unPropsWatch = watch([timeRange, refreshImmediate, refreshInterval], () => {
           app.$forceUpdate();
         });
         await nextTick();
         app.$mount(mainRef.value);
-        window.mainComponent = app;
+        window.traceLogComponent = app;
       } else {
         empty.value = true;
       }
@@ -181,8 +209,8 @@ export default defineComponent({
     onUnmounted(() => {
       if (!empty.value) {
         logStore.commit('resetState');
-        window.mainComponent.$destroy();
-        window.mainComponent = null;
+        window.traceLogComponent.$destroy();
+        window.traceLogComponent = null;
         unPropsWatch?.();
       }
     });
@@ -192,6 +220,7 @@ export default defineComponent({
       empty,
       loading,
       handleRelated,
+      t,
     };
   },
   render() {
@@ -200,13 +229,13 @@ export default defineComponent({
         {this.empty ? (
           <div class='empty-chart-log'>
             {this.loading ? (
-              window.i18n.tc('加载中...')
+              this.t('加载中...')
             ) : (
               <Exception type='building'>
-                <span>{this.$t('暂无关联日志')}</span>
+                <span>{this.t('暂无关联日志')}</span>
                 <div class='text-wrap'>
                   <pre class='text-row'>
-                    {this.$t(
+                    {this.t(
                       '关联日志方法：\n1. 开启应用的日志上报开关，开启后会自动关联对应的索引集\n2. 在服务配置 - 关联日志出关联对应索引集\n3. 在 Span 中增加 IP 地址，将会自动关联此主机对应的采集项'
                     )}
                   </pre>
@@ -214,7 +243,7 @@ export default defineComponent({
                     theme='primary'
                     onClick={() => this.handleRelated()}
                   >
-                    {this.$t('日志采集')}
+                    {this.t('日志采集')}
                   </Button>
                 </div>
               </Exception>

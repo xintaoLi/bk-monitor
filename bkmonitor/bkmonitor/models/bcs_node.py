@@ -105,6 +105,11 @@ class BCSNode(BCSBase, BCSBaseUsageResources):
         unique_together = ["bcs_cluster_id", "name"]
         index_together = ["bk_biz_id", "bcs_cluster_id"]
 
+    def to_meta_dict(self):
+        return {
+            "node": self.name,
+        }
+
     @staticmethod
     def hash_unique_key(bk_biz_id, bcs_cluster_id, name):
         return BCSNode.md5str(
@@ -436,6 +441,7 @@ class BCSNode(BCSBase, BCSBaseUsageResources):
 
 
 class BCSNodeLabels(models.Model):
+    id = models.BigAutoField(primary_key=True)
     resource = models.ForeignKey(BCSNode, db_constraint=False, on_delete=models.CASCADE)
     label = models.ForeignKey(BCSLabel, db_constraint=False, on_delete=models.CASCADE)
     bcs_cluster_id = models.CharField(verbose_name="集群ID", max_length=128, db_index=True)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -26,7 +25,7 @@ from bkcrypto import constants as bkcrypto_constants
 from blueapps.conf.default_settings import *  # noqa
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from config.log import get_logging_config_dict
 
@@ -71,6 +70,7 @@ INSTALLED_APPS += (
     "apps.esb",
     "apps.bk_log_admin",
     "apps.grafana",
+    "apps.ai_assistant",
     "bk_monitor",
     "home_application",
     "console",
@@ -111,7 +111,7 @@ MIDDLEWARE = (
     "apps.middleware.pyinstrument.ProfilerMiddleware",
     # http -> https 转换中间件
     "apps.middlewares.HttpsMiddleware",
-    "django.middleware.gzip.GZipMiddleware",
+    # "django.middleware.gzip.GZipMiddleware",
     "apps.middleware.user_middleware.BkLogMetricsBeforeMiddleware",
     # request instance provider
     "blueapps.middleware.request_provider.RequestProvider",
@@ -391,6 +391,8 @@ BK_APIGW_NAME = os.getenv("BKAPP_APIGW_NAME", "bk-log-search")
 # APIGW 接口地址模板
 BK_API_URL_TMPL = os.getenv("BKAPP_API_URL_TMPL", f"{PAAS_API_HOST}/api/{{api_name}}/")
 BK_APIGW_JWT_PROVIDER_CLS = "apps.middleware.apigw.ApiGatewayJWTProvider"
+# APIGW 同步配置
+SYNC_APIGATEWAY_ENABLED = os.getenv("BKAPP_SYNC_APIGATEWAY_ENABLED", "on")
 
 # 日志归档文档
 BK_ARCHIVE_DOC_URL = os.getenv("BKAPP_ARCHIVE_DOC_URL", "")
@@ -400,7 +402,6 @@ BK_ASSESSMEN_HOST_COUNT = int(os.getenv("BKAPP_ASSESSMEN_HOST_COUNT", 30))
 # 日志清洗文档
 BK_ETL_DOC_URL = os.getenv("BKAPP_ETL_DOC_URL", "")
 
-BK_COMPONENT_API_URL = os.environ.get("BK_COMPONENT_API_URL")
 # 计算平台文档地址
 BK_DOC_DATA_URL = ""
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
@@ -418,7 +419,7 @@ DEPLOY_MODE = os.environ.get("DEPLOY_MODE", "")
 
 def redirect_func(request):
     login_page_url = reverse("account:login_page")
-    next_url = "{}?refer_url={}".format(login_page_url, request.path)
+    next_url = f"{login_page_url}?refer_url={request.path}"
     return HttpResponseRedirect(next_url)
 
 
@@ -889,6 +890,9 @@ BKLOG_CONFIG_VERSION = os.getenv("BKAPP_BKLOG_CONFIG_VERSION", "v1alpha1")
 # 是否关闭权限中心校验
 IGNORE_IAM_PERMISSION = os.environ.get("BKAPP_IGNORE_IAM_PERMISSION", False)
 
+# 是否开启过期时间处理
+DEAL_RETENTION_TIME = os.getenv("BKAPP_DEAL_RETENTION_TIME", "on") == "on"
+
 # 日志采集器配置
 # 日志文件多久没更新则不再读取
 COLLECTOR_CLOSE_INACTIVE = 86400
@@ -1084,8 +1088,8 @@ BK_ITSM_CALLBACK_HOST = os.getenv("BKAPP_ITSM_CALLBACK_HOST", BK_BKLOG_HOST)
 # 外部版PAAS地址
 EXTERNAL_PAAS_HOST = os.getenv("BKAPP_EXTERNAL_PAAS_HOST", "")
 
-# 监控网关地址（新）
-MONITOR_APIGATEWAY_ROOT_NEW = os.getenv("BKAPP_BKMONITOR_APIGW_HOST", "")
+# 是否使用新监控网关地址
+USE_NEW_MONITOR_APIGATEWAY = os.getenv("BKAPP_USE_NEW_MONITOR_APIGATEWAY", "off").lower() == "on"
 
 # 外部版网关密钥
 EXTERNAL_APIGW_PUBLIC_KEY = os.getenv("BKAPP_EXTERNAL_APIGW_PUBLIC_KEY", "")
@@ -1233,6 +1237,24 @@ UNIFY_QUERY_DATA_SOURCE = "bklog"
 # UNIFYQUERY APIGW HOST
 UNIFYQUERY_APIGATEWAY_ROOT = os.getenv("BKAPP_UNIFYQUERY_APIGATEWAY_ROOT", "")
 
+# AIDEV
+# aidev的apigw地址
+AIDEV_API_BASE_URL = os.getenv("BKAPP_AIDEV_API_BASE_URL", "")
+
+# 是否启用多租户模式
+ENABLE_MULTI_TENANT_MODE = os.getenv("ENABLE_MULTI_TENANT_MODE", "false").lower() == "true"
+# 是否启用全局租户（blueapps依赖）
+IS_GLOBAL_TENANT = True
+# 为了统一多租户和非多租户场景的逻辑，默认使用system租户
+DEFAULT_TENANT_ID = "system"
+# 已经初始化的租户列表
+INITIALIZED_TENANT_LIST = [DEFAULT_TENANT_ID]
+
+# 预查询时间, 默认6h小时, 0代表禁用
+try:
+    PRE_SEARCH_SECONDS = int(os.getenv("BKAPP_PRE_SEARCH_SECONDS", 6 * 60 * 60))
+except ValueError:
+    PRE_SEARCH_SECONDS = 6 * 60 * 60
 
 """
 以下为框架代码 请勿修改
@@ -1276,3 +1298,27 @@ if locals().get("DISABLED_APPS"):
         if locals().get(_key) is None:
             continue
         locals()[_key] = tuple([_item for _item in locals()[_key] if not _item.startswith(_app + ".")])
+
+
+import pymysql
+from django.db.backends.mysql.features import DatabaseFeatures
+from django.utils.functional import cached_property
+
+
+# Django 4.2+ 不再官方支持 Mysql 5.7，但目前 Django 仅是对 5.7 做了软性的不兼容改动，
+# 在没有使用 8.0 特异的功能时，对 5.7 版本的使用无影响，为兼容存量的 Mysql 5.7 DB 做此 Patch
+class PatchFeatures:
+    """Patched Django Features"""
+
+    @cached_property
+    def minimum_database_version(self):
+        if self.connection.mysql_is_mariadb:  # type: ignore[attr-defined] # noqa
+            return 10, 4
+        return 5, 7
+
+
+DatabaseFeatures.minimum_database_version = PatchFeatures.minimum_database_version  # noqa
+
+
+# 让 Django 使用 pymysql 作为 MySQLdb 的替代品
+pymysql.install_as_MySQLdb()

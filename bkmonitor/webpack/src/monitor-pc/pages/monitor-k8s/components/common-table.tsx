@@ -524,6 +524,9 @@ export default class CommonTable extends tsc<ICommonTableProps, ICommonTableEven
           // });
           return;
         }
+        if (urlStr.startsWith('/service')) {
+          this.$emit('goToServiceByLink', item);
+        }
         this.$router.push({
           path: `${window.__BK_WEWEB_DATA__?.baseroute || ''}${urlStr}`.replace(/\/\//g, '/'),
         });
@@ -828,7 +831,7 @@ export default class CommonTable extends tsc<ICommonTableProps, ICommonTableEven
                   ? () => column.renderHeader()
                   : undefined
             }
-            formatter={(row: TableRow) => this.handleSetFormatter(column.id, { ...this.overviewData, ...row })}
+            formatter={(row: TableRow) => this.handleSetFormatter(column.id, row)}
             label={column.name}
             prop={column.id}
             show-overflow-tooltip={showOverflowTooltip}

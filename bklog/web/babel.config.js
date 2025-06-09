@@ -23,8 +23,7 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-
-const isMonitorProduction = process.env.NODE_ENV === 'production' && process.env.APP === 'apm';
+const isMonitorCompiler = ['apm', 'trace'].includes(process.env.MONITOR_APP);
 module.exports = function (api) {
   api?.cache.never();
   const presets = [
@@ -32,10 +31,9 @@ module.exports = function (api) {
       '@babel/preset-env',
       {
         targets: {
-          browsers:
-            process.env.APP === 'apm'
-              ? ['> 0.3%', 'Chrome > 90', 'last 2 versions', 'Firefox ESR', 'not dead']
-              : ['> 1%', 'last 2 versions', 'not ie <= 8'],
+          browsers: isMonitorCompiler
+            ? ['> 0.3%', 'Chrome > 90', 'last 2 versions', 'Firefox ESR', 'not dead']
+            : ['> 1%', 'last 2 versions', 'not ie <= 8'],
           node: 'current',
         },
         useBuiltIns: 'usage',
@@ -47,7 +45,7 @@ module.exports = function (api) {
   ];
   const plugins = [
     '@babel/plugin-transform-runtime',
-    isMonitorProduction
+    process.env.NODE_ENV === 'production' && isMonitorCompiler
       ? undefined
       : [
           'babel-plugin-import-bk-magic-vue',
@@ -55,6 +53,15 @@ module.exports = function (api) {
             baseLibName: 'bk-magic-vue',
           },
         ],
+    [
+      'module-resolver',
+      {
+        root: ['./src'],
+        alias: {
+          '@': './src',
+        },
+      },
+    ],
   ].filter(Boolean);
   return {
     presets,

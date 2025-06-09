@@ -151,6 +151,12 @@ export default defineComponent({
           // 起始时间均有值
           handleSetSlider();
         }
+      } else if (!startVal.value && !endVal.value) {
+        errMsg.value = '';
+        startError.value = false;
+        endError.value = false;
+        durationSlider.value = { ...DEFAULT_SLIDER_VALUE };
+        emit('change', null);
       } else {
         errMsg.value = t('单位仅支持ns, μs, ms, s, m, h, d');
       }
@@ -193,6 +199,7 @@ export default defineComponent({
       handleExchange,
       handleRangeChange,
       handleChangeDebounce,
+      t,
     };
   },
   render() {
@@ -233,7 +240,7 @@ export default defineComponent({
                 class='exchange-btn'
                 onClick={this.handleExchange}
               >
-                {this.$t('数值互换')}
+                {this.t('数值互换')}
               </span>
             )}
           </div>

@@ -62,6 +62,7 @@ export default class ApmServiceList extends tsc<
   IProps,
   {
     onRouteUrlChange: (params: Record<string, any>) => void;
+    onGoToServiceByLink?: () => void;
   }
 > {
   @Prop() appData: Partial<IAppListItem>;
@@ -139,8 +140,8 @@ export default class ApmServiceList extends tsc<
       filters: JSON.stringify(this.filterCondition),
       service_keyword: this.searchKeyWord,
       app_name: this.appName,
-      start_time: this.timeRange[0],
-      end_time: this.timeRange[1],
+      from: this.timeRange[0],
+      to: this.timeRange[1],
     };
   }
   handleGotoAppOverview() {
@@ -410,9 +411,9 @@ export default class ApmServiceList extends tsc<
       }, {});
       return { field, data };
     });
-    newData.forEach(item => {
+    for (const item of newData) {
       this.renderTableBatchByBatch(item.field, item.data);
-    });
+    }
     if (this.filterLoading) {
       const { filter: filterDataPart2 = [] } = serviceData;
       this.mergeServiceFilterData(filterDataPart2);
@@ -428,16 +429,18 @@ export default class ApmServiceList extends tsc<
     const setData = (currentIndex = 0) => {
       let needBreak = false;
       if (currentIndex <= this.tableData.length && this.tableData.length) {
-        const endIndex = Math.min(currentIndex + 2, this.tableData.length);
+        const endIndex = Math.min(currentIndex + 1, this.tableData.length);
         for (let i = currentIndex; i < endIndex; i++) {
           const item = this.tableData[i];
           item[field] = dataMap[String(item.service_name.value || '')] || null;
           needBreak = i === this.tableData.length - 1;
         }
         if (!needBreak) {
-          window.requestIdleCallback(() => {
-            window.requestAnimationFrame(() => setData(endIndex));
-          });
+          setTimeout(() => {
+            window.requestAnimationFrame(() => {
+              setData(endIndex);
+            });
+          }, 300);
         } else {
           this.tableColumns.find(col => col.id === field).asyncable = false;
         }
@@ -508,6 +511,10 @@ export default class ApmServiceList extends tsc<
     return values.reduce((prev, curr) => {
       return Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev;
     });
+  }
+
+  handleGotoService(item) {
+    this.$emit('goToServiceByLink', item);
   }
 
   /**
@@ -690,6 +697,7 @@ export default class ApmServiceList extends tsc<
                               pagination={this.pagination}
                               scrollLoading={false}
                               onCollect={val => this.handleCollect(val)}
+                              onGoToServiceByLink={val => this.handleGotoService(val)}
                               onLimitChange={this.handlePageLimitChange}
                               onPageChange={this.handlePageChange}
                               onSortChange={val => this.handleSortChange(val as any)}

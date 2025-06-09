@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,6 +7,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 import json
 import logging
 import re
@@ -15,7 +15,12 @@ import re
 from blueapps.middleware.xss.decorators import escape_exempt
 from django.conf import settings
 from django.contrib import auth
-from django.http import Http404, HttpResponse, HttpResponseForbidden
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseForbidden,
+    HttpResponseRedirect,
+)
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -24,12 +29,16 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import ValidationError
 
 from bk_dataview.api import get_or_create_org
+from bk_dataview.permissions import GrafanaRole
 from bk_dataview.views import ProxyView, StaticView, SwitchOrgView
 from bkm_space.api import SpaceApi
+from bkmonitor.iam.action import ActionEnum
 from bkmonitor.models.external_iam import ExternalPermission
+from constants.common import DEFAULT_TENANT_ID
 from core.drf_resource import api
 from core.errors.api import BKAPIError
 from monitor.models import GlobalConfig
+from monitor_web.grafana.permissions import DashboardPermission
 from monitor_web.grafana.utils import patch_home_panels
 
 __all__ = ["ProxyView", "StaticView", "SwitchOrgView", "RedirectDashboardView"]
@@ -97,6 +106,8 @@ class RedirectDashboardView(ProxyView):
 
 
 class GrafanaSwitchOrgView(SwitchOrgView):
+    RE_DASHBORD_UID = re.compile(r"/d/([a-zA-Z0-9_-]+)")
+
     @staticmethod
     def is_allowed_external_request(request):
         if not request.org_name:
@@ -130,14 +141,36 @@ class GrafanaSwitchOrgView(SwitchOrgView):
                 key="EXTERNAL_AUTHORIZER_MAP", defaults={"value": {}}
             )
             authorizer = authorizer_map.value[org_name]
-            user = auth.authenticate(username=authorizer)
+            user = auth.authenticate(username=authorizer, tenant_id=DEFAULT_TENANT_ID)
             setattr(request, "user", user)
 
             # 过滤外部用户仪表盘
             if not self.is_allowed_external_request(request):
                 return HttpResponseForbidden(f"外部用户{request.external_user}无该仪表盘访问或操作权限")
 
-        return super(GrafanaSwitchOrgView, self).dispatch(request, *args, **kwargs)
+        # 提前进行单仪表盘权限校验，跳转至403页面
+        match_result = self.RE_DASHBORD_UID.findall(request.path)
+        if match_result:
+            uid = match_result[0]
+            # 兼容旧版权限
+            role = DashboardPermission.get_user_role(username=request.user.username, org_name=org_name)
+            if role < GrafanaRole.Viewer:
+                _, role, dashboard_permissions = DashboardPermission.get_user_permission(
+                    username=request.user.username, org_name=org_name
+                )
+                if role < GrafanaRole.Viewer and uid not in dashboard_permissions:
+                    return HttpResponseRedirect(
+                        f"/?bizId={org_name}&needMenu=false#/exception/403?actionId={ActionEnum.VIEW_SINGLE_DASHBOARD.id}"
+                    )
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def update_response(self, response, content):
+        content = super().update_response(response, content)
+        if isinstance(content, bytes):
+            content = content.decode("utf-8")
+        enable_watermark = settings.GRAPH_WATERMARK and settings.ROLE == "web"
+        return content.replace("<script>", f"<script>\nvar graphWatermark={json.dumps(enable_watermark)};")
 
 
 class GrafanaProxyView(ProxyView):
@@ -161,10 +194,10 @@ class GrafanaProxyView(ProxyView):
                 key="EXTERNAL_AUTHORIZER_MAP", defaults={"value": {}}
             )
             authorizer = authorizer_map.value[org_name]
-            user = auth.authenticate(username=authorizer)
+            user = auth.authenticate(username=authorizer, tenant_id=DEFAULT_TENANT_ID)
             setattr(request, "user", user)
 
-        response = super(GrafanaProxyView, self).dispatch(request, *args, **kwargs)
+        response = super().dispatch(request, *args, **kwargs)
 
         # 这里对 Home 仪表盘进行 patch，替换为指定的面板
         if request.method == "GET" and request.path.rstrip("/").endswith("/api/dashboards/home"):
@@ -174,7 +207,7 @@ class GrafanaProxyView(ProxyView):
                 patched_content = json.dumps(origin_content)
                 return HttpResponse(patched_content, status=response.status_code)
             except Exception as e:
-                logger.exception("[patch home panels] error: {}".format(e))
+                logger.exception(f"[patch home panels] error: {e}")
                 # 异常则不替换了
                 return response
 
@@ -185,7 +218,7 @@ class GrafanaProxyView(ProxyView):
         return response
 
     def get_request_headers(self, request):
-        headers = super(GrafanaProxyView, self).get_request_headers(request)
+        headers = super().get_request_headers(request)
         # 单仪表盘权限适配
         for exempt_api in self.exempt_apis:
             if exempt_api.match(request.path):
@@ -194,12 +227,11 @@ class GrafanaProxyView(ProxyView):
         return headers
 
     def update_response(self, response, content):
-        content = super(GrafanaProxyView, self).update_response(response, content)
+        content = super().update_response(response, content)
         if isinstance(content, bytes):
             content = content.decode("utf-8")
-        return content.replace(
-            "<script>", f"<script>\nvar graphWatermark={'true' if settings.GRAPH_WATERMARK else 'false'};"
-        )
+        enable_watermark = settings.GRAPH_WATERMARK and settings.ROLE == "web"
+        return content.replace("<script>", f"<script>\nvar graphWatermark={json.dumps(enable_watermark)};")
 
 
 class ApiProxyView(GrafanaProxyView):
@@ -207,7 +239,7 @@ class ApiProxyView(GrafanaProxyView):
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
-        response = super(ApiProxyView, self).dispatch(request, *args, **kwargs)
+        response = super().dispatch(request, *args, **kwargs)
 
         # 过滤外部用户仪表盘
         if "api/search" in request.path:

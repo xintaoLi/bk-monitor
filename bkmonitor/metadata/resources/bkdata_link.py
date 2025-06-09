@@ -414,3 +414,62 @@ class QueryDataLinkInfoResource(Resource):
                 continue
 
         return space_to_result_table_router_infos
+
+
+class QueryDataIdsByBizIdResource(Resource):
+    """
+    根据业务ID查询其下所有数据源ID
+    @param bk_biz_id 业务ID
+    @return [{'bk_data_id': 123, 'monitor_table_id': 'xxx', 'storage_type': 'xxx'}]
+    """
+
+    class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.CharField(label="业务ID", required=True)
+
+    def perform_request(self, data):
+        bk_biz_id = data["bk_biz_id"]
+
+        # 获取所有相关的 ResultTable
+        result_tables = models.ResultTable.objects.filter(bk_biz_id=bk_biz_id)
+        table_ids = list(result_tables.values_list('table_id', flat=True))
+
+        # 获取 table_id 对应的 default_storage，存入字典方便后续快速查找
+        table_storage_mapping = dict(result_tables.values_list('table_id', 'default_storage'))
+
+        # 查询 DataSourceResultTable，获取 bk_data_id 和 table_id，确保数据一致性
+        data_source_mappings = models.DataSourceResultTable.objects.filter(table_id__in=table_ids).values(
+            'bk_data_id', 'table_id'
+        )
+
+        # 组合最终结果
+        result = [
+            {
+                'bk_data_id': item['bk_data_id'],
+                'monitor_table_id': item['table_id'],
+                'storage_type': table_storage_mapping.get(item['table_id']),
+            }
+            for item in data_source_mappings
+        ]
+        return result
+
+
+class IntelligentDiagnosisMetadataResource(Resource):
+    """
+    元数据智能诊断接口
+    """
+
+    class RequestSerializer(serializers.Serializer):
+        bk_data_id = serializers.CharField(label="数据源ID", required=True)
+
+    def perform_request(self, validated_request_data):
+        from metadata.agents.diagnostic.metadata_diagnostic_agent import (
+            MetadataDiagnosisAgent,
+        )
+
+        bk_data_id = validated_request_data["bk_data_id"]
+        logger.info("agents: try to diagnose bk_data_id->[%s]", bk_data_id)
+        try:
+            report = MetadataDiagnosisAgent.diagnose(bk_data_id=int(bk_data_id))
+            return json.dumps(report, ensure_ascii=False)  # 适配中文返回
+        except Exception as e:  # pylint: disable=broad-except
+            logger.exception("metadata diagnose error, bk_data_id->[%s], error->[%s]", bk_data_id, e)

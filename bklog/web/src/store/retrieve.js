@@ -43,9 +43,10 @@ export default {
     catchFieldCustomConfig: {
       fieldsWidth: {},
       displayFields: [],
-      filterSetting: {
-        filterFields: [],
-      },
+      filterSetting: [],
+      filterAddition: [],
+      fixedFilterAddition: false,
+      sortList: [],
     },
     activeVersion: 'v2',
   },
@@ -76,6 +77,12 @@ export default {
       state.indexSetList = [];
       state.indexSetList.push(...payload);
     },
+    updateIndexSetItem(state, item) {
+      const index = state.indexSetList.findIndex(item => item.index_set_id === item.index_set_id);
+      if (index > -1) {
+        state.indexSetList.splice(index, 1, item);
+      }
+    },
     updateIndexSetLoading(state, payload) {
       state.isIndexSetLoading = payload;
     },
@@ -85,17 +92,25 @@ export default {
         {
           fieldsWidth: {},
           displayFields: [],
-          filterSetting: {
-            filterFields: [],
-          },
+          filterSetting: [],
+          filterAddition: [],
+          sortList: [],
         },
         payload ?? {},
       );
     },
+
+    updateCatchFilterAddition(state, { addition }) {
+      if (addition?.length) {
+        state.catchFieldCustomConfig.filterAddition.length = 0;
+        state.catchFieldCustomConfig.filterAddition = [];
+        state.catchFieldCustomConfig.filterAddition.push(...addition);
+      }
+    },
   },
   actions: {
     getIndexSetList(ctx, payload) {
-      const { spaceUid, isLoading = true } = payload;
+      const { spaceUid, isLoading = true, is_group } = payload;
       if (isLoading) ctx.commit('updateIndexSetLoading', true);
 
       ctx.commit('updateIndexSetList', []);
@@ -103,6 +118,7 @@ export default {
         .request('retrieve/getIndexSetList', {
           query: {
             space_uid: spaceUid,
+            is_group,
           },
         })
         .then(res => {
@@ -112,13 +128,23 @@ export default {
             // 根据权限排序
             const s1 = [];
             const s2 = [];
-            for (const item of res.data) {
-              if (item.permission?.[authorityMap.SEARCH_LOG_AUTH]) {
-                s1.push(item);
-              } else {
-                s2.push(item);
+
+            const authEachPush = (list, is_child_node = false, parent_node = null) => {
+              for (const item of list) {
+                Object.assign(item, { is_child_node, parent_node });
+                if (item.permission?.[authorityMap.SEARCH_LOG_AUTH]) {
+                  s1.push(item);
+                } else {
+                  s2.push(item);
+                }
+
+                if (Array.isArray(item?.children ?? null)) {
+                  authEachPush(item.children, true, item);
+                }
               }
-            }
+            };
+
+            authEachPush(res.data);
 
             indexSetList = s1.concat(s2);
             // 索引集数据加工

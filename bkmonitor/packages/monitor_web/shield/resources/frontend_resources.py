@@ -171,6 +171,9 @@ class FrontendShieldListResource(Resource):
                         "dimension_config": self.get_dimension_config(shield),
                         "content": shield["content"] or manager.get_shield_content(shield, strategy_id_to_name),
                         "begin_time": shield["begin_time"],
+                        "end_time": shield["end_time"],
+                        "current_cycle_ramaining_time": manager.get_current_cycle_ramaining_time(shield),
+                        "shield_cycle": manager.get_shield_cycle(shield),
                         "failure_time": shield["failure_time"],
                         "cycle_duration": manager.get_cycle_duration(shield),
                         "description": shield["description"],
@@ -256,14 +259,9 @@ class FrontendShieldDetailResource(Resource):
             strategy_ids = shield["dimension_config"]["strategy_id"]
             if not isinstance(strategy_ids, list):
                 strategy_ids = [strategy_ids]
-            strategy_ids = StrategyModel.objects.filter(id__in=strategy_ids, bk_biz_id=self.bk_biz_id).values_list(
-                "id", flat=True
+            strategies = list(
+                StrategyModel.objects.filter(id__in=strategy_ids, bk_biz_id=self.bk_biz_id).values("id", "name")
             )
-
-            strategies = []
-            for strategy_id in strategy_ids:
-                strategy_info = resource.strategies.strategy_info(id=strategy_id, bk_biz_id=self.bk_biz_id)
-                strategies.append(strategy_info)
             dimension_config.update({"strategies": strategies})
 
         if shield["category"] == ShieldCategory.STRATEGY:

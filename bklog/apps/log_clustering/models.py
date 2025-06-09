@@ -25,7 +25,7 @@ import json
 import arrow
 from django.db import models
 from django.db.models import Q
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from apps.log_clustering.constants import (
     LogColShowTypeEnum,
@@ -38,6 +38,7 @@ from apps.log_clustering.constants import (
 )
 from apps.log_clustering.exceptions import ClusteringConfigNotExistException
 from apps.models import SoftDeleteModel
+from apps.utils.local import get_external_app_code
 
 
 class SampleSet(SoftDeleteModel):
@@ -86,6 +87,10 @@ class ClusteringRemark(SoftDeleteModel):
     group_hash = models.CharField(_("分组hash"), max_length=256)
     remark = models.JSONField(_("备注信息"), default=list, null=True, blank=True)
     owners = models.JSONField(_("负责人"), default=list, null=True, blank=True)
+    strategy_id = models.IntegerField(_("策略id"), default=0)
+    strategy_enabled = models.BooleanField(_("策略是否启用"), default=False)
+    source_app_code = models.CharField(verbose_name=_("来源系统"), default=get_external_app_code, max_length=32, blank=True)
+    notice_group_id = models.IntegerField(_("告警组id"), default=0)
 
     class Meta:
         index_together = ["signature", "group_hash"]
@@ -171,16 +176,13 @@ class ClusteringConfig(SoftDeleteModel):
 
     @classmethod
     def get_by_index_set_id(cls, index_set_id: int, raise_exception: bool = True) -> "ClusteringConfig":
-        try:
-            return ClusteringConfig.objects.get(index_set_id=index_set_id)
-        except ClusteringConfig.DoesNotExist:
-            try:
-                return ClusteringConfig.objects.get(new_cls_index_set_id=index_set_id)
-            except ClusteringConfig.DoesNotExist:
-                if raise_exception:
-                    raise ClusteringConfigNotExistException()
-                else:
-                    return None
+        obj = ClusteringConfig.objects.filter(
+            Q(index_set_id=index_set_id) | Q(new_cls_index_set_id=index_set_id)
+        ).first()
+        if obj:
+            return obj
+        if raise_exception:
+            raise ClusteringConfigNotExistException()
 
     @classmethod
     def get_by_flow_id(cls, flow_id: int, raise_exception: bool = True):

@@ -1,8 +1,10 @@
 <script setup>
-  import { ref, computed, watch, onBeforeUnmount, inject } from 'vue';
+  import { ref, computed, onBeforeUnmount, inject, onMounted } from 'vue';
   import useStore from '@/hooks/use-store';
   import useTrendChart from '@/hooks/use-trend-chart';
   import { useRoute } from 'vue-router/composables';
+  import { getCommonFilterAddition } from '../../store/helper';
+  import RetrieveHelper, { RetrieveEvent } from '../../views/retrieve-helper';
   import axios from 'axios';
 
   import http from '@/api';
@@ -16,15 +18,15 @@
   const unionIndexList = computed(() => store.getters.unionIndexList);
   const retrieveParams = computed(() => store.getters.retrieveParams);
   const isLoading = computed(() => store.state.indexFieldInfo.is_loading);
-
-  const chartKey = computed(() => store.state.retrieve.chartKey);
+  const gradeOptions = computed(() => store.state.indexFieldInfo.custom_config?.grade_options);
 
   const refDataTrendCanvas = ref(null);
-
+  const dynamicHeight = ref(130);
   const handleChartDataZoom = inject('handleChartDataZoom', () => {});
-  const { initChartData, setChartData, clearChartData } = useTrendChart({
+  const { initChartData, setChartData } = useTrendChart({
     target: refDataTrendCanvas,
     handleChartDataZoom,
+    dynamicHeight,
   });
 
   const finishPolling = ref(false);
@@ -36,19 +38,23 @@
   let logChartCancel = null;
 
   const handleRequestSplit = (startTime, endTime) => {
-    const duration = (endTime - startTime) / 3600;
+    const duration = (endTime - startTime) / 3600000;
     if (duration <= 6) {
       // 小于6小时 一次性请求
       return 0;
     }
     if (duration < 48) {
       // 小于24小时 6小时间隔
-      return 21600;
-    } // 大于1天 按0.5天请求
-    return 86400 / 2;
+      return 21600 * 1000;
+    }
+
+    // 大于1天 按0.5天请求
+    return (86400 * 1000) / 2;
   };
 
   let runningInterval = 'auto';
+  let isInit = true;
+  let sumCount = 0;
 
   // 需要更新图表数据
   const getSeriesData = (startTimeStamp, endTimeStamp) => {
@@ -59,6 +65,8 @@
     requestInterval = isStart.value ? requestInterval : handleRequestSplit(startTimeStamp, endTimeStamp);
 
     if (!isStart.value) {
+      isInit = true;
+      sumCount = 0;
       pollingEndTime = endTimeStamp;
       pollingStartTime = requestInterval > 0 ? pollingEndTime - requestInterval : startTimeStamp;
 
@@ -91,13 +99,13 @@
       return;
     }
 
-    const indexId = window.__IS_MONITOR_APM__ ? route.query.indexId : route.params.indexId;
+    const indexId = window.__IS_MONITOR_COMPONENT__ ? route.query.indexId : route.params.indexId;
     if ((!isUnionSearch.value && !!indexId) || (isUnionSearch.value && unionIndexList.value?.length)) {
       // 从检索切到其他页面时 表格初始化的时候路由中indexID可能拿不到 拿不到 则不请求图表
       const urlStr = isUnionSearch.value ? 'unionSearch/unionDateHistogram' : 'retrieve/getLogChartList';
       const queryData = {
         ...retrieveParams.value,
-        addition: [...retrieveParams.value.addition, ...retrieveParams.value.commonFilters],
+        addition: [...retrieveParams.value.addition, ...getCommonFilterAddition(store.state)],
         time_range: 'customized',
         interval: runningInterval,
         // 每次轮循的起始时间
@@ -109,6 +117,18 @@
           index_set_ids: unionIndexList.value,
         });
       }
+
+      if (
+        gradeOptions.value &&
+        !gradeOptions.value.disabled &&
+        gradeOptions.value.type === 'custom' &&
+        gradeOptions.value.field
+      ) {
+        Object.assign(queryData, {
+          group_field: gradeOptions.value.field,
+        });
+      }
+
       http
         .request(
           urlStr,
@@ -124,9 +144,9 @@
         )
         .then(res => {
           if (res?.data) {
-            const originChartData = res?.data?.aggs?.group_by_histogram?.buckets || [];
-            const data = originChartData.map(item => [item.key, item.doc_count, item.key_as_string]);
-            const sumCount = setChartData(data);
+            sumCount += setChartData(res?.data?.aggs, queryData.group_field, isInit);
+            isInit = false;
+
             store.commit('retrieve/updateTrendDataCount', sumCount);
           }
 
@@ -155,43 +175,38 @@
   };
 
   let runningTimer = null;
+  const loadTrendData = () => {
+    logChartCancel?.();
+    setChartData(null, null, true);
 
-  watch(
-    () => chartKey.value,
-    () => {
-      logChartCancel?.();
+    runningTimer && clearTimeout(runningTimer);
+    runningTimer = setTimeout(() => {
+      finishPolling.value = false;
+      isStart.value = false;
+      getSeriesData(retrieveParams.value.start_time, retrieveParams.value.end_time);
+    });
+  };
 
-      runningTimer && clearTimeout(runningTimer);
-      runningTimer = setTimeout(() => {
-        clearChartData();
-
-        finishPolling.value = false;
-        isStart.value = false;
-        getSeriesData(retrieveParams.value.start_time, retrieveParams.value.end_time);
-      });
-    },
-    {
-      immediate: true,
-    },
-  );
-
-  const isRenderLoading = ref(false);
-  watch(
-    () => isLoading.value,
-    () => {
-      if (isLoading.value) {
-        isRenderLoading.value = true;
-        return;
-      }
-
-      setTimeout(() => {
-        isRenderLoading.value = false;
-      }, 300);
-    },
+  RetrieveHelper.on(
+    [
+      RetrieveEvent.SEARCH_VALUE_CHANGE,
+      RetrieveEvent.SEARCH_TIME_CHANGE,
+      RetrieveEvent.TREND_GRAPH_SEARCH,
+      RetrieveEvent.FAVORITE_ACTIVE_CHANGE,
+      RetrieveEvent.INDEX_SET_ID_CHANGE,
+    ],
+    loadTrendData,
   );
 
   onBeforeUnmount(() => {
+    finishPolling.value = true;
+    runningTimer && clearTimeout(runningTimer);
     logChartCancel?.();
+    RetrieveHelper.off(RetrieveEvent.TREND_GRAPH_SEARCH, loadTrendData);
+    RetrieveHelper.off(RetrieveEvent.SEARCH_VALUE_CHANGE, loadTrendData);
+    RetrieveHelper.off(RetrieveEvent.SEARCH_TIME_CHANGE, loadTrendData);
+    RetrieveHelper.off(RetrieveEvent.FAVORITE_ACTIVE_CHANGE, loadTrendData);
+    RetrieveHelper.off(RetrieveEvent.INDEX_SET_ID_CHANGE, loadTrendData);
   });
 </script>
 <script>
@@ -201,12 +216,12 @@
 </script>
 <template>
   <div
-    v-bkloading="{ isLoading: isRenderLoading }"
+    v-bkloading="{ isLoading: isLoading, zIndex: 10, size: 'mini' }"
     class="monitor-echart-wrap"
   >
     <div
       ref="refDataTrendCanvas"
-      style="height: 110px"
+      :style="{ height: dynamicHeight + 'px' }"
     ></div>
   </div>
 </template>

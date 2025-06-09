@@ -98,6 +98,15 @@
             </template>
           </bk-tab>
         </div>
+        <bk-input
+          ref="menuSearchInput"
+          class="menu-select-search"
+          :clearable="false"
+          :placeholder="$t('搜索')"
+          :value="keyword"
+          @change="searchChange"
+        >
+        </bk-input>
         <div class="fields-list-container">
           <div class="total-fields-list">
             <div class="title">
@@ -111,7 +120,7 @@
             </div>
             <ul class="select-list">
               <li
-                v-for="item in shadowTotal"
+                v-for="item in filterShadowTotal"
                 style="cursor: pointer"
                 class="select-item"
                 v-show="activeFieldTab === 'visible' ? !item.is_display : !item.isSorted && item.es_doc_values"
@@ -121,7 +130,7 @@
                 <span
                   class="field-name"
                   v-bk-overflow-tips
-                  >{{ getFiledDisplay(item.field_name) }}</span
+                  >{{ getFiledDisplay(item) }}</span
                 >
                 <span class="icon bklog-icon bklog-filled-right-arrow"></span>
               </li>
@@ -164,7 +173,7 @@
                   <span
                     class="field-name"
                     v-bk-overflow-tips
-                    >{{ getFiledDisplay(item) }}</span
+                    >{{ getFiledDisplayByFieldName(item) }}</span
                   >
                   <span
                     class="bk-icon icon-close-circle-shape delete"
@@ -208,7 +217,7 @@
                     :style="`width: calc(100% - ${fieldWidth}px);`"
                     class="field-name"
                     v-bk-overflow-tips
-                    >{{ getFiledDisplay(item[0]) }}</span
+                    >{{ getFiledDisplayByFieldName(item[0]) }}</span
                   >
                   <span :class="`bk-icon status ${filterStatusIcon(item[1])}`"></span>
                   <span
@@ -244,23 +253,17 @@
         {{ $t('取消') }}
       </bk-button>
     </div>
-    <div class="field-alias-setting">
-      <span style="margin-right: 4px">{{ $t('表头显示别名') }}</span>
-      <bk-switcher
-        v-model="showFieldAlias"
-        size="small"
-        theme="primary"
-      ></bk-switcher>
-    </div>
   </div>
 </template>
 
 <script>
+  import { getFieldNameByField } from '@/hooks/use-field-name';
   import VueDraggable from 'vuedraggable';
   import { mapGetters } from 'vuex';
 
+  // import useFieldNameHook from '@/hooks/use-field-name';
   import fieldsSettingOperate from './fields-setting-operate';
-
+  import { BK_LOG_STORAGE } from '@/store/store.type';
   export default {
     components: {
       VueDraggable,
@@ -275,7 +278,6 @@
       return {
         isLoading: false,
         shadowVisible: [],
-        showFieldAlias: localStorage.getItem('showFieldAlias') === 'true',
         shadowAllTotal: [], // 所有字段
         newConfigStr: '', // 新增配置配置名
         isShowAddInput: false, // 是否展示新增配置输入框
@@ -296,6 +298,7 @@
           'ghost-class': 'sortable-ghost-class',
         },
         isSortFieldChanged: false,
+        keyword: '',
       };
     },
     computed: {
@@ -305,6 +308,17 @@
       shadowTotal() {
         return this.$store.state.indexFieldInfo.fields;
       },
+      filterShadowTotal() {
+        const fields = this.$store.state.indexFieldInfo.fields;
+        return fields.filter(item => {
+          const matchesKeyword = item.field_name?.includes(this.keyword) || item.query_alias?.includes(this.keyword);
+          const isInShadowVisible = this.shadowVisible.some(shadowItem => shadowItem === item.field_name);
+          return matchesKeyword && !isInShadowVisible;
+        });
+      },
+      showFieldAlias() {
+        return this.$store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS];
+      },
       fieldAliasMap() {
         let fieldAliasMap = {};
         this.$store.state.indexFieldInfo.fields.forEach(item => {
@@ -313,6 +327,9 @@
         return fieldAliasMap;
       },
       toSelectLength() {
+        if (this.keyword) {
+          return this.filterShadowTotal.length;
+        }
         if (this.activeFieldTab === 'visible') {
           return this.shadowTotal.length - this.shadowVisible.length;
         }
@@ -351,12 +368,19 @@
       this.initRequestConfigListShow();
     },
     methods: {
-      getFiledDisplay(name) {
-        const alias = this.fieldAliasMap[name];
-        if (alias && alias !== name) {
-          return `${name}(${alias})`;
+      getFiledDisplayByFieldName(name) {
+        const field = this.shadowTotal.find(item => item.field_name === name);
+        return this.getFiledDisplay(field);
+      },
+      getFiledDisplay(field) {
+        if (this[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
+          return getFieldNameByField(field, this.$store);
         }
-        return name;
+        const alias = this.fieldAliasMap[field.field_name];
+        if (alias && alias !== field.field_name) {
+          return `${field.field_name}(${alias})`;
+        }
+        return field.field_name;
       },
       /** 带config列表请求的初始化 */
       async initRequestConfigListShow() {
@@ -383,7 +407,6 @@
             await this.submitFieldsSet(this.currentClickConfigData.id);
           }
           this.cancelModifyFields();
-          this.$store.commit('updateShowFieldAlias', this.showFieldAlias);
           this.$store.commit('updateIsSetDefaultTableColumn', false);
           this.$store
             .dispatch('userFieldConfigChange', {
@@ -407,7 +430,7 @@
         await this.$http
           .request('retrieve/postFieldsConfig', {
             data: {
-              index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId,
+              index_set_id: window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId,
               index_set_ids: this.unionIndexList,
               index_set_type: this.isUnionSearch ? 'union' : 'single',
               display_fields: this.shadowVisible,
@@ -584,7 +607,7 @@
           sort_list: updateItem.sort_list,
           display_fields: updateItem.display_fields,
           config_id: undefined,
-          index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId,
+          index_set_id: window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId,
           index_set_ids: this.unionIndexList,
           index_set_type: this.isUnionSearch ? 'union' : 'single',
         };
@@ -614,7 +637,7 @@
           await this.$http.request('retrieve/deleteFieldsConfig', {
             data: {
               config_id: configID,
-              index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId,
+              index_set_id: window.__IS_MONITOR_COMPONENT__ ? this.$route.query.indexId : this.$route.params.indexId,
               index_set_ids: this.unionIndexList,
               index_set_type: this.isUnionSearch ? 'union' : 'single',
             },
@@ -625,7 +648,6 @@
           this.newConfigStr = '';
           if (this.filedSettingConfigID === configID) {
             this.currentClickConfigID = this.configTabPanels[0].id;
-            this.$store.commit('updateShowFieldAlias', this.showFieldAlias);
             const { display_fields } = this.configTabPanels[0];
             this.$store.commit('resetVisibleFields', display_fields);
             this.$store.dispatch('requestIndexSetQuery');
@@ -664,7 +686,11 @@
             data: {
               ...(this.isUnionSearch
                 ? { index_set_ids: this.unionIndexList }
-                : { index_set_id: window.__IS_MONITOR_APM__ ? this.$route.query.indexId : this.$route.params.indexId }),
+                : {
+                    index_set_id: window.__IS_MONITOR_COMPONENT__
+                      ? this.$route.query.indexId
+                      : this.$route.params.indexId,
+                  }),
               scope: 'default',
               index_set_type: this.isUnionSearch ? 'union' : 'single',
             },
@@ -681,6 +707,9 @@
       },
       setPopperInstance(status) {
         this.$emit('set-popper-instance', status);
+      },
+      searchChange(v) {
+        this.keyword = v;
       },
     },
   };
@@ -813,11 +842,17 @@
       padding: 0px 10px 0 10px;
     }
 
+    .menu-select-search {
+      width: 340px;
+      padding-left: 10px;
+      margin-top: -30px;
+    }
+
     .fields-list-container {
       display: flex;
       width: 723px;
       padding: 0 10px 14px 10px;
-      margin-top: -30px;
+      margin-top: 10px;
 
       .total-fields-list,
       .visible-fields-list,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -16,9 +15,11 @@ import logging
 import traceback
 from abc import ABC
 from collections import defaultdict
-from typing import List, NamedTuple, Tuple, Union
+from typing import NamedTuple
+from collections.abc import Callable
 
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from apm import constants
@@ -28,12 +29,13 @@ from apm.utils.base import divide_biscuit
 from apm.utils.es_search import limits
 from bkmonitor.utils.thread_backend import ThreadPool
 from constants.apm import OtlpKey, SpanKind, TelemetryDataType
+from core.drf_resource.exceptions import CustomException
 
 logger = logging.getLogger("apm")
 
 
 def get_topo_instance_key(
-    keys: List[Tuple[str, str]],
+    keys: list[tuple[str, str]],
     kind: str,
     category: str,
     item,
@@ -65,7 +67,7 @@ def get_topo_instance_key(
     return ":".join(instance_keys)
 
 
-def exists_field(predicate_key: Union[Tuple[str, str], List[Tuple[str, str]]], item) -> bool:
+def exists_field(predicate_key: tuple[str, str] | list[tuple[str, str]], item) -> bool:
     if item is None:
         return False
 
@@ -81,7 +83,7 @@ def exists_field(predicate_key: Union[Tuple[str, str], List[Tuple[str, str]]], i
     return all(all_exists)
 
 
-def extract_field_value(key: Union[List[Tuple[str, str]], Tuple[str, str]], item):
+def extract_field_value(key: list[tuple[str, str]] | tuple[str, str], item):
     if key and isinstance(key, list):
         # 忽略 predicate_key 为多个的情况 直接取第一个
         key = key[0]
@@ -91,11 +93,11 @@ def extract_field_value(key: Union[List[Tuple[str, str]], Tuple[str, str]], item
 
 
 class ApmTopoDiscoverRuleCls(NamedTuple):
-    instance_keys: List[Tuple[str, str]]
+    instance_keys: list[tuple[str, str]]
     topo_kind: str
     category_id: str
-    predicate_key: Union[Tuple[str, str], List[Tuple[str, str]]]
-    endpoint_key: Union[Tuple[str, str], None]
+    predicate_key: tuple[str, str] | list[tuple[str, str]]
+    endpoint_key: tuple[str, str] | None
     type: str
     sort: int
 
@@ -127,7 +129,10 @@ class DiscoverBase(ABC):
 
     @property
     def application(self):
-        return ApmApplication.get_application(self.bk_biz_id, self.app_name)
+        app = ApmApplication.objects.filter(bk_biz_id=self.bk_biz_id, app_name=self.app_name).first()
+        if not app:
+            raise CustomException(_("业务下的应用: {} 不存在").format(self.app_name))
+        return app
 
     def _get_key_pair(self, key: str):
         pair = key.split(".", 1)
@@ -146,7 +151,6 @@ class DiscoverBase(ABC):
         other_rules = []
 
         for rule in rule_instances:
-
             # [!!!] predicate_key 可能为单个也可能为多个
             # 注意这里类型可能是 string 或者 list
             # 目前只有 k8s 规则存在多个
@@ -178,8 +182,10 @@ class DiscoverBase(ABC):
     def get_service_name(self, span):
         return extract_field_value((OtlpKey.RESOURCE, ResourceAttributes.SERVICE_NAME), span)
 
-    def get_match_rule(self, span, rules, other_rule=None):
-        res = next((rule for rule in rules if exists_field(rule.predicate_key, span)), None)
+    def get_match_rule(
+        self, span, rules, other_rule=None, extra_cond: Callable[[ApmTopoDiscoverRuleCls], bool] = lambda x: True
+    ):
+        res = next((rule for rule in rules if exists_field(rule.predicate_key, span) and extra_cond(rule)), None)
 
         return res if res else other_rule
 
@@ -393,7 +399,14 @@ class TopoHandler:
         trace_id_count = 0
         span_count = 0
         filter_span_count = 0
-        max_result_count, per_trace_size, index_name = self._get_trace_task_splits()
+        try:
+            max_result_count, per_trace_size, index_name = self._get_trace_task_splits()
+        except Exception as e:
+            logger.error(
+                f"[TopoHandler] 业务id: {self.bk_biz_id}和应用名: {self.app_name}"
+                f"构建的TopoHandler对象在discover方法内发生异常, error({e})"
+            )
+            return
 
         for round_index, trace_ids in enumerate(self.list_trace_ids(index_name)):
             if not trace_ids:

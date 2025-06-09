@@ -42,13 +42,19 @@
           .segment-content {
             span {
               color: #934c04;
+              white-space: pre-wrap;
 
               &.valid-text {
                 cursor: pointer;
+                padding: 1px 0px;
 
                 &.focus-text,
                 &:hover {
                   color: #3a84ff;
+                }
+
+                &:hover {
+                  padding: 4px 0px;
                 }
               }
             }
@@ -60,9 +66,18 @@
 
   .bklog-json-view-object {
     .bklog-json-view-icon-text,
-    .bklog-json-view-icon-expand {
+    .bklog-json-view-icon-expand,
+    .bklog-json-view-copy {
       padding: 2px;
       cursor: pointer;
+      font-size: 0.75em;
+      line-height: 1.1em;
+    }
+
+    .bklog-json-view-copy {
+      font-size: 14px;
+      padding: 4px;
+      margin-bottom: -4px;
     }
 
     .bklog-json-view-icon-expand {

@@ -287,7 +287,15 @@ export default {
   '当前数据无维度，所以没有变量选择': 'No variables available as there are no dimensions for the current data',
   '你当前有 {0} 个业务权限，暂无告警事件':
     'You currently have {0} business permissions, and there are no alarm events temporarily',
-  '你当前有 {0} 个业务权限，暂无故障': 'You currently have {0} business permissions and there are no incidents yet.',
+  '{0} 空间未开启故障分析功能，请联系管理员开启':
+    '{0} The fault analysis function is not enabled in this space. Please contact the administrator to enable it.',
+  当前空间下暂无故障: 'There is no fault in the current space',
+  '{count} 空间未开启故障分析功能，请联系 {link}':
+    '{count} space does not have fault analysis function enabled, please contact {link}',
+  '你当前有 {0} 个空间权限，暂无您负责的故障':
+    'You currently have {0} space permissions, and there are no faults that you are responsible for.',
+  '你当前有 {count} 个空间权限，暂未开启灰度, 请联系 {link}':
+    'You currently have {count} space permissions, grayscale is not enabled yet, please contact {link}',
   '本次操作未选择目标，无下发操作记录': 'No target selected for this operation, no records of issuance',
   无法选择Agent状态异常的服务器: 'Cannot select server with abnormal Agent status',
   '当前拨测任务状态良好，无告警事件产生': 'The current dialing task is in good condition and has no alarm events',
@@ -439,6 +447,11 @@ export default {
     "Detected Alarm rule No monitoring target is configured. After creating the rule, don't forget to add the target to take effect. Can self-developed middleware be connected to BlueKing Monitoring? ",
   '没找到相关的维度？': 'No related dimensions found?',
   '确认删除仪表盘？': 'Confirmed to delete the dashboard?',
+  '确认更新？': 'Confirmed to update the dashboard?',
+  仪表盘内没有要更新的旧面板: 'There are no old panels to update in the dashboard',
+  '更新成功,部分旧面板更新失败': 'Update completed. Some panels may have failed to update',
+  '解决grafana升级后组件兼容性问题，不影响数据':
+    'Resolve component compatibility issues after Grafana upgrade without affecting data',
   '覆盖已有监控目标？': 'Overwrite existing monitoring targets?',
   '是否开始迁移策略？': 'start migrating the rule?',
   确定回收所选分享链接: 'Recycle these sharing links ?',
@@ -470,6 +483,13 @@ export default {
   '内容正在生成中...': 'Content is being generated...',
   '您可以键入“/”查看更多提问示例': 'You can type "/" to view more question examples',
   '监控策略如何使用？': 'How to use bkmonitor strategy?',
+  '是否将该业务设为默认业务？': 'Should this business be set as the default business?',
+  '是否取消默认业务？': 'Should the default business be cancelled?',
+  '设为默认后，每次进入监控平台将会默认选中该业务':
+    'After setting it as default, the monitoring platform will default to this business every time you enter',
+  '取消默认业务后，每次进入监控平台将会默认选中最近使用的业务而非当前默认业务':
+    'After canceling the default business, the monitoring platform will default to the most recently used business instead of the current default business every time you enter',
+
   // 调用分析
   '仅展示前 30 条数据': 'Only the first 30 data are displayed',
   查看关联调用链: 'View related call chains',
@@ -495,4 +515,10 @@ export default {
   前匹配: 'match before',
   后匹配: 'match after',
   当前维度外层已选中: 'The outer layer of the current dimension is selected',
+  无请求数据: 'No request data',
+  '无维度，已汇聚为1条曲线': 'No dimensions, aggregated into 1 curve',
+  故障诊断: 'Fault diagnosis',
+  异常比例: 'Exception ratio',
+  成功覆盖当前收藏: 'Successfully covered the current collection',
+  批量移动成功: 'Batch move successful',
 };

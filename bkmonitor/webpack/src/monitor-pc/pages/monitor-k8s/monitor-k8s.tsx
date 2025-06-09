@@ -59,7 +59,7 @@ export default class MonitorK8s extends tsc<object> {
   /** 定位详情文案 */
   subName = '';
 
-  get positonText() {
+  get positionText() {
     const label = this.tabName;
     const value = this.sceneType === 'overview' ? window.i18n.tc('概览') : this.subName;
     return `${label}：${value}`;
@@ -100,11 +100,14 @@ export default class MonitorK8s extends tsc<object> {
   handleRouterBack() {
     this.backToOverviewKey = random(8);
   }
-  handleSecendTypeChange(type) {
+  handleSceneTypeChange(type) {
     this.sceneType = type;
   }
   handleAddCluster() {
     skipToDocsLink('addClusterMd');
+  }
+  handleGotoNew() {
+    this.$router.push({ name: 'k8s-new', query: {} });
   }
   render() {
     if (this.showGuidePage) return <GuidePage guideData={introduce.data.k8s.introduce} />;
@@ -117,7 +120,7 @@ export default class MonitorK8s extends tsc<object> {
           sceneType={this.sceneType}
           toggleTabSearchFilterKeys={['bcs_cluster_id']}
           tab2SceneType
-          onSceneTypeChange={this.handleSecendTypeChange}
+          onSceneTypeChange={this.handleSceneTypeChange}
           onTabChange={this.handleSceneTabChange}
           onTitleChange={this.handleTitleChange}
         >
@@ -125,10 +128,17 @@ export default class MonitorK8s extends tsc<object> {
             slot='nav'
             callbackRouterBack={this.handleRouterBack}
             needShadow={true}
-            positionText={this.positonText}
+            positionText={this.positionText}
             routeList={this.routeList}
             needCopyLink
           />
+          <bk-button
+            slot='prependTools'
+            onClick={this.handleGotoNew}
+          >
+            <i class='icon-monitor icon-mc-change-version change-version' />
+            {this.$t('切换新版')}
+          </bk-button>
           {!this.readonly && (
             <bk-button
               style='margin-left: 8px;'

@@ -43,7 +43,8 @@ export default class AggChart extends tsc<object> {
   @Prop({ type: Object, required: true }) retrieveParams: any;
   @Prop({ type: Boolean, default: false }) isFrontStatistics: boolean;
   @Prop({ type: Object, default: () => ({}) }) statisticalFieldData: any;
-  @Prop({ type: Number, default: 5}) limit: number;
+  @Prop({ type: Number, default: 5 }) limit: number;
+  @Prop({ type: Array }) colorList: string[];
   showAllList = false;
   listLoading = false;
   mappingKay = {
@@ -81,7 +82,6 @@ export default class AggChart extends tsc<object> {
     return this.showAllList ? totalList : totalList.filter((item, index) => index < 5);
   }
   get showFiveList() {
-
     return this.isFrontStatistics ? this.topFiveList : this.fieldValueData.values;
   }
   get showValidCount() {
@@ -110,6 +110,13 @@ export default class AggChart extends tsc<object> {
     if (!this.isFrontStatistics) this.queryFieldFetchTopList(this.limit);
   }
 
+  getCssVar(index) {
+    return {
+      '--bar-bg-color': this.colorList?.[index] || '#5AB8A8',
+      '--percent-text-color': this.colorList?.length ? '#979ba5' : '#5AB8A8',
+    };
+  }
+
   // 计算百分比
   computePercent(count) {
     const percentageNum = count / this.showTotalCount;
@@ -123,7 +130,7 @@ export default class AggChart extends tsc<object> {
     const router = this.$router;
     const route = this.$route;
     // const store = this.$store;
-    
+
     store.dispatch('setQueryCondition', { field: this.fieldName, operator, value: [value] }).then(() => {
       const query = { ...route.query };
 
@@ -164,7 +171,7 @@ export default class AggChart extends tsc<object> {
     try {
       const indexSetIDs = this.isUnionSearch
         ? this.unionIndexList
-        : [window.__IS_MONITOR_APM__ ? this.route.query.indexId : this.route.params.indexId];
+        : [window.__IS_MONITOR_COMPONENT__ ? this.route.query.indexId : this.route.params.indexId];
       this.listLoading = true;
       const data = {
         ...this.retrieveParams,
@@ -177,7 +184,7 @@ export default class AggChart extends tsc<object> {
       });
       if (res.code === 0) {
         await this.$nextTick();
-        this.emitDistinctCount(res.data.distinct_count)
+        this.emitDistinctCount(res.data.distinct_count);
         Object.assign(this.fieldValueData, res.data);
       }
     } catch (error) {
@@ -197,8 +204,23 @@ export default class AggChart extends tsc<object> {
           <div>
             {/* <div class='title'>{this.t('字段内容分布')}</div> */}
             <ul class='chart-list'>
-              {this.showFiveList.map(item => (
-                <li class='chart-item'>
+              {this.showFiveList.map((item, index) => (
+                <li
+                  class='chart-item'
+                  style={this.getCssVar(index)}
+                >
+                  <div class='operation-container'>
+                    <span
+                      class={['bk-icon icon-enlarge-line', this.filterIsExist('is', item[0]) ? 'disable' : '']}
+                      v-bk-tooltips={this.getIconPopover('=', item[0])}
+                      onClick={() => this.addCondition('is', item[0])}
+                    ></span>
+                    <span
+                      class={['bk-icon icon-narrow-line', this.filterIsExist('is not', item[0]) ? 'disable' : '']}
+                      v-bk-tooltips={this.getIconPopover('!=', item[0])}
+                      onClick={() => this.addCondition('is not', item[0])}
+                    ></span>
+                  </div>
                   <div class='chart-content'>
                     <div class='text-container'>
                       <div
@@ -217,18 +239,6 @@ export default class AggChart extends tsc<object> {
                         class='percent-bar'
                       ></div>
                     </div>
-                  </div>
-                  <div class='operation-container'>
-                    <span
-                      class={['bk-icon icon-enlarge-line', this.filterIsExist('is', item[0]) ? 'disable' : '']}
-                      v-bk-tooltips={this.getIconPopover('=', item[0])}
-                      onClick={() => this.addCondition('is', item[0])}
-                    ></span>
-                    <span
-                      class={['bk-icon icon-narrow-line', this.filterIsExist('is not', item[0]) ? 'disable' : '']}
-                      v-bk-tooltips={this.getIconPopover('!=', item[0])}
-                      onClick={() => this.addCondition('is not', item[0])}
-                    ></span>
                   </div>
                 </li>
               ))}

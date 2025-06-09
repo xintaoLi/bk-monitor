@@ -18,7 +18,7 @@ import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import arrow
 import pytz
@@ -182,7 +182,7 @@ class BaseAccessDataProcess(base.BaseAccessProcess):
                 "count": len(record_list),
             }
 
-    def push(self, records: List = None, output_client=None):
+    def push(self, records: Optional[List] = None, output_client=None):
         """
         推送格式化后的数据到 detect 和 nodata 中(按单个策略，单个item项，写入不同的队列)
         """
@@ -196,8 +196,8 @@ class BaseAccessDataProcess(base.BaseAccessProcess):
         PriorityChecker.check_records(records)
 
         # 按item_id分组
-        pending_to_push = {}
-        item_id_to_item = {}
+        pending_to_push: Dict[int, List[DataRecord]] = {}
+        item_id_to_item: Dict[int, Item] = {}
         for record in records:
             for item in record.items:
                 item_id = item.id
@@ -211,7 +211,7 @@ class BaseAccessDataProcess(base.BaseAccessProcess):
         for item_id, record_list in list(pending_to_push.items()):
             item = item_id_to_item[item_id]
             if record_list:
-                strategy_ids.add(item.strategy.strategy_id)
+                strategy_ids.add(item.strategy.id)
 
                 # 推送到检测队列
                 self._push(item, record_list, output_client)
@@ -220,8 +220,14 @@ class BaseAccessDataProcess(base.BaseAccessProcess):
                 try:
                     self._push_noise_data(item, record_list)
                 except BaseException as e:
-                    logger.exception("push noise data of strategy(%s) error, %s", item.strategy.strategy_id, str(e))
+                    logger.exception("push noise data of strategy(%s) error, %s", item.strategy.id, str(e))
 
+            logger.info(
+                "strategy_group_key(%s) strategy(%s) item(%s) push records to detect done",
+                item.strategy.strategy_group_key,
+                item.strategy.id,
+                item.id,
+            )
             # 推送无数据处理
             if item.no_data_config["is_enabled"]:
                 self._push(item, records, output_client, key.NO_DATA_LIST_KEY)
@@ -344,6 +350,7 @@ class AccessDataProcess(BaseAccessDataProcess):
         if not (first_item.data_source_types & MULTI_METRIC_DATA_SOURCES):
             first_item.data_sources[0]._advance_where = []
 
+        bkdata_tmp_advance_where = []
         # 计算平台指标查询localTime
         if DataSourceLabel.BK_DATA in first_item.data_source_labels:
             if len(first_item.expression.strip()) <= 1:
@@ -351,6 +358,10 @@ class AccessDataProcess(BaseAccessDataProcess):
                 first_item.data_sources[0].metrics.append(
                     {"field": "localTime", "method": "MAX", "alias": "_localTime"}
                 )
+                first_item.data_sources[0].rollback_query()
+                # 暂存高级过滤条件
+                bkdata_tmp_advance_where = first_item.data_sources[0]._advance_where
+                first_item.data_sources[0]._advance_where = []
 
         try:
             points = first_item.query_record(self.from_timestamp, self.until_timestamp)
@@ -371,6 +382,8 @@ class AccessDataProcess(BaseAccessDataProcess):
             first_item.data_sources[0].metrics = [
                 m for m in first_item.data_sources[0].metrics if m["field"] != "localTime"
             ]
+            # 恢复高级过滤条件
+            first_item.data_sources[0]._advance_where = bkdata_tmp_advance_where
             filter_point_time = None
             for point_time, max_local_time in local_time_list:
                 if now_timestamp - max_local_time.timestamp() <= settings.BKDATA_LOCAL_TIME_THRESHOLD:
@@ -418,7 +431,12 @@ class AccessDataProcess(BaseAccessDataProcess):
                 until_timestamp = 0
 
         time_delay = settings.ACCESS_DATA_TIME_DELAY
-        if (DataSourceLabel.BK_LOG_SEARCH, DataTypeLabel.LOG) in first_item.data_source_types:
+        if first_item.time_delay:
+            time_delay += first_item.time_delay
+        elif (DataSourceLabel.BK_LOG_SEARCH, DataTypeLabel.LOG) in first_item.data_source_types:
+            time_delay += 60
+        elif first_item.use_aiops_sdk:
+            # bkbase智能检测flow默认有1分钟的计算等待延迟, SDK智能检测保持相同的逻辑
             time_delay += 60
 
         if not until_timestamp:
@@ -505,8 +523,10 @@ class AccessDataProcess(BaseAccessDataProcess):
                 have_priority = True
                 break
 
+        max_data_time = 0
         for record in reversed(points):
             point = DataRecord(self.items, record)
+
             if point.value is not None:
                 # 去除重复数据
                 if dup_obj.is_duplicate(point):
@@ -518,8 +538,17 @@ class AccessDataProcess(BaseAccessDataProcess):
                 else:
                     dup_obj.add_record(point)
                     records.append(point)
+
+                    # 只观察非重复数据
+                    if point.time > max_data_time:
+                        max_data_time = point.time
             else:
                 none_point_counts += 1
+
+        # 如果当前数据延迟超过一定值，则上报延迟埋点
+        # 对于非batch的数据，有可能存在数据稀疏的情况，因此在filter duplicate后再进行延迟统计
+        if max_data_time > 0 and not self.batch_timestamp and self.until_timestamp:
+            self.observe_big_latency_datasource(first_item, max_data_time)
 
         dup_obj.refresh_cache()
         self.record_list = records
@@ -574,7 +603,7 @@ class AccessDataProcess(BaseAccessDataProcess):
         # 非批量任务，记录日志
         if not self.sub_task_id:
             logger.info(
-                "strategy_group_key({}), push records({}), last_checkpoint({})".format(
+                "strategy_group_key({}), process records({}), last_checkpoint({})".format(
                     self.strategy_group_key,
                     len(self.record_list),
                     arrow.get(last_checkpoint).strftime(constants.STD_LOG_DT_FORMAT),
@@ -755,6 +784,28 @@ class AccessDataProcess(BaseAccessDataProcess):
             if last_checkpoint > 0:
                 # 记录检测点 下次从检测点开始重新检查
                 checkpoint.set(last_checkpoint)
+
+    def observe_big_latency_datasource(self, item: Item, max_data_time: int):
+        """上报数据源延迟较大的指标，以此发现告警策略数据源的质量问题.
+
+        :param item: 检测配置
+        :param max_data_time: 当前批次数据最大的数据时间.
+        """
+        agg_interval = min(query_config["agg_interval"] for query_config in item.query_configs)
+        max_latency = self.until_timestamp - max_data_time - agg_interval
+        threshold = agg_interval * settings.ACCESS_LATENCY_INTERVAL_FACTOR + settings.ACCESS_LATENCY_THRESHOLD_CONSTANT
+        if max_latency > threshold:
+            logger.warning(
+                "[data source delay]big latency %s,  strategy(%s)",
+                max_latency,
+                item.strategy.id,
+            )
+            metrics.PROCESS_BIG_LATENCY.labels(
+                strategy_id=item.strategy.id,
+                strategy_name=item.strategy.name,
+                bk_biz_id=item.strategy.bk_biz_id,
+                module="data_delay",
+            ).observe(max_latency)
 
 
 class AccessBatchDataProcess(AccessDataProcess):

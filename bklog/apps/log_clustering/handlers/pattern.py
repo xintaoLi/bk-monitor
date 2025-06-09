@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -19,17 +18,21 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 We undertake not to change the open source license (MIT license) applicable to the current version of
 the project delivered to anyone in the future.
 """
+
 import copy
 import re
-from typing import List
 
 import arrow
+from django.conf import settings
 from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.functional import cached_property
 
+from apps.api import MonitorApi
 from apps.log_clustering.constants import (
     AGGS_FIELD_PREFIX,
+    DEFAULT_ACTION_NOTICE,
+    DEFAULT_ALERT_NOTICE,
     DEFAULT_LABEL,
     DOUBLE_PERCENTAGE,
     HOUR_MINUTES,
@@ -54,7 +57,11 @@ from apps.models import model_to_dict
 from apps.utils.bkdata import BkData
 from apps.utils.db import array_hash
 from apps.utils.function import map_if
-from apps.utils.local import get_local_param, get_request_username
+from apps.utils.local import (
+    get_external_app_code,
+    get_local_param,
+    get_request_username,
+)
 from apps.utils.log import logger
 from apps.utils.thread import MultiExecuteFunc
 from apps.utils.time_handler import generate_time_range, generate_time_range_shift
@@ -103,7 +110,7 @@ class PatternHandler:
         new_class = result.get("new_class", set())
         # 同步的pattern保存信息
         if self._clustering_config.signature_pattern_rt:
-            pattern_map = self._get_pattern_data()
+            pattern_map = self._get_pattern_data(patterns=list({p["key"] for p in pattern_aggs}))
         elif self._clustering_config.model_output_rt:
             # 在线训练逻辑适配
             pattern_map = AiopsSignatureAndPattern.objects.filter(
@@ -118,13 +125,17 @@ class PatternHandler:
         sum_count = sum([pattern.get("doc_count", MIN_COUNT) for pattern in pattern_aggs if pattern["key"]])
 
         # 符合当前分组hash的所有clustering_remark  signature和origin_pattern可能不相同
-        clustering_remarks = ClusteringRemark.objects.filter(bk_biz_id=self._clustering_config.bk_biz_id).values(
+        clustering_remarks = ClusteringRemark.objects.filter(
+            bk_biz_id=self._clustering_config.bk_biz_id, source_app_code=get_external_app_code()
+        ).values(
             "signature",
             "origin_pattern",
             "group_hash",
             "remark",
             "owners",
             "groups",
+            "strategy_id",
+            "strategy_enabled",
         )
 
         signature_map_remark = {}
@@ -169,20 +180,30 @@ class PatternHandler:
             if (signature, group_hash) in signature_map_remark:
                 remark = signature_map_remark[(signature, group_hash)]["remark"]
                 owners = signature_map_remark[(signature, group_hash)]["owners"]
+                strategy_id = signature_map_remark[(signature, group_hash)]["strategy_id"]
+                strategy_enabled = signature_map_remark[(signature, group_hash)]["strategy_enabled"]
             elif signature_origin_pattern and (signature_origin_pattern, group_hash) in origin_pattern_map_remark:
                 remark = origin_pattern_map_remark[(signature_origin_pattern, group_hash)]["remark"]
                 owners = origin_pattern_map_remark[(signature_origin_pattern, group_hash)]["owners"]
+                strategy_id = origin_pattern_map_remark[(signature_origin_pattern, group_hash)]["strategy_id"]
+                strategy_enabled = origin_pattern_map_remark[(signature_origin_pattern, group_hash)]["strategy_enabled"]
             # 如果带分组的记录中没有找到备注，则退化为使用无分组的备注内容展示
             elif signature in signature_map_remark_without_group:
                 remark = signature_map_remark_without_group[signature]["remark"]
                 owners = signature_map_remark_without_group[signature]["owners"]
+                strategy_id = signature_map_remark_without_group[signature]["strategy_id"]
+                strategy_enabled = signature_map_remark_without_group[signature]["strategy_enabled"]
             elif signature_origin_pattern and signature_origin_pattern in origin_pattern_map_remark_without_group:
                 remark = origin_pattern_map_remark_without_group[signature_origin_pattern]["remark"]
                 owners = origin_pattern_map_remark_without_group[signature_origin_pattern]["owners"]
+                strategy_id = origin_pattern_map_remark_without_group[signature_origin_pattern]["strategy_id"]
+                strategy_enabled = origin_pattern_map_remark_without_group[signature_origin_pattern]["strategy_enabled"]
             # 任意一种情况都不匹配
             else:
                 remark = []
                 owners = []
+                strategy_id = 0
+                strategy_enabled = False
 
             result.append(
                 {
@@ -197,6 +218,8 @@ class PatternHandler:
                     "year_on_year_count": year_on_year_compare,
                     "year_on_year_percentage": self._year_on_year_calculate_percentage(count, year_on_year_compare),
                     "group": group,
+                    "strategy_id": strategy_id,
+                    "strategy_enabled": strategy_enabled,
                 }
             )
         if self._show_new_pattern:
@@ -287,7 +310,7 @@ class PatternHandler:
     def new_class_field(self) -> str:
         return f"{NEW_CLASS_FIELD_PREFIX}_{self._pattern_level}"
 
-    def _parse_pattern_aggs_result(self, pattern_field: str, aggs_result: dict) -> List[dict]:
+    def _parse_pattern_aggs_result(self, pattern_field: str, aggs_result: dict) -> list[dict]:
         aggs = aggs_result.get("aggs")
         pattern_field_aggs = aggs.get(pattern_field)
         if not pattern_field_aggs:
@@ -330,7 +353,7 @@ class PatternHandler:
                     .select(*select_fields)
                     .where(NEW_CLASS_SENSITIVITY_FIELD, "=", self.pattern_aggs_field)
                     .where(IS_NEW_PATTERN_PREFIX, "=", 1)
-                    .time_range(start_time.timestamp, end_time.timestamp)
+                    .time_range(int(start_time.timestamp()), int(end_time.timestamp()))
                     .query()
                 )
             except Exception:  # pylint: disable=broad-except
@@ -341,7 +364,7 @@ class PatternHandler:
                     .select(*select_fields)
                     .where(NEW_CLASS_SENSITIVITY_FIELD, "=", self.pattern_aggs_field)
                     .where(IS_NEW_PATTERN_PREFIX, "=", 1)
-                    .time_range(start_time.timestamp, end_time.timestamp)
+                    .time_range(int(start_time.timestamp()), int(end_time.timestamp()))
                     .query()
                 )
         else:
@@ -350,12 +373,14 @@ class PatternHandler:
                 BkData(self._clustering_config.new_cls_pattern_rt)
                 .select(*select_fields)
                 .where(NEW_CLASS_SENSITIVITY_FIELD, "=", self.new_class_field)
-                .time_range(start_time.timestamp, end_time.timestamp)
+                .time_range(int(start_time.timestamp(), int(end_time.timestamp())))
                 .query()
             )
         return {tuple(str(new_class[field]) for field in select_fields) for new_class in new_classes}
 
-    def _get_pattern_data(self):
+    def _get_pattern_data(self, patterns):
+        if not patterns:
+            return []
         start_time, end_time = generate_time_range(
             NEW_CLASS_QUERY_TIME_RANGE, self._query["start_time"], self._query["end_time"], get_local_param("time_zone")
         )
@@ -363,7 +388,11 @@ class PatternHandler:
             records = (
                 BkData(self._clustering_config.signature_pattern_rt)
                 .select("signature", "pattern")
-                .time_range(start_time=start_time.shift(days=-1).timestamp)  # 只查截止开始时间前一天的数据，避免历史数据膨胀
+                .where("signature", "IN", patterns)
+                .time_range(
+                    start_time=int(start_time.shift(days=-1).timestamp())
+                )  # 只查开始时间前1天的数据，避免历史数据膨胀
+                .limit(50000)  # 最多只拉取 5w 条
                 .query()
             )
         except Exception as e:  # pylint:disable=broad-except
@@ -375,7 +404,7 @@ class PatternHandler:
             )
             records = []
         for record in records:
-            record["pattern"] = re.sub(r'\$([a-zA-Z-_]+)', r'#\1#', record["pattern"])
+            record["pattern"] = re.sub(r"\$([a-zA-Z-_]+)", r"#\1#", record["pattern"])
         return records
 
     def set_clustering_owner(self, params: dict):
@@ -392,6 +421,7 @@ class PatternHandler:
                 bk_biz_id=self._clustering_config.bk_biz_id,
                 group_hash=ClusteringRemark.convert_groups_to_groups_hash(params["groups"]),
             )
+            .filter(source_app_code=get_external_app_code())
             .first()
         )
 
@@ -409,6 +439,33 @@ class PatternHandler:
         else:
             remark_obj.owners = owners
         remark_obj.save()
+
+        if not remark_obj.strategy_id or not remark_obj.strategy_enabled:
+            return model_to_dict(remark_obj)
+        # 更新告警组
+        if settings.USE_NEW_MONITOR_APIGATEWAY:
+            user_group = MonitorApi.search_user_groups(
+                {"bk_biz_ids": [self._clustering_config.bk_biz_id], "ids": [remark_obj.notice_group_id]}
+            )[0]
+            MonitorApi.save_notice_group(
+                params={
+                    "id": remark_obj.notice_group_id,
+                    "name": user_group["name"],
+                    "bk_biz_id": user_group["bk_biz_id"],
+                    "duty_arranges": [{"users": [{"type": "user", "id": name} for name in remark_obj.owners]}],
+                    "alert_notice": DEFAULT_ALERT_NOTICE,
+                    "action_notice": DEFAULT_ACTION_NOTICE,
+                }
+            )
+        else:
+            MonitorApi.save_notice_group(
+                params={
+                    "id": remark_obj.notice_group_id,
+                    "notice_receiver": [{"type": "user", "id": name} for name in remark_obj.owners],
+                    "bk_biz_id": self._clustering_config.bk_biz_id,
+                }
+            )
+
         return model_to_dict(remark_obj)
 
     def update_group_fields(self, group_fields: list):
@@ -436,9 +493,10 @@ class PatternHandler:
                 bk_biz_id=self._clustering_config.bk_biz_id,
                 group_hash=ClusteringRemark.convert_groups_to_groups_hash(params["groups"]),
             )
+            .filter(source_app_code=get_external_app_code())
             .first()
         )
-        now = int(arrow.now().timestamp * 1000)
+        now = int(arrow.now().timestamp() * 1000)
         # 如果不存在则新建  同时同步其它signature或origin_pattern相同的ClusteringRemark
         if method == "create":
             remark_info = {"username": get_request_username(), "create_time": now, "remark": params["remark"]}
@@ -498,9 +556,10 @@ class PatternHandler:
 
     def get_signature_owners(self) -> list:
         # 获取 AiopsSignatureAndPattern 表中的 signature 和 origin_pattern 字段的值
-        owners = ClusteringRemark.objects.filter(bk_biz_id=self._clustering_config.bk_biz_id).values_list(
-            'owners', flat=True
-        )
+        owners = ClusteringRemark.objects.filter(
+            bk_biz_id=self._clustering_config.bk_biz_id,
+            source_app_code=get_external_app_code(),
+        ).values_list("owners", flat=True)
         result = set()
         for owner in owners:
             result.update(owner)

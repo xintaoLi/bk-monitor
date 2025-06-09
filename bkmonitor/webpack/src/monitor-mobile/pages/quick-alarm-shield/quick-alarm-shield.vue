@@ -51,14 +51,35 @@
       <div class="shield-section-detail">
         <div
           v-for="(item, index) in shieldContent"
-          class="detail-item"
+          :class="['detail-item', { 'is-dimension': item.name === $t('维度') }]"
           :key="index"
         >
           <template v-if="item.type === shieldType">
             <span>
               {{ `${item.name}:` }}
             </span>
-            <span class="detail-item-span">{{ item.value }}</span>
+            <!-- 维度信息需要可复选 -->
+            <van-checkbox-group
+              v-if="item.name === $t('维度') && Array.isArray(item.value)"
+              class="detail-item-span"
+              v-model="selectedDimension"
+              icon-size="16px"
+            >
+              <van-checkbox
+                v-for="dimension in item.value"
+                :key="dimension.displayValue"
+                :name="dimension.key"
+                shape="square"
+              >
+                {{ dimension.displayValue }}
+              </van-checkbox>
+            </van-checkbox-group>
+            <span
+              v-else
+              class="detail-item-span"
+            >
+              {{ item.value }}
+            </span>
           </template>
         </div>
       </div>
@@ -116,10 +137,10 @@
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 
-import { Grid, GridItem, Popup, Radio, RadioGroup } from 'vant';
+import { Checkbox, CheckboxGroup, Grid, GridItem, Popup, Radio, RadioGroup } from 'vant';
 
 import { quickShield } from '../../../monitor-api/modules/mobile_event';
-import DatetimePicker, { ITimeObj } from '../../components/datetime-picker/datetime-picker.vue';
+import DatetimePicker, { type ITimeObj } from '../../components/datetime-picker/datetime-picker.vue';
 import FooterButton from '../../components/footer-button/footer-button.vue';
 import AlarmModule from '../../store/modules/alarm-info';
 import EventModule from '../../store/modules/event-detail';
@@ -127,6 +148,12 @@ import EventModule from '../../store/modules/event-detail';
 interface IRadioList {
   name: string;
   value: string;
+}
+interface IDimensionItem {
+  displayValue: string;
+  displayKey: string;
+  value: string;
+  key: string;
 }
 interface IDataPickerList {
   id: number;
@@ -136,9 +163,10 @@ interface IDataPickerList {
 interface IShieldItem {
   type: string;
   name: string;
-  value: string;
+  value: IDimensionItem[] | string;
 }
 interface IEentDetail {
+  dimensions: IDimensionItem[];
   dimensionMessage: string;
   strategyName: string;
   targetMessage: string;
@@ -147,11 +175,11 @@ interface IEentDetail {
 }
 enum TimeSemantics {
   TenMinutes = 1,
-  ThirtyMinutes,
-  TwelveHour,
-  OneDays,
-  SevenDays,
-  Custom,
+  ThirtyMinutes = 2,
+  TwelveHour = 3,
+  OneDays = 4,
+  SevenDays = 5,
+  Custom = 6,
 }
 
 @Component({
@@ -159,6 +187,8 @@ enum TimeSemantics {
   components: {
     [RadioGroup.name]: RadioGroup,
     [Radio.name]: Radio,
+    [CheckboxGroup.name]: CheckboxGroup,
+    [Checkbox.name]: Checkbox,
     DatetimePicker,
     [Popup.name]: Popup,
     [Grid.name]: Grid,
@@ -179,9 +209,11 @@ export default class AlarmDetail extends Vue {
   private loading = false;
   private minDate: Date = new Date(); // 可选的最小时间
   private shieldContent: IShieldItem[] = []; // 屏蔽内容
+  private selectedDimension: string[] = []; // 选择的维度信息
   private endTime = ''; // 截止时间
   private eventDetail: IEentDetail = {
     // 事件详情
+    dimensions: [],
     dimensionMessage: '',
     strategyName: '',
     targetMessage: '',
@@ -196,10 +228,7 @@ export default class AlarmDetail extends Vue {
 
   created() {
     this.radioList = {
-      type: [
-        { name: this.$tc('事件屏蔽'), value: 'event' },
-        { name: this.$tc('策略屏蔽'), value: 'strategy' },
-      ],
+      type: [{ name: this.$tc('事件屏蔽'), value: 'event' }],
       reason: [
         { name: this.$tc('变更中'), value: '变更中' },
         { name: this.$tc('无关紧要'), value: '无关紧要' },
@@ -237,6 +266,7 @@ export default class AlarmDetail extends Vue {
       AlarmModule.getEventNum(),
     ]);
     this.eventDetail = eventDetail;
+    this.selectedDimension = this.eventDetail.dimensions?.map(item => item.key) || []; // 默认选中所有维度信息
     this.handleSetRadioList();
     this.shieldContent = [
       {
@@ -247,7 +277,7 @@ export default class AlarmDetail extends Vue {
       {
         type: 'event',
         name: this.$tc('维度'),
-        value: this.eventDetail.dimensionMessage,
+        value: this.eventDetail.dimensions,
       },
       {
         type: 'strategy',
@@ -320,12 +350,15 @@ export default class AlarmDetail extends Vue {
       return;
     }
     this.loading = true;
-    const params = {
+    const params: Record<string, any> = {
       event_id: this.eventId,
       type: this.shieldType,
       end_time: this.endTime,
       desc: this.reason,
     };
+    if (this.shieldType === 'event') {
+      params.dimension_keys = this.selectedDimension;
+    }
     quickShield(params)
       .then(() => {
         this.$router.back();
@@ -396,6 +429,38 @@ export default class AlarmDetail extends Vue {
 
         &-span {
           word-break: break-all;
+        }
+      }
+
+      .is-dimension {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+
+        span {
+          flex-shrink: 0;
+        }
+
+        .detail-item-span {
+          width: 100%;
+          padding-bottom: 5px;
+          margin-left: 4px;
+          overflow: hidden;
+        }
+
+        .van-checkbox {
+          padding-bottom: 5px;
+          border-bottom: 1px solid #ebecf1;
+
+          & + .van-checkbox {
+            margin-top: 5px;
+          }
+        }
+
+        :deep(.van-checkbox__label) {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       }
     }

@@ -47,11 +47,17 @@ export default defineComponent({
       if (['default', '100%'].includes(props.width as string)) {
         return {
           width: '100%',
+          minWidth: `${props.minWidth}px`,
         };
       }
       return {
         width: `${props.width}px`,
-        minWidth: typeof props.minWidth === 'number' ? `${props.minWidth}px` : `${props.width}px`,
+        minWidth:
+          typeof props.minWidth === 'number'
+            ? Number(props.width) < Number(props.minWidth)
+              ? `${props.width}px`
+              : `${props.minWidth}px`
+            : `${props.width}px`,
       };
     });
 
@@ -73,22 +79,27 @@ export default defineComponent({
       if (props.resize) {
         nextTick(() => {
           const container = refRoot.value?.closest('.bklog-result-container') as HTMLElement;
-          const guideLineElement = container.querySelector('.resize-guide-line') as HTMLElement;
+          const guideLineElement = container?.querySelector('.resize-guide-line') as HTMLElement;
 
           const setGuidLeft = event => {
             const client = event.client;
-            const containerRect = container.getBoundingClientRect();
+            const containerRect = container?.getBoundingClientRect();
 
-            guideLineElement.style.left = `${client.x - containerRect.x}px`;
+            if (guideLineElement) {
+              guideLineElement.style.left = `${client.x - containerRect.x}px`;
+            }
           };
 
           interactjsInstance = interactjs(refRoot.value);
-          interactjsInstance.resizable({
+          interactjsInstance?.resizable({
             edges: { top: false, left: false, bottom: false, right: true },
             listeners: {
               start(event) {
-                // Show the guide line when resizing starts
-                guideLineElement.style.display = 'block';
+                if (guideLineElement) {
+                  // Show the guide line when resizing starts
+                  guideLineElement.style.display = 'block';
+                }
+
                 document.body.classList.add('no-user-select');
                 setGuidLeft(event);
               },
@@ -111,8 +122,11 @@ export default defineComponent({
                   transform: `translate(${x}px, ${y}px)`,
                 });
 
-                // Hide the guide line when resizing ends
-                guideLineElement.style.display = 'none';
+                if (guideLineElement) {
+                  // Hide the guide line when resizing ends
+                  guideLineElement.style.display = 'none';
+                }
+
                 document.body.classList.remove('no-user-select');
                 emit('resize-width', event.rect.width);
               },

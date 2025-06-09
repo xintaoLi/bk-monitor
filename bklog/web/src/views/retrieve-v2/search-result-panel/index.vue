@@ -3,13 +3,26 @@
 
   import useStore from '@/hooks/use-store';
 
+  import RetrieveHelper from '../../retrieve-helper';
   import NoIndexSet from '../result-comp/no-index-set';
+  import { throttle } from 'lodash';
+
+  // #if MONITOR_APP !== 'trace'
   import SearchResultChart from '../search-result-chart/index.vue';
   import FieldFilter from './field-filter';
   import LogClustering from './log-clustering/index';
-  import LogResult from './log-result/index';
+  // #endif
 
-  const DEFAULT_FIELDS_WIDTH = 220;
+  // #else
+  // #code const SearchResultChart = defineComponent(() => h('div'));
+  // #code const FieldFilter = defineComponent(() => h('div'));
+  // #code const LogClustering = defineComponent(() => h('div'));
+  // #endif
+
+  import LogResult from './log-result/index';
+  import { BK_LOG_STORAGE } from '@/store/store.type';
+
+  const DEFAULT_FIELDS_WIDTH = 200;
 
   const props = defineProps({
     activeTab: { type: String, default: '' },
@@ -30,9 +43,12 @@
   const totalCount = ref(0);
   const queueStatus = ref(false);
   const isTrendChartShow = ref(true);
-  const isShowFieldStatistics = ref(true);
-  const fieldFilterWidth = ref(DEFAULT_FIELDS_WIDTH);
   const heightNum = ref();
+
+  const fieldFilterWidth = computed(() => store.state.storage[BK_LOG_STORAGE.FIELD_SETTING].width);
+  const isShowFieldStatistics = computed(() => store.state.storage[BK_LOG_STORAGE.FIELD_SETTING].show);
+
+  RetrieveHelper.setLeftFieldSettingWidth(fieldFilterWidth.value);
 
   const changeTotalCount = count => {
     totalCount.value = count;
@@ -44,20 +60,41 @@
   const handleToggleChange = (isShow, height) => {
     isTrendChartShow.value = isShow;
     heightNum.value = height + 4;
+    RetrieveHelper.setTrendGraphHeight(heightNum.value);
   };
 
   const handleFieldsShowChange = status => {
-    if (status) fieldFilterWidth.value = DEFAULT_FIELDS_WIDTH;
-    isShowFieldStatistics.value = status;
+    if (status) {
+      RetrieveHelper.setLeftFieldSettingWidth(DEFAULT_FIELDS_WIDTH);
+    }
+    RetrieveHelper.setLeftFieldIsShown(!!status);
+    store.commit('updateStorage', {
+      [BK_LOG_STORAGE.FIELD_SETTING]: {
+        show: !!status,
+        width: DEFAULT_FIELDS_WIDTH,
+      },
+    });
   };
 
-  const handleFilterWidthChange = width => {
-    fieldFilterWidth.value = width;
-  };
+  const handleFilterWidthChange = throttle(width => {
+    if (width !== fieldFilterWidth.value) {
+      RetrieveHelper.setLeftFieldSettingWidth(width);
+      store.commit('updateStorage', {
+        [BK_LOG_STORAGE.FIELD_SETTING]: {
+          show: true,
+          width,
+        },
+      });
+    }
+  });
 
   const handleUpdateActiveTab = active => {
     emit('update:active-tab', active);
   };
+
+  const __IS_MONITOR_TRACE__ = computed(() => {
+    return !!window.__IS_MONITOR_TRACE__;
+  });
 
   const rightContentStyle = computed(() => {
     if (isOriginShow.value) {
@@ -74,18 +111,18 @@
 </script>
 
 <template>
-  <div class="search-result-panel flex">
+  <div :class="['search-result-panel', { flex: !__IS_MONITOR_TRACE__ }]">
     <!-- 无索引集 申请索引集页面 -->
     <NoIndexSet v-if="!pageLoading && isNoIndexSet" />
     <template v-else>
       <div :class="['field-list-sticky', { 'is-show': isShowFieldStatistics }]">
         <FieldFilter
-          v-model="isShowFieldStatistics"
+          :value="isShowFieldStatistics"
           v-bkloading="{ isLoading: isFilterLoading && isShowFieldStatistics }"
           v-log-drag="{
             minWidth: 160,
             maxWidth: 500,
-            defaultWidth: DEFAULT_FIELDS_WIDTH,
+            defaultWidth: fieldFilterWidth,
             autoHidden: false,
             theme: 'dotted',
             placement: 'left',
@@ -94,15 +131,17 @@
             onWidthChange: handleFilterWidthChange,
           }"
           v-show="isOriginShow"
+          :width="fieldFilterWidth"
           :class="{ 'filet-hidden': !isShowFieldStatistics }"
           @field-status-change="handleFieldsShowChange"
         ></FieldFilter>
       </div>
       <div
+        :style="__IS_MONITOR_TRACE__ ? undefined : rightContentStyle"
         :class="['search-result-content', { 'field-list-show': isShowFieldStatistics }]"
-        :style="rightContentStyle"
       >
         <SearchResultChart
+          :class="RetrieveHelper.randomTrendGraphClassName"
           v-show="isOriginShow"
           @change-queue-res="changeQueueRes"
           @change-total-count="changeTotalCount"

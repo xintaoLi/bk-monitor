@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -19,21 +18,19 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
-from typing import Union
 
 from django.db import IntegrityError, transaction
 from django.utils.module_loading import import_string
 
 from apps.constants import UserOperationActionEnum, UserOperationTypeEnum
 from apps.decorators import user_operation_record
-from apps.log_databus.constants import (
-    ETLProcessorChoices,
-)
+from apps.log_databus.constants import ETLProcessorChoices
 from apps.log_databus.exceptions import (
     CollectorPluginNameDuplicateException,
     CollectorPluginNotExistException,
 )
-from apps.log_databus.handlers.collector import CollectorHandler
+from apps.log_databus.handlers.collector_handler.base import CollectorHandler
+from apps.log_databus.handlers.collector_handler.host import HostCollectorHandler
 from apps.log_databus.models import CollectorConfig, CollectorPlugin, DataLinkConfig
 from apps.models import model_to_dict
 from apps.utils.local import get_request_username
@@ -47,7 +44,7 @@ def get_collector_plugin_handler(etl_processor, collector_plugin_id=None):
     }
     try:
         collector_plugin_handler = import_string(
-            "apps.log_databus.handlers.collector_plugin.{}.{}".format(etl_processor, mapping.get(etl_processor))
+            f"apps.log_databus.handlers.collector_plugin.{etl_processor}.{mapping.get(etl_processor)}"
         )
         return collector_plugin_handler(collector_plugin_id)
     except ImportError as error:
@@ -113,7 +110,7 @@ class CollectorPluginHandler:
 
         raise NotImplementedError
 
-    def _create_data_id(self, instance: Union[CollectorConfig, CollectorPlugin]) -> int:
+    def _create_data_id(self, instance: CollectorConfig | CollectorPlugin) -> int:
         """
         创建数据源
         """
@@ -134,6 +131,7 @@ class CollectorPluginHandler:
         is_allow_alone_data_id = params["is_allow_alone_data_id"]
         is_allow_alone_etl_config = params["is_allow_alone_etl_config"]
         is_allow_alone_storage = params["is_allow_alone_storage"]
+        is_create_storage = params.get("is_create_storage", True)
         model_fields = {
             "collector_plugin_name": collector_plugin_name,
             "description": description,
@@ -143,23 +141,28 @@ class CollectorPluginHandler:
             "is_allow_alone_etl_config": is_allow_alone_etl_config,
             "is_allow_alone_storage": is_allow_alone_storage,
             "storage_cluster_id": params.get("storage_cluster_id"),
-            "retention": params.get("retention", 1),
-            "allocation_min_days": params.get("allocation_min_days", 0),
-            "storage_replies": params.get("storage_replies", 1),
-            "storage_shards_nums": params.get("storage_shards_nums", 1),
-            "storage_shards_size": params.get("storage_shards_size", 10),
             "etl_config": params.get("etl_config"),
             "etl_params": params.get("etl_params", {}),
             "fields": params.get("fields", []),
             "params": params.get("params", []),
             "index_settings": params.get("index_settings", {}),
+            "is_create_storage": is_create_storage,
         }
+        if is_create_storage:
+            model_fields.update(
+                {
+                    "retention": params.get("retention", 1),
+                    "allocation_min_days": params.get("allocation_min_days", 0),
+                    "storage_replies": params.get("storage_replies", 1),
+                    "storage_shards_nums": params.get("storage_shards_nums", 1),
+                    "storage_shards_size": params.get("storage_shards_size", 10),
+                }
+            )
 
         is_create_public_data_id = params.get("is_create_public_data_id", False)
 
         # 创建插件
         if not self.collector_plugin:
-
             # 创建后不允许更新的参数
             bk_biz_id = params["bk_biz_id"]
             collector_plugin_name_en = params["collector_plugin_name_en"]
@@ -209,7 +212,6 @@ class CollectorPluginHandler:
 
         # 更新插件
         else:
-
             # 更新字段
             for key, val in model_fields.items():
                 setattr(self.collector_plugin, key, val)
@@ -228,7 +230,7 @@ class CollectorPluginHandler:
             self._update_or_create_etl_storage(params, is_create)
 
         # 独立存储
-        if not is_allow_alone_storage:
+        if not is_allow_alone_storage and is_create_storage:
             self._create_metadata_result_table()
 
         self.collector_plugin.save()
@@ -360,7 +362,7 @@ class CollectorPluginHandler:
         params = self.build_instance_params(params)
 
         # 创建采集项
-        return CollectorHandler().update_or_create(params)
+        return HostCollectorHandler().update_or_create(params)
 
     def update_instance(self, params: dict) -> dict:
         """
@@ -371,7 +373,7 @@ class CollectorPluginHandler:
         params = self.build_instance_params(params)
 
         # 更新采集项
-        return CollectorHandler(params["collector_config_id"]).update_or_create(params)
+        return HostCollectorHandler(params["collector_config_id"]).update_or_create(params)
 
     def create_instance_etl(self, instance: CollectorConfig, params: dict) -> dict:
         """

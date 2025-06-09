@@ -100,11 +100,13 @@ class BCSPod(BCSBase, BCSBaseResources):
         super().save(*args, **kwargs)
 
     def to_meta_dict(self):
-        return {
+        meta_dict = {
             "pod": self.name,
             "namespace": self.namespace,
-            "workload": f"{self.workload_type}:{self.workload_name}",
         }
+        if self.workload_type and self.workload_name:
+            meta_dict.update({"workload": f"{self.workload_type}:{self.workload_name}"})
+        return meta_dict
 
     @classmethod
     def get_columns(cls, columns_type="list"):
@@ -483,6 +485,7 @@ class BCSPod(BCSBase, BCSBaseResources):
 
 
 class BCSPodLabels(models.Model):
+    id = models.BigAutoField(primary_key=True)
     resource = models.ForeignKey(BCSPod, db_constraint=False, on_delete=models.CASCADE)
     label = models.ForeignKey(BCSLabel, db_constraint=False, on_delete=models.CASCADE)
     bcs_cluster_id = models.CharField(verbose_name="集群ID", max_length=128, db_index=True)

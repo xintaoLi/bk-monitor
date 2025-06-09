@@ -23,13 +23,12 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { computed, defineComponent, ref, watch, h, Ref, provide, set } from 'vue';
+import { computed, defineComponent, ref, watch, h, Ref, onBeforeUnmount, nextTick } from 'vue';
 
 import {
   parseTableRowData,
   formatDateNanos,
   formatDate,
-  copyMessage,
   setDefaultTableWidth,
   TABLE_LOG_FIELDS_SORT_REGULAR,
 } from '@/common/util';
@@ -38,32 +37,33 @@ import useLocale from '@/hooks/use-locale';
 import useResizeObserve from '@/hooks/use-resize-observe';
 import useStore from '@/hooks/use-store';
 import useWheel from '@/hooks/use-wheel';
-import { RetrieveUrlResolver } from '@/store/url-resolver';
-import { uniqueId } from 'lodash';
-import { useRoute, useRouter } from 'vue-router/composables';
 
-import ExpandView from '../original-log/expand-view.vue';
-import OperatorTools from '../original-log/operator-tools.vue';
-import { getConditionRouterParams } from '../panel-util';
+import PopInstanceUtil from '../../../../global/pop-instance-util';
+import ExpandView from '../../components/result-cell-element/expand-view.vue';
+import OperatorTools from '../../components/result-cell-element/operator-tools.vue';
 import LogCell from './log-cell';
 import { bkMessage } from 'bk-magic-vue';
 import {
   LOG_SOURCE_F,
   ROW_EXPAND,
+  ROW_F_JSON,
   ROW_F_ORIGIN_CTX,
   ROW_F_ORIGIN_OPT,
   ROW_F_ORIGIN_TIME,
   ROW_INDEX,
   ROW_KEY,
-  RowProxyData,
   SECTION_SEARCH_INPUT,
 } from './log-row-attributes';
 import RowRender from './row-render';
-import ScrollTop from './scroll-top';
+import ScrollTop from '../../components/scroll-top/index';
 import ScrollXBar from './scroll-x-bar';
 import TableColumn from './table-column.vue';
 import useLazyRender from './use-lazy-render';
 import useHeaderRender from './use-render-header';
+import RetrieveHelper, { RetrieveEvent } from '../../../retrieve-helper';
+import LogResultException from './log-result-exception';
+import { BK_LOG_STORAGE } from '../../../../store/store.type';
+import useTextAction from '../../hooks/use-text-action';
 
 import './log-rows.scss';
 
@@ -74,9 +74,6 @@ type RowConfig = {
   stickyTop?: number;
   rowMinHeight?: number;
 };
-
-type RowData = Record<string, any>;
-type ColumnFiled = Record<string, any>;
 
 export default defineComponent({
   props: {
@@ -89,167 +86,123 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { $t } = useLocale();
+
     const refRootElement: Ref<HTMLElement> = ref();
     const refTableHead: Ref<HTMLElement> = ref();
+    const refLoadMoreElement: Ref<HTMLElement> = ref();
+    const refResultRowBox: Ref<HTMLElement> = ref();
+
+    const popInstanceUtil = new PopInstanceUtil({
+      refContent: ref('智能分析'),
+      tippyOptions: {
+        appendTo: document.body,
+        placement: 'top',
+        theme: 'dark',
+      },
+    });
 
     const pageIndex = ref(1);
     // 前端本地分页
     const pageSize = ref(50);
     const isRending = ref(false);
-    const visibleRowLength = ref(50);
 
     const tableRowConfig = new WeakMap();
-    const tableCellCache = new WeakMap<RowData, WeakMap<ColumnFiled, any>>();
+    const hasMoreList = ref(true);
+    const isPageLoading = ref(RetrieveHelper.isSearching);
 
-    const renderList = ref([]);
+    let renderList = Object.freeze([]);
     const indexFieldInfo = computed(() => store.state.indexFieldInfo);
     const indexSetQueryResult = computed(() => store.state.indexSetQueryResult);
     const visibleFields = computed(() => store.state.visibleFields);
     const indexSetOperatorConfig = computed(() => store.state.indexSetOperatorConfig);
-    const formatJson = computed(() => store.state.tableJsonFormat);
-    const tableShowRowIndex = computed(() => store.state.tableShowRowIndex);
-    const tableLineIsWrap = computed(() => store.state.tableLineIsWrap);
+    const formatJson = computed(() => store.state.storage[BK_LOG_STORAGE.TABLE_JSON_FORMAT]);
+    const tableShowRowIndex = computed(() => store.state.storage[BK_LOG_STORAGE.TABLE_SHOW_ROW_INDEX]);
+    const tableLineIsWrap = computed(() => store.state.storage[BK_LOG_STORAGE.TABLE_LINE_IS_WRAP]);
     const unionIndexItemList = computed(() => store.getters.unionIndexItemList);
     const timeField = computed(() => indexFieldInfo.value.time_field);
     const timeFieldType = computed(() => indexFieldInfo.value.time_field_type);
     const isLoading = computed(() => indexSetQueryResult.value.is_loading || indexFieldInfo.value.is_loading);
-    const kvShowFieldsList = computed(() => Object.keys(indexSetQueryResult.value?.fields ?? {}) || []);
+    const kvShowFieldsList = computed(() => indexFieldInfo.value?.fields.map(f => f.field_name));
     const userSettingConfig = computed(() => store.state.retrieve.catchFieldCustomConfig);
     const tableDataSize = computed(() => indexSetQueryResult.value?.list?.length ?? 0);
     const fieldRequestCounter = computed(() => indexFieldInfo.value.request_counter);
     const isUnionSearch = computed(() => store.getters.isUnionSearch);
-    const tableList = computed(() => indexSetQueryResult.value?.list ?? []);
+    const tableList = computed<Array<any>>(() => Object.freeze(indexSetQueryResult.value?.list ?? []));
+    const gradeOption = computed(() => store.state.indexFieldInfo.custom_config?.grade_options ?? { disabled: false });
 
-    const apmRelation = computed(() => store.state.indexSetFieldConfig.apm_relation);
+    const exceptionMsg = computed(() => {
+      if (/^cancel$/gi.test(indexSetQueryResult.value?.exception_msg)) {
+        return $t('检索结果为空');
+      }
+
+      return indexSetQueryResult.value?.exception_msg || $t('检索结果为空');
+    });
 
     const fullColumns = ref([]);
     const showCtxType = ref(props.contentType);
-
-    const router = useRouter();
-    const route = useRoute();
-
-    const totalCount = computed(() => {
-      const count = store.state.indexSetQueryResult.total;
-      if (count._isBigNumber) {
-        return count.toNumber();
-      }
-
-      return count;
+    RetrieveHelper.on(RetrieveEvent.SEARCHING_CHANGE, isSearching => {
+      isPageLoading.value = isSearching;
     });
 
-    const hasMoreList = computed(
-      () => totalCount.value > tableList.value.length || pageIndex.value * pageSize.value < totalCount.value,
-    );
-
-    const intersectionArgs: Ref<RowProxyData> = ref({});
-    const rowProxy: RowProxyData = {};
-
-    const setRenderList = (length?, next?) => {
+    const setRenderList = (length?) => {
       const targetLength = length ?? tableDataSize.value;
       const inteval = 50;
 
       const appendChildNodes = () => {
-        const appendLength = targetLength - renderList.value.length;
+        const appendLength = targetLength - renderList.length;
         const stepLength = appendLength > inteval ? inteval : appendLength;
-        const startIndex = renderList.value.length - 1;
+        const startIndex = renderList.length;
 
         if (appendLength > 0) {
-          renderList.value.push(
-            ...new Array(stepLength).fill('').map((_, i) => {
-              const index = i + startIndex + 1;
-              const row = tableList.value[index];
-              return { item: row, [ROW_KEY]: `${row.dtEventTimeStamp}_${index}` };
-            }),
-          );
-          appendChildNodes();
+          const arr = [];
+          const endIndex = startIndex + stepLength;
+          const lastIndex = endIndex <= tableList.value.length ? endIndex : tableList.value.length;
+          for (let i = 0; i < lastIndex; i++) {
+            arr.push({
+              item: tableList.value[i],
+              [ROW_KEY]: `${tableList.value[i].dtEventTimeStamp}_${i}`,
+            });
+          }
 
+          renderList = Object.freeze(arr);
+          appendChildNodes();
           return;
         }
-
-        next?.();
       };
 
       appendChildNodes();
     };
 
-    const resetRowState = () => {
-      for (let i = 0; i < tableDataSize.value; i++) {
-        const target = intersectionArgs.value[`${i}`];
-        if (target && !target.visible) {
-          rowProxy[`${i}`].mounted = false;
-          set(target, 'mounted', false);
+    /**
+     * 分步更新行属性
+     * 主要是是否Json格式化
+     * @param startIndex
+     */
+    const stepUpdateRowProp = (startIndex = 0, formatJson = false) => {
+      const inteval = 50;
+      const endIndex = startIndex + inteval;
+
+      for (let i = startIndex; i < endIndex; i++) {
+        if (i < tableList.value.length) {
+          const row = tableList.value[i];
+          const config = tableRowConfig.get(row);
+          config.value[ROW_F_JSON] = formatJson;
         }
       }
-    };
 
-    /**
-     * 设置预加载区域
-     */
-    const setVisibleIndexSection = () => {
-      const idxs = Object.entries(rowProxy ?? {})
-        .filter(([, v]) => v.visible)
-        .map(([, { rowIndex }]) => rowIndex);
-
-      const length = idxs.length > 0 ? idxs.length : pageSize.value;
-      const buffer = Math.max(length, 1);
-      const max = Math.max(...idxs, 0) + buffer;
-      const min = idxs.length ? Math.min(...idxs) - buffer : 0;
-      const end = Math.min(max, tableDataSize.value);
-      const start = Math.max(min, 0);
-      visibleRowLength.value = buffer;
-      Object.assign(rowProxy, { start, end });
-    };
-
-    const delayUpdate = () => {
-      setVisibleIndexSection();
-      Object.keys(rowProxy).forEach(key => {
-        set(intersectionArgs.value, key, rowProxy[key]);
-      });
-    };
-
-    const updateIntersectionArgs = (index, visible?, height?) => {
-      if (height && rowProxy[index]?.mounted === false) {
-        rowProxy[index].mounted = true;
+      if (endIndex < tableList.value.length) {
+        requestAnimationFrame(() => stepUpdateRowProp(endIndex, formatJson));
       }
-
-      if (!rowProxy[index]) {
-        Object.assign(rowProxy, {
-          [index]: {
-            visible,
-            height,
-            rowIndex: Number(index),
-            mounted: false,
-          },
-        });
-      }
-      Object.assign(rowProxy[index], {
-        visible: visible ?? rowProxy[index].visible,
-        height: height ?? rowProxy[index].height,
-      });
     };
-
-    const intersectionObserver = new IntersectionObserver(
-      entries => {
-        entries.forEach(entry => {
-          const index = entry.target.getAttribute('data-row-index');
-          updateIntersectionArgs(index, entry.isIntersecting);
-        });
-        delayUpdate();
-      },
-      { threshold: 0.001 },
-    );
-
-    provide('intersectionObserver', intersectionObserver);
-    provide('rowProxy', intersectionArgs);
-    provide('tableCellCache', tableCellCache);
 
     const searchContainerHeight = ref(52);
 
-    const resultContainerId = ref(uniqueId('result_container_key_'));
+    const resultContainerId = ref(RetrieveHelper.logRowsContainerId);
     const resultContainerIdSelector = `#${resultContainerId.value}`;
 
     const operatorToolsWidth = computed(() => {
-      return indexSetOperatorConfig.value?.bcsWebConsole?.is_active ? 84 : 58;
+      const w = indexSetOperatorConfig.value?.bcsWebConsole?.is_active ? 84 : 58;
+      return store.getters.isAiAssistantActive ? w + 26 : w;
     });
 
     const originalColumns = computed(() => {
@@ -298,13 +251,17 @@ export default defineComponent({
         align: 'top',
         resize: true,
         renderBodyCell: ({ row }) => {
+          const config: RowConfig = tableRowConfig.get(row).value;
           return (
             // @ts-ignore
             <TableColumn
               content={getTableColumnContent(row, field)}
               field={field}
+              formatJson={config[ROW_F_JSON]}
               row={row}
-              onIcon-click={(type, content, isLink, depth) => handleIconClick(type, content, field, row, isLink, depth)}
+              onIcon-click={(type, content, isLink, depth, isNestedField) =>
+                handleIconClick(type, content, field, row, isLink, depth, isNestedField)
+              }
             ></TableColumn>
           );
         },
@@ -313,7 +270,16 @@ export default defineComponent({
           return renderHead(field, order => {
             if (sortable) {
               const sortList = order ? [[field.field_name, order]] : [];
-              store.commit('updateIndexFieldInfo', { sort_list: sortList });
+              const updatedSortList = store.state.indexFieldInfo.sort_list.map(item => {
+                if (sortList.length > 0 && item[0] === field.field_name) {
+                  return sortList[0];
+                } else if (sortList.length === 0 && item[0] === field.field_name) {
+                  return [field.field_name, 'desc'];
+                }
+                return item;
+              });
+              store.commit('updateLocalSort', true);
+              store.commit('updateIndexFieldInfo', { sort_list: updatedSortList });
               store.commit('updateIndexItemParams', { sort_list: sortList });
               store.dispatch('requestIndexSetQuery');
             }
@@ -322,16 +288,49 @@ export default defineComponent({
       };
     };
 
+    const setColWidth = (col, w = '100%') => {
+      col.minWidth = col.width - 4;
+      col.width = '100%';
+    };
+
     const getFieldColumns = () => {
       if (showCtxType.value === 'table') {
-        if (visibleFields.value.length) {
-          return visibleFields.value.map(formatColumn);
+        const columnList = [];
+        const columns = visibleFields.value.length > 0 ? visibleFields.value : fullColumns.value;
+        let maxColWidth = operatorToolsWidth.value + 40;
+        let logField = null;
+
+        columns.forEach(col => {
+          const formatValue = formatColumn(col);
+          if (col.field_name === 'log') {
+            logField = formatValue;
+          }
+
+          columnList.push(formatValue);
+          maxColWidth += formatValue.width;
+        });
+
+        if (!logField && columnList.length > 0) {
+          logField = columnList[columnList.length - 1];
         }
 
-        return fullColumns.value.map(formatColumn);
+        if (logField && offsetWidth.value > maxColWidth) {
+          setColWidth(logField);
+        }
+
+        return columnList;
       }
 
       return originalColumns.value;
+    };
+
+    const hanldeAfterExpandClick = (target: HTMLElement) => {
+      const expandTarget = target
+        .closest('.bklog-row-container')
+        ?.querySelector('.bklog-row-observe .expand-view-wrapper');
+      if (expandTarget) {
+        RetrieveHelper.highlightElement(expandTarget);
+      }
     };
 
     const leftColumns = computed(() => [
@@ -341,15 +340,24 @@ export default defineComponent({
         // 设置需要显示展开图标的列
         type: 'expand',
         title: '',
-        width: 50,
+        width: 36,
         align: 'center',
         resize: false,
         fixed: 'left',
         renderBodyCell: ({ row }) => {
           const config: RowConfig = tableRowConfig.get(row).value;
 
-          const hanldeExpandClick = () => {
+          const hanldeExpandClick = event => {
+            event.stopPropagation();
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
             config.expand = !config.expand;
+            nextTick(() => {
+              if (config.expand) {
+                hanldeAfterExpandClick(event.target);
+              }
+            });
           };
 
           return (
@@ -357,7 +365,10 @@ export default defineComponent({
               class={['bklog-expand-icon', { 'is-expaned': config.expand }]}
               onClick={hanldeExpandClick}
             >
-              <i class='bk-icon icon-play-shape'></i>
+              <i
+                style={{ color: '#4D4F56', fontSize: '9px' }}
+                class='bk-icon icon-play-shape'
+              ></i>
             </span>
           );
         },
@@ -377,27 +388,55 @@ export default defineComponent({
       },
     ]);
 
-    const rightColumns = computed(() => [
-      {
-        field: ROW_F_ORIGIN_OPT,
-        key: ROW_F_ORIGIN_OPT,
-        title: $t('操作'),
-        width: operatorToolsWidth.value,
-        fixed: 'right',
-        resize: false,
-        renderBodyCell: ({ row }) => {
-          return (
-            // @ts-ignore
-            <OperatorTools
-              handle-click={event => props.handleClickTools(event, row, indexSetOperatorConfig.value)}
-              index={row[ROW_INDEX]}
-              operator-config={indexSetOperatorConfig.value}
-              row-data={row}
-            />
-          );
+    const handleRowAIClcik = (e: MouseEvent, row: any) => {
+      const rowIndex = tableRowConfig.get(row).value[ROW_INDEX] + 1;
+      const targetRow = (e.target as HTMLElement).closest('.bklog-row-container');
+      const oldRow = targetRow?.parentElement.querySelector('.bklog-row-container.ai-active');
+
+      oldRow?.classList.remove('ai-active');
+      targetRow?.classList.add('ai-active');
+
+      props.handleClickTools('ai', row, indexSetOperatorConfig.value, rowIndex);
+    };
+
+    const rightColumns = computed(() => {
+      if (window?.__IS_MONITOR_TRACE__) {
+        return [];
+      }
+      return [
+        {
+          field: ROW_F_ORIGIN_OPT,
+          key: ROW_F_ORIGIN_OPT,
+          title: $t('操作'),
+          width: operatorToolsWidth.value,
+          fixed: 'right',
+          resize: false,
+          renderBodyCell: ({ row }) => {
+            return (
+              // @ts-ignore
+              <OperatorTools
+                handle-click={(type, event) => {
+                  if (type === 'ai') {
+                    handleRowAIClcik(event, row);
+                    return;
+                  }
+
+                  props.handleClickTools(
+                    type,
+                    row,
+                    indexSetOperatorConfig.value,
+                    tableRowConfig.get(row).value[ROW_INDEX] + 1,
+                  );
+                }}
+                index={row[ROW_INDEX]}
+                operator-config={indexSetOperatorConfig.value}
+                row-data={row}
+              />
+            );
+          },
         },
-      },
-    ]);
+      ];
+    });
 
     const getTableColumnContent = (row, field) => {
       // 日志来源 展示来源的索引集名称
@@ -407,109 +446,41 @@ export default defineComponent({
           ''
         );
       }
-      return parseTableRowData(row, field.field_name, field.field_type);
+      return parseTableRowData(row, field.field_name, field.field_type, false);
     };
 
-    const getOriginTimeShow = data => {
-      if (timeFieldType.value === 'date') {
+    const formatDateValue = (data, field_type) => {
+      if (field_type === 'date') {
         return formatDate(Number(data)) || data;
       }
       // 处理纳秒精度的UTC时间格式
-      if (timeFieldType.value === 'date_nanos') {
-        return formatDateNanos(data, true, true);
+      if (field_type === 'date_nanos') {
+        return formatDateNanos(data);
       }
       return data;
     };
 
-    const setRouteParams = () => {
-      const query = { ...route.query };
-
-      const resolver = new RetrieveUrlResolver({
-        keyword: store.getters.retrieveParams.keyword,
-        addition: store.getters.retrieveParams.addition,
-      });
-
-      Object.assign(query, resolver.resolveParamsToUrl());
-
-      router.replace({
-        query,
-      });
+    const getOriginTimeShow = data => {
+      return formatDateValue(data, timeFieldType.value);
     };
 
-    const handleAddCondition = (field, operator, value, isLink = false, depth = undefined) => {
-      store
-        .dispatch('setQueryCondition', { field, operator, value, isLink, depth })
-        .then(([newSearchList, searchMode, isNewSearchPage]) => {
-          setRouteParams();
-          if (isLink) {
-            const openUrl = getConditionRouterParams(newSearchList, searchMode, isNewSearchPage);
-            window.open(openUrl, '_blank');
-          }
-        });
+    const { handleOperation } = useTextAction(emit, 'origin');
+
+    // 替换原有的handleIconClick
+    const handleIconClick = (type, content, field, row, isLink, depth, isNestedField) => {
+      handleOperation(type, { content, field, row, isLink, depth, isNestedField });
     };
 
-    const handleTraceIdClick = traceId => {
-      if (apmRelation.value?.is_active) {
-        const { app_name: appName, bk_biz_id: bkBizId } = apmRelation.value.extra;
-        const path = `/?bizId=${bkBizId}#/trace/home?app_name=${appName}&search_type=accurate&trace_id=${traceId}`;
-        const url = `${window.__IS_MONITOR_APM__ ? location.origin : window.MONITOR_URL}${path}`;
-        window.open(url, '_blank');
-      } else {
-        bkMessage({
-          theme: 'warning',
-          message: $t('未找到相关的应用，请确认是否有Trace数据的接入。'),
-        });
-      }
-    };
-
-    const handleIconClick = (type, content, field, row, isLink, depth) => {
-      let value = ['date', 'date_nanos'].includes(field.field_type) ? row[field.field_name] : content;
-      value = String(value)
-        .replace(/<mark>/g, '')
-        .replace(/<\/mark>/g, '');
-
-      if (type === 'trace-view') {
-        handleTraceIdClick(value);
-        return;
-      }
-
-      if (type === 'search') {
-        // 将表格单元添加到过滤条件
-        handleAddCondition(field.field_name, 'eq', [value], isLink);
-        return;
-      }
-
-      if (type === 'copy') {
-        // 复制单元格内容
-        copyMessage(value);
-        return;
-      }
-
-      if (['is', 'is not', 'new-search-page-is'].includes(type)) {
-        handleAddCondition(field.field_name, type, value === '--' ? [] : [value], isLink, depth);
-        return;
-      }
-    };
-
+    // 替换原有的handleMenuClick
     const handleMenuClick = (option, isLink) => {
-      switch (option.operation) {
-        case 'is':
-        case 'is not':
-        case 'not':
-        case 'new-search-page-is':
-          const { fieldName, operation, value, depth } = option;
-          const operator = operation === 'not' ? 'is not' : operation;
-          handleAddCondition(fieldName, operator, value === '--' ? [] : [value], isLink, depth);
-          break;
-        case 'copy':
-          copyMessage(option.value);
-          break;
-        case 'display':
-          emit('fields-updated', option.displayFieldNames, undefined, false);
-          break;
-        default:
-          break;
-      }
+      handleOperation(option.operation, {
+        value: option.value,
+        fieldName: option.fieldName,
+        operation: option.operation,
+        isLink,
+        depth: option.depth,
+        displayFieldNames: option.displayFieldNames,
+      });
     };
 
     const { renderHead } = useHeaderRender();
@@ -542,53 +513,75 @@ export default defineComponent({
     };
 
     const getRowConfigWithCache = () => {
-      return [
-        ['expand', false],
-        ['isIntersect', true],
-        ['minHeight', 40],
-        ['rowMinHeight', 40],
-        ['stickyTop', 0],
-      ].reduce((cfg, item: [keyof RowConfig, any]) => Object.assign(cfg, { [item[0]]: item[1] }), {});
+      return [['expand', false]].reduce(
+        (cfg, item: [keyof RowConfig, any]) => Object.assign(cfg, { [item[0]]: item[1] }),
+        {},
+      );
     };
 
     const updateTableRowConfig = (nextIdx = 0) => {
-      for (let index = nextIdx; index < tableDataSize.value; index++) {
-        const nextRow = tableList.value[index];
-        if (!tableRowConfig.has(nextRow)) {
-          const rowKey = `${ROW_KEY}_${index}`;
-          tableRowConfig.set(
-            nextRow,
-            ref({
-              [ROW_KEY]: rowKey,
-              [ROW_INDEX]: index,
-              ...getRowConfigWithCache(),
-            }),
-          );
+      if (nextIdx >= 0) {
+        for (let index = nextIdx; index < tableDataSize.value; index++) {
+          const nextRow = tableList.value[index];
+          if (!tableRowConfig.has(nextRow)) {
+            const rowKey = `${ROW_KEY}_${index}`;
+            tableRowConfig.set(
+              nextRow,
+              ref({
+                [ROW_KEY]: rowKey,
+                [ROW_INDEX]: index,
+                [ROW_F_JSON]: formatJson.value,
+                ...getRowConfigWithCache(),
+              }),
+            );
+          }
+        }
+      }
+
+      if (nextIdx === -1) {
+        for (let index = 0; index < tableDataSize.value; index++) {
+          const nextRow = tableList.value[index];
+          tableRowConfig.delete(nextRow);
         }
       }
     };
 
     const isRequesting = ref(false);
+    let requestingTimer = null;
 
-    const debounceSetLoading = () => {
-      setTimeout(() => {
+    const debounceSetLoading = (delay = 120) => {
+      requestingTimer && clearTimeout(requestingTimer);
+      requestingTimer = setTimeout(() => {
         isRequesting.value = false;
-      }, 120);
+      }, delay);
     };
 
     const expandOption = {
       render: ({ row }) => {
+        const config = tableRowConfig.get(row);
         return (
           <ExpandView
             data={row}
             kv-show-fields-list={kvShowFieldsList.value}
             list-data={row}
-            onValue-click={(type, content, isLink, field, depth) =>
-              handleIconClick(type, content, field, row, isLink, depth)
+            row-index={config.value[ROW_INDEX]}
+            onValue-click={(type, content, isLink, field, depth, isNestedField) =>
+              handleIconClick(type, content, field, row, isLink, depth, isNestedField)
             }
           ></ExpandView>
         );
       },
+    };
+
+    const resetRowListState = (oldValSize?) => {
+      hasMoreList.value = tableDataSize.value > 0 && tableDataSize.value % 50 === 0;
+      setRenderList(null);
+      debounceSetLoading();
+      updateTableRowConfig(oldValSize ?? 0);
+
+      if (tableDataSize.value <= 50) {
+        nextTick(RetrieveHelper.updateMarkElement.bind(RetrieveHelper));
+      }
     };
 
     watch(
@@ -603,29 +596,19 @@ export default defineComponent({
     watch(
       () => [props.contentType, formatJson.value, tableLineIsWrap.value],
       () => {
-        scrollXOffsetLeft.value = 0;
+        scrollXOffsetLeft = 0;
         refScrollXBar.value?.scrollLeft(0);
-        isRending.value = true;
-        renderList.value = [];
-        pageIndex.value = 1;
 
-        setTimeout(() => {
-          showCtxType.value = props.contentType;
-          resetRowState();
-          const maxLength = Math.min(pageSize.value * pageIndex.value, tableDataSize.value);
-          setRenderList(maxLength, () => {
-            isRending.value = false;
-          });
-
-          computeRect();
-        });
+        showCtxType.value = props.contentType;
+        stepUpdateRowProp(0, formatJson.value);
+        computeRect();
       },
     );
 
     watch(
       () => [fieldRequestCounter.value],
       () => {
-        scrollXOffsetLeft.value = 0;
+        scrollXOffsetLeft = 0;
         refScrollXBar.value?.scrollLeft(0);
 
         setTimeout(() => {
@@ -647,14 +630,19 @@ export default defineComponent({
       () => isLoading.value,
       () => {
         if (!isRequesting.value) {
-          if (isLoading.value) {
-            renderList.value.length = 0;
-            renderList.value = [];
+          isRequesting.value = true;
 
+          if (isLoading.value) {
+            scrollToTop(0);
+            renderList = [];
             return;
           }
 
           setRenderList();
+        }
+
+        if (!isLoading.value) {
+          debounceSetLoading();
         }
       },
     );
@@ -662,10 +650,7 @@ export default defineComponent({
     watch(
       () => [tableDataSize.value],
       (val, oldVal) => {
-        setRenderList(null, () => {
-          debounceSetLoading();
-        });
-        updateTableRowConfig(oldVal?.[0] ?? 0);
+        resetRowListState(oldVal?.[0]);
       },
       {
         immediate: true,
@@ -713,7 +698,9 @@ export default defineComponent({
     };
 
     const loadMoreTableData = () => {
-      if (isRequesting.value) {
+      // tableDataSize.value === 0 用于判定是否是第一次渲染导致触发的请求
+      // visibleFields.value 在字段重置时会清空，所以需要判断
+      if (isRequesting.value || tableDataSize.value === 0 || visibleFields.value.length === 0) {
         return;
       }
 
@@ -721,17 +708,25 @@ export default defineComponent({
         isRequesting.value = true;
         pageIndex.value++;
         const maxLength = Math.min(pageSize.value * pageIndex.value, tableDataSize.value);
-        setRenderList(maxLength, debounceSetLoading);
+        setRenderList(maxLength);
+        debounceSetLoading(0);
+        nextTick(RetrieveHelper.updateMarkElement.bind(RetrieveHelper));
         return;
       }
 
-      if (totalCount.value > tableList.value.length) {
+      if (hasMoreList.value) {
         isRequesting.value = true;
-
-        return store.dispatch('requestIndexSetQuery', { isPagination: true }).finally(() => {
-          pageIndex.value++;
-          debounceSetLoading();
-        });
+        return store
+          .dispatch('requestIndexSetQuery', { isPagination: true })
+          .then(resp => {
+            if (resp?.size === 50) {
+              pageIndex.value++;
+            }
+          })
+          .finally(() => {
+            debounceSetLoading(0);
+            nextTick(RetrieveHelper.updateMarkElement.bind(RetrieveHelper));
+          });
       }
 
       return Promise.resolve(false);
@@ -741,98 +736,82 @@ export default defineComponent({
       searchContainerHeight.value = entry.contentRect.height;
     });
 
-    const scrollXOffsetLeft = ref(0);
+    let scrollXOffsetLeft = 0;
     const refScrollXBar = ref();
+
+    const afterScrollTop = () => {
+      pageIndex.value = 1;
+
+      const maxLength = Math.min(pageSize.value * pageIndex.value, tableDataSize.value);
+      renderList = renderList.slice(0, maxLength);
+    };
 
     // 监听滚动条滚动位置
     // 判定是否需要拉取更多数据
-    const { offsetWidth, computeRect } = useLazyRender({
+    const { offsetWidth, scrollWidth, computeRect, scrollToTop } = useLazyRender({
       loadMoreFn: loadMoreTableData,
       container: resultContainerIdSelector,
       rootElement: refRootElement,
+      refLoadMoreElement,
     });
 
-    const scrollWidth = computed(() => {
-      const callback = (acc, item) => {
-        acc = acc + (item?.width ?? 0);
-        return acc;
-      };
-
-      const leftWidth = leftColumns.value.reduce(callback, 0);
-      const rightWidth = rightColumns.value.reduce(callback, 0);
-      const visibleWidth = getFieldColumns().reduce(callback, 0);
-
-      if (isNaN(visibleWidth)) {
-        return offsetWidth.value;
+    const setRowboxTransform = () => {
+      if (refResultRowBox.value && refRootElement.value) {
+        refResultRowBox.value.scrollLeft = scrollXOffsetLeft;
+        if (refTableHead.value) {
+          refTableHead.value.style.transform = `translateX(-${scrollXOffsetLeft}px)`;
+          const fixedRight = refTableHead.value?.querySelector(
+            '.bklog-list-row .bklog-row-cell.header-cell.right',
+          ) as HTMLElement;
+          if (fixedRight) {
+            fixedRight.style.transform = `translateX(${scrollXOffsetLeft}px)`;
+          }
+        }
       }
-
-      return leftWidth + rightWidth + visibleWidth - 2;
-    });
+    };
 
     const hasScrollX = computed(() => {
-      return offsetWidth.value < scrollWidth.value;
+      return showCtxType.value === 'table' && scrollWidth.value > offsetWidth.value;
     });
 
+    let isAnimating = false;
     useWheel({
       target: refRootElement,
       callback: (event: WheelEvent) => {
         const maxOffset = scrollWidth.value - offsetWidth.value;
-
         if (event.deltaX !== 0 && hasScrollX.value) {
           event.stopPropagation();
           event.stopImmediatePropagation();
           event.preventDefault();
-
-          requestAnimationFrame(() => {
-            const nextOffset = scrollXOffsetLeft.value + event.deltaX;
-            if (nextOffset <= maxOffset && nextOffset >= 0) {
-              scrollXOffsetLeft.value += event.deltaX;
-              refScrollXBar.value?.scrollLeft(nextOffset);
-            }
-          });
+          if (!isAnimating) {
+            isAnimating = true;
+            requestAnimationFrame(() => {
+              isAnimating = false;
+              const nextOffset = scrollXOffsetLeft + event.deltaX;
+              if (nextOffset <= maxOffset && nextOffset >= 0) {
+                scrollXOffsetLeft += event.deltaX;
+                setRowboxTransform();
+                refScrollXBar.value?.scrollLeft(nextOffset);
+              }
+            });
+          }
         }
       },
     });
 
     const operatorFixRightWidth = computed(() => {
       const operatorWidth = operatorToolsWidth.value;
-      const diff = scrollWidth.value - scrollXOffsetLeft.value - offsetWidth.value;
-      return diff > operatorWidth ? 0 : operatorWidth - diff;
+      const diff = scrollWidth.value - scrollXOffsetLeft - offsetWidth.value;
+
+      return operatorWidth + (diff > 0 ? diff : 0);
     });
 
-    const setHeaderStyle = () => {
-      if (refTableHead.value) {
-        refTableHead.value.style.setProperty('transform', `translateX(-${scrollXOffsetLeft.value}px)`);
-        refTableHead.value.style.setProperty('top', `${searchContainerHeight.value}px`);
-      }
-    };
-
-    const setBodyStyle = () => {
-      if (refRootElement.value) {
-        refRootElement.value.style.setProperty('--scroll-left', `-${scrollXOffsetLeft.value}px`);
-        refRootElement.value.style.setProperty('--padding-right', `${operatorToolsWidth.value}px`);
-        refRootElement.value.style.setProperty('--fix-right-width', `${operatorFixRightWidth.value}px`);
-        refRootElement.value.style.setProperty('--scroll-width', `${Math.max(offsetWidth.value, scrollWidth.value)}px`);
-        refRootElement.value.style.setProperty(
-          '--last-column-left',
-          `${offsetWidth.value - operatorToolsWidth.value + scrollXOffsetLeft.value}px`,
-        );
-      }
-    };
-
     watch(
-      () => [
-        scrollXOffsetLeft.value,
-        operatorToolsWidth.value,
-        operatorFixRightWidth.value,
-        offsetWidth.value,
-        scrollWidth.value,
-        searchContainerHeight.value,
-      ],
+      () => [operatorFixRightWidth.value, offsetWidth.value, scrollWidth.value],
       () => {
-        setBodyStyle();
-        setHeaderStyle();
+        setRowboxTransform();
       },
+      { immediate: true },
     );
 
     const showHeader = computed(() => {
@@ -851,7 +830,7 @@ export default defineComponent({
                 key={column.key}
                 width={column.width}
                 class={[column.class ?? '', 'bklog-row-cell header-cell', column.fixed]}
-                minWidth={column.minWidth ?? 'auto'}
+                minWidth={column.minWidth > 0 ? column.minWidth : column.width}
                 resize={column.resize}
                 onResize-width={w => handleColumnWidthChange(w, column)}
               >
@@ -864,24 +843,27 @@ export default defineComponent({
     };
 
     const renderScrollTop = () => {
-      return <ScrollTop></ScrollTop>;
+      return <ScrollTop on-scroll-top={afterScrollTop}></ScrollTop>;
     };
 
     const renderRowCells = (row, rowIndex) => {
       const { expand } = tableRowConfig.get(row).value;
-      const opStyle = {
-        width: `${operatorToolsWidth.value}px`,
-        minWidth: `${operatorToolsWidth.value}px`,
-      };
 
       return [
-        <div class='bklog-list-row'>
+        <div
+          class='bklog-list-row'
+          data-row-index={rowIndex}
+          data-row-click
+        >
           {[...leftColumns.value, ...getFieldColumns(), ...rightColumns.value].map(column => {
             const width = ['100%', 'default', 'auto'].includes(column.width) ? column.width : `${column.width}px`;
             const cellStyle = {
               width,
               minWidth: column.minWidth ? `${column.minWidth}px` : `${column.width}px`,
             };
+            if (typeof column.minWidth === 'number' && column.width < column.minWidth) {
+              cellStyle.minWidth = `${column.width}px`;
+            }
             return (
               <div
                 key={`${rowIndex}-${column.key}`}
@@ -892,31 +874,30 @@ export default defineComponent({
               </div>
             );
           })}
-          <div
-            style={opStyle}
-            class={['hidden-field bklog-row-cell']}
-          ></div>
         </div>,
         expand ? expandOption.render({ row }) : '',
       ];
     };
 
     const renderRowVNode = () => {
-      return renderList.value.map((row, rowIndex) => {
-        return (
+      return renderList.map((row, rowIndex) => {
+        const logLevel = gradeOption.value.disabled ? '' : RetrieveHelper.getLogLevel(row.item, gradeOption.value);
+
+        return [
           <RowRender
             key={row[ROW_KEY]}
-            class={['bklog-row-container']}
+            class={['bklog-row-container', logLevel ?? 'normal']}
             row-index={rowIndex}
           >
             {renderRowCells(row.item, rowIndex)}
-          </RowRender>
-        );
+          </RowRender>,
+        ];
       });
     };
 
     const handleScrollXChanged = (event: MouseEvent) => {
-      scrollXOffsetLeft.value = (event.target as HTMLElement).scrollLeft;
+      scrollXOffsetLeft = (event.target as HTMLElement)?.scrollLeft;
+      setRowboxTransform();
     };
 
     const renderScrollXBar = () => {
@@ -940,7 +921,7 @@ export default defineComponent({
       }
 
       if (!isRequesting.value && !hasMoreList.value && tableDataSize.value > 0) {
-        return `已加载所有数据: 共计${tableDataSize.value}条`;
+        return ` - 已加载所有数据: 共计 ${tableDataSize.value} 条 - `;
       }
 
       return '';
@@ -948,14 +929,20 @@ export default defineComponent({
 
     const renderLoader = () => {
       return (
-        <div class={['bklog-requsting-loading']}>
-          <div style={{ width: `${offsetWidth.value}px` }}>{loadingText.value}</div>
+        <div
+          ref={refLoadMoreElement}
+          class={['bklog-requsting-loading']}
+        >
+          <div style={{ width: `${offsetWidth.value}px`, minWidth: '100%' }}>{loadingText.value}</div>
         </div>
       );
     };
 
     const renderFixRightShadow = () => {
-      if (tableDataSize.value > 0) {
+      if (window?.__IS_MONITOR_TRACE__) {
+        return null;
+      }
+      if (tableDataSize.value > 0 && showCtxType.value === 'table') {
         return <div class='fixed-right-shadown'></div>;
       }
 
@@ -963,11 +950,83 @@ export default defineComponent({
     };
 
     const isTableLoading = computed(() => {
-      return (isRequesting.value && !isRequesting.value && tableDataSize.value === 0) || isRending.value;
+      return (
+        tableDataSize.value === 0 && (isRequesting.value || isRending.value || isPageLoading.value || isLoading.value)
+      );
+    });
+
+    const exceptionType = computed(() => {
+      if (tableDataSize.value === 0) {
+        if (isRequesting.value || isLoading.value || isPageLoading.value) {
+          return 'loading';
+        }
+
+        if ($t('检索结果为空') === exceptionMsg.value) {
+          return 'search-empty';
+        }
+
+        if (/^index-set-not-found/.test(exceptionMsg.value)) {
+          return 'index-set-not-found';
+        }
+
+        if (/^index-set-field-not-found/.test(exceptionMsg.value)) {
+          return 'index-set-field-not-found';
+        }
+
+        return exceptionMsg.value.length ? 'error' : 'empty';
+      }
+
+      return 'hidden';
+    });
+
+    const getExceptionRender = () => {
+      return (
+        <LogResultException
+          type={exceptionType.value}
+          message={exceptionMsg.value}
+        ></LogResultException>
+      );
+    };
+
+    const onRootClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      if (
+        (target?.hasAttribute('data-row-click') && target?.hasAttribute('data-row-index')) ||
+        !(
+          target?.classList.contains('segment-content') ||
+          target?.classList.contains('bklog-json-view-icon-expand') ||
+          target?.classList.contains('bklog-json-view-icon-text') ||
+          target?.classList.contains('black-mark') ||
+          target?.parentElement?.classList.contains('segment-content')
+        )
+      ) {
+        const row = target.hasAttribute('data-row-index') ? target : target.closest('[data-row-click]');
+        const index = parseInt(row?.getAttribute?.('data-row-index') ?? '-1', 10);
+
+        if (index >= 0) {
+          const { item } = renderList[index] ?? {};
+          if (item) {
+            const config: RowConfig = tableRowConfig.get(item).value;
+            config.expand = !config.expand;
+            nextTick(() => {
+              if (config.expand) {
+                hanldeAfterExpandClick(target);
+              }
+            });
+          }
+        }
+      }
+    };
+
+    onBeforeUnmount(() => {
+      popInstanceUtil.uninstallInstance();
+      resetRowListState(-1);
     });
 
     return {
       refRootElement,
+      refResultRowBox,
       isTableLoading,
       renderRowVNode,
       renderFixRightShadow,
@@ -975,12 +1034,14 @@ export default defineComponent({
       renderScrollXBar,
       renderLoader,
       renderHeadVNode,
+      getExceptionRender,
+      onRootClick,
       tableDataSize,
       resultContainerId,
       hasScrollX,
       showHeader,
       isRequesting,
-      isLoading,
+      exceptionMsg,
     };
   },
   render() {
@@ -989,24 +1050,17 @@ export default defineComponent({
         ref='refRootElement'
         class={['bklog-result-container', { 'has-scroll-x': this.hasScrollX, 'show-header': this.showHeader }]}
         v-bkloading={{ isLoading: this.isTableLoading, opacity: 0.1 }}
+        onClick={this.onRootClick}
       >
         {this.renderHeadVNode()}
         <div
           id={this.resultContainerId}
+          ref='refResultRowBox'
           class={['bklog-row-box']}
         >
           {this.renderRowVNode()}
         </div>
-        {this.tableDataSize === 0 ? (
-          <bk-exception
-            style='margin-top: 100px;'
-            class='exception-wrap-item exception-part'
-            scene='part'
-            type='search-empty'
-          >
-            {this.isRequesting || this.isLoading ? 'loading...' : this.$t('检索结果为空')}
-          </bk-exception>
-        ) : null}
+        {this.getExceptionRender()}
         {this.renderFixRightShadow()}
         {this.renderScrollXBar()}
         {this.renderLoader()}

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2021 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,9 +7,9 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 import json
 import logging
-from typing import Dict, List, Optional
 
 import requests
 
@@ -26,12 +25,13 @@ from metadata.models.space.constants import (
     SpaceTypes,
 )
 from metadata.models.space.space_table_id_redis import SpaceTableIDRedis
+from metadata.models.space.utils import reformat_table_id
 from metadata.utils.redis_tools import RedisTools
 
 logger = logging.getLogger("metadata")
 
 
-def get_space_config_from_redis(space_uid: str, table_id: str) -> Dict:
+def get_space_config_from_redis(space_uid: str, table_id: str) -> dict:
     """从 redis 中获取空间配置信息"""
     key = f"{SPACE_REDIS_KEY}:{space_uid}"
     data = RedisTools.hget(key, table_id)
@@ -42,7 +42,7 @@ def get_space_config_from_redis(space_uid: str, table_id: str) -> Dict:
     return json.loads(data.decode("utf-8"))
 
 
-def get_kihan_prom_field_list(domain: str) -> List:
+def get_kihan_prom_field_list(domain: str) -> list:
     # NOTE: 因为是临时接口，访问的域名配置到 apigw，通过header 传递进来
     url = f"{domain}/api/v1/targets/metadata"
     params = {"match_target": "{namespace='pg'}"}
@@ -51,7 +51,7 @@ def get_kihan_prom_field_list(domain: str) -> List:
     return list({i["metric"] for i in metrics["data"]})
 
 
-def push_and_publish_es_space_router(space_type: str, space_id: str):
+def push_and_publish_log_space_router(space_type: str, space_id: str):
     """推送并发布es空间路由"""
     client = SpaceTableIDRedis()
     if space_type == SpaceTypes.BKCC.value:
@@ -64,9 +64,15 @@ def push_and_publish_es_space_router(space_type: str, space_id: str):
         logger.error("not found space_type: %s, space_id: %s", space_type, space_id)
         raise ValueError("not found space type")
 
+    # 二段式校验&补充
+    values_to_redis = {}
+    for key, value in values.items():
+        key = reformat_table_id(key)
+        values_to_redis[key] = value
+
     # 推送并发布
     space_uid = f"{space_type}__{space_id}"
-    RedisTools.hmset_to_redis(SPACE_TO_RESULT_TABLE_KEY, {space_uid: json.dumps(values)})
+    RedisTools.hmset_to_redis(SPACE_TO_RESULT_TABLE_KEY, {space_uid: json.dumps(values_to_redis)})
     RedisTools.publish(SPACE_TO_RESULT_TABLE_CHANNEL, [space_uid])
 
     logger.info("push and publish es space router success, space_type: %s, space_id: %s", space_type, space_id)
@@ -78,6 +84,7 @@ def push_and_publish_es_aliases(data_label: str):
         return
     # 为避免覆盖，重新获取一遍数据
     table_id_list = list(models.ResultTable.objects.filter(data_label=data_label).values_list("table_id", flat=True))
+    table_id_list = [reformat_table_id(i) for i in table_id_list]
     RedisTools.hmset_to_redis(DATA_LABEL_TO_RESULT_TABLE_KEY, {data_label: json.dumps(table_id_list)})
     RedisTools.publish(DATA_LABEL_TO_RESULT_TABLE_CHANNEL, [data_label])
 
@@ -85,7 +92,7 @@ def push_and_publish_es_aliases(data_label: str):
 
 
 def push_and_publish_es_table_id(
-    table_id: str, index_set: str, source_type: str, cluster_id: int, options: Optional[List] = None
+    table_id: str, index_set: str, source_type: str, cluster_id: int, options: list | None = None
 ):
     """推送并发布es结果表
 
@@ -106,7 +113,7 @@ def push_and_publish_es_table_id(
         "storage_id": cluster_id,
         "db": index_set,
         "measurement": "__default__",
-        'storage_type': models.ESStorage.STORAGE_TYPE,
+        "storage_type": models.ESStorage.STORAGE_TYPE,
         "options": {},
     }
     if options:
@@ -151,3 +158,38 @@ def push_and_publish_es_table_id(
         source_type,
         cluster_id,
     )
+
+
+def push_and_publish_doris_table_id_detail(
+    table_id: str,
+):
+    """
+    推送并发布doris结果表路由
+    """
+    logger.info("push_and_publish_doris_table_id_detail: table_id->[%s]", table_id)
+
+    try:
+        result_table = models.ResultTable.objects.get(table_id=table_id)
+        doris_storage = models.DorisStorage.objects.get(table_id=table_id)
+    except Exception as e:
+        logger.error(
+            "push_and_publish_doris_table_id_detail: table_id->[%s] get result table or doris storage "
+            "failed, error: [%s]",
+            table_id,
+            e,
+        )
+        raise ValueError(f"get result table or doris storage failed, table_id:{table_id}")
+
+    values = {
+        "db": doris_storage.bkbase_table_id,
+        "measurement": models.ClusterInfo.TYPE_DORIS,
+        "storage_type": "bk_sql",
+        "data_label": result_table.data_label,
+    }
+
+    RedisTools.hmset_to_redis(
+        RESULT_TABLE_DETAIL_KEY,
+        {table_id: json.dumps(values)},
+    )
+    RedisTools.publish(RESULT_TABLE_DETAIL_CHANNEL, [table_id])
+    logger.info("push and publish doris table_id detail successfully, table_id->[%s]", table_id)

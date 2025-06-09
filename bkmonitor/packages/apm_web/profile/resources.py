@@ -14,6 +14,7 @@ import json
 import logging
 from collections import defaultdict
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -107,11 +108,19 @@ class QueryServicesDetailResource(Resource):
             sample_type_parts = svr["sample_type"].split("/")
             key = svr["sample_type"]
             name = sample_type_parts[0].upper()
+            default_agg_method = settings.APM_PROFILING_AGG_METHOD_MAPPING.get(name, "SUM")
 
             if sample_type_parts[-1] == "count" and key not in cls.COUNT_ALLOW_SAMPLE_TYPES:
                 continue
 
-            res.append({"key": key, "name": name, "is_large": svr.get("is_large", False)})
+            res.append(
+                {
+                    "key": key,
+                    "name": name,
+                    "is_large": svr.get("is_large", False),
+                    "default_agg_method": default_agg_method,
+                }
+            )
 
         return res
 
@@ -154,6 +163,7 @@ class ListApplicationServicesResource(Resource):
 
     class RequestSerializer(serializers.Serializer):
         bk_biz_id = serializers.IntegerField()
+        is_get_ebpf = serializers.BooleanField(required=False, default=False)
 
     @classmethod
     def batch_query_profile_services_detail(cls, validated_data):
@@ -201,7 +211,11 @@ class ListApplicationServicesResource(Resource):
                         "services": [],
                     }
                 )
-
+        if data.get("is_get_ebpf", False):
+            deepflow_data = api.apm_api.query_ebpf_service_list(bk_biz_id=data["bk_biz_id"])
+            # 查询 deepflow 集群和 service 装载入结果
+            # 其他 ebpf 数据源数据 可横向拓展
+            apps.extend(deepflow_data)
         return {
             "normal": apps,
             "no_data": nodata_apps,
@@ -229,14 +243,14 @@ class QueryProfileBarGraphResource(Resource):
 
         labels = query_template.parse_labels(
             **query_params,
-            label_filter={"profile_id": "op_is_not_null", **filter_labels},
+            label_filter={"span_id": "op_is_not_null", **filter_labels},
             limit=self.POINT_LABEL_LIMIT,
         )
         if labels:
             trace_data[timestamp] = [
                 {
                     "time": datetime.datetime.fromtimestamp(i["time"] / 1000).strftime("%Y-%m-%d %H:%M:%S"),
-                    "span_id": i.get("labels", {}).get("profile_id", "unknown"),
+                    "span_id": i.get("labels", {}).get("span_id", "unknown"),
                 }
                 for i in labels
             ]
@@ -255,7 +269,7 @@ class QueryProfileBarGraphResource(Resource):
             end_time=end_time * 1000,
             sample_type=validate_data["data_type"],
             service_name=validate_data["service_name"],
-            label_filter={"profile_id": "op_is_not_null", **validate_data["filter_labels"]},
+            label_filter={"span_id": "op_is_not_null", **validate_data["filter_labels"]},
         )
 
         trace_data = {}

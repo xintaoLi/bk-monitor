@@ -30,9 +30,7 @@ export const ROW_EXPAND = '__component_row_expand';
 export const ROW_F_ORIGIN_TIME = '__component_origin_time';
 export const ROW_F_ORIGIN_CTX = '__component_origin_content';
 export const ROW_F_ORIGIN_OPT = '__component_table_operator';
-
-// 滚动条查询条件
-export const GLOBAL_SCROLL_SELECTOR = '.retrieve-v2-index.scroll-y';
+export const ROW_F_JSON = '__component_format_json';
 
 // 搜索框查询条件
 export const SECTION_SEARCH_INPUT = '.search-bar-wrapper';

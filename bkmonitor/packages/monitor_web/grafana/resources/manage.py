@@ -9,7 +9,9 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import json
-from collections import defaultdict
+import logging
+import traceback
+from collections import defaultdict, namedtuple
 from copy import deepcopy
 from typing import Any, Dict
 
@@ -24,8 +26,11 @@ from bkmonitor.utils.request import get_request
 from constants.data_source import DataSourceLabel
 from core.drf_resource import Resource, api, resource
 from core.errors.dashboard import GetFolderOrDashboardError
-from monitor_web.grafana.auth import GrafanaAuthSync
+from monitor.models.models import ApplicationConfig
 from monitor_web.grafana.permissions import DashboardPermission
+from monitor_web.tasks import migrate_all_panels_task
+
+logger = logging.getLogger(__name__)
 
 
 class GetDashboardList(Resource):
@@ -39,7 +44,7 @@ class GetDashboardList(Resource):
         is_starred = serializers.BooleanField(label="是否收藏", required=False)
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
 
         try:
             username = get_request().user.username
@@ -107,7 +112,8 @@ class GetDirectoryTree(Resource):
         )
 
         # 是否过滤无权限的仪表盘
-        filter_no_permission = params.get("filter_no_permission", False) or getattr(request, "external_user", False)
+        is_external_user = getattr(request, "external_user", False)
+        filter_no_permission = params.get("filter_no_permission", False) or is_external_user
 
         for record in result["data"]:
             _type = record.pop("type", "")
@@ -115,13 +121,19 @@ class GetDirectoryTree(Resource):
                 folders[record["id"]].update(record)
             elif _type == "dash-db":
                 # 过滤无权限的仪表盘
-                if filter_no_permission and record["uid"] not in dashboard_permissions and role < GrafanaRole.Viewer:
+                if (
+                    filter_no_permission
+                    and record["uid"] not in dashboard_permissions
+                    and (role < GrafanaRole.Viewer or is_external_user)
+                ):
                     continue
                 # 仪表盘是否可编辑
                 record["editable"] = (
                     role >= GrafanaRole.Editor
                     or dashboard_permissions.get(record["uid"], GrafanaPermission.View) >= GrafanaPermission.Edit
                 )
+                # 是否有权限
+                record["has_permission"] = role > GrafanaRole.Anonymous or record["uid"] in dashboard_permissions
                 folder_id = record.pop("folderId", 0)
                 record.pop("folderUid", None)
                 record.pop("folderTitle", None)
@@ -143,7 +155,7 @@ class CreateDashboardOrFolder(Resource):
         folderId = serializers.IntegerField(label="文件夹ID", default=0)
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
 
         if params["type"] == "folder":
             result = api.grafana.create_folder(org_id=org_id, title=params["title"])
@@ -193,7 +205,7 @@ class DeleteDashboard(Resource):
         uid = serializers.CharField(label="仪表盘ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         result = api.grafana.delete_dashboard_by_uid(org_id=org_id, uid=params["uid"])
         return result
 
@@ -208,7 +220,7 @@ class StarDashboard(Resource):
         dashboard_id = serializers.CharField(label="仪表盘ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         username = get_request().user.username
         result = api.grafana.star_dashboard(org_id=org_id, id=params["dashboard_id"], username=username)
         return result
@@ -224,7 +236,7 @@ class UnstarDashboard(Resource):
         dashboard_id = serializers.CharField(label="仪表盘ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         username = get_request().user.username
         result = api.grafana.unstar_dashboard(org_id=org_id, id=params["dashboard_id"], username=username)
         return result
@@ -239,7 +251,7 @@ class GetDefaultDashboard(Resource):
         bk_biz_id = serializers.IntegerField(label="业务ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         result = api.grafana.get_organization_preference(org_id=org_id)
 
         if not result["result"]:
@@ -267,7 +279,7 @@ class SetDefaultDashboard(Resource):
         dashboard_uid = serializers.CharField(label="仪表盘ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         result = api.grafana.search_folder_or_dashboard(type="dash-db", org_id=org_id)
 
         if result["result"]:
@@ -295,7 +307,7 @@ class DeleteFolder(Resource):
         uid = serializers.CharField(label="目录ID")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         result = api.grafana.delete_folder(org_id=org_id, uid=params["uid"])
         return result
 
@@ -311,7 +323,7 @@ class RenameFolder(Resource):
         title = serializers.CharField(label="目录名称")
 
     def perform_request(self, params):
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         folder_data = api.grafana.get_folder_by_uid(org_id=org_id, uid=params["uid"])
         current_version = folder_data["data"].get("version", 1)
         result = api.grafana.update_folder(
@@ -337,7 +349,7 @@ class QuickImportDashboard(Resource):
             dash_name += ".json"
         folder_name = params["folder_name"]
         folder_id = 0
-        org_id = GrafanaAuthSync.get_or_create_org_id(bk_biz_id)
+        org_id = get_or_create_org(bk_biz_id)["id"]
         # 确定存放目录
         if folder_name and folder_name != "General":
             folder_list = api.grafana.search_folder_or_dashboard(type="dash-folder", org_id=org_id, query=folder_name)[
@@ -370,7 +382,7 @@ class CopyDashboardToFolder(Resource):
 
     def perform_request(self, params):
         # 1. 获取源仪表盘信息
-        org_id = GrafanaAuthSync.get_or_create_org_id(params["bk_biz_id"])
+        org_id = get_or_create_org(params["bk_biz_id"])["id"]
         dashboard_info = api.grafana.get_dashboard_by_uid(org_id=org_id, uid=params["dashboard_uid"])
         dashboard = dashboard_info.get("data", {}).get("dashboard")
 
@@ -421,12 +433,17 @@ class MigrateOldPanels(Resource):
     将旧版 panels 迁移到新版本
     """
 
+    PanelMigrationConfig = namedtuple('PanelMigrationConfig', ['old_type', 'new_type', 'method_name'])
+    GRAPH_TO_TIMESERIES = PanelMigrationConfig("graph", "timeseries", "graph_to_timeseries")
+    OLD_TABLE_TO_NEW = PanelMigrationConfig("table-old", "table", "oldtable_to_newtable")
+    OLD_PIECHART_TO_NEW = PanelMigrationConfig("grafana-piechart-panel", "piechart", "old_piechart_to_new")
+    PANEL_MIGRATIONS = [GRAPH_TO_TIMESERIES, OLD_TABLE_TO_NEW, OLD_PIECHART_TO_NEW]
+
     class RequestSerializer(serializers.Serializer):
         bk_biz_id = serializers.IntegerField(label="业务ID", required=True)
         dashboard_uid = serializers.CharField(label="仪表盘UID", required=True)
 
-    @staticmethod
-    def graph_to_timeseries(panel: Dict):
+    def graph_to_timeseries(self, panel: Dict):
         """
         将旧版 graph 面板 迁移到新版本的 timeseries 面板
         """
@@ -435,7 +452,7 @@ class MigrateOldPanels(Resource):
 
         # panel 基本信息
         panel["id"] = old_panel["id"]
-        panel["type"] = "timeseries"
+        panel["type"] = self.GRAPH_TO_TIMESERIES.new_type
         panel["title"] = old_panel.get("title", "Panel Title")
         panel["gridPos"] = old_panel["gridPos"]
         panel["datasource"] = old_panel["datasource"]
@@ -540,8 +557,7 @@ class MigrateOldPanels(Resource):
         if overrides:
             panel["fieldConfig"]["overrides"] = overrides
 
-    @staticmethod
-    def oldtable_to_newtable(panel: Dict):
+    def oldtable_to_newtable(self, panel: Dict):
         """
         将旧版 table 面板 迁移到新版本的 table 面板
         """
@@ -550,7 +566,7 @@ class MigrateOldPanels(Resource):
 
         # panel 基本信息
         panel["id"] = old_panel["id"]
-        panel["type"] = "table"
+        panel["type"] = self.OLD_TABLE_TO_NEW.new_type
         panel["title"] = old_panel.get("title", "Panel Title")
         panel["gridPos"] = old_panel["gridPos"]
         panel["datasource"] = old_panel["datasource"]
@@ -598,20 +614,83 @@ class MigrateOldPanels(Resource):
 
             panel["fieldConfig"]["overrides"].append(override)
 
-    def migrate_panel(self, panel: Dict, is_migrate: bool):
+    def old_piechart_to_new(self, panel: Dict):
+        """
+        将旧版 piechart 面板 迁移到新版本的 piechart 面板
+        """
+        old_panel = deepcopy(panel)
+        panel.clear()
+
+        # panel 基本信息
+        panel["id"] = old_panel["id"]
+        panel["type"] = self.OLD_PIECHART_TO_NEW.new_type
+        panel["title"] = old_panel.get("title", "Panel Title")
+        panel["gridPos"] = old_panel["gridPos"]
+        panel["datasource"] = old_panel["datasource"]
+        panel["targets"] = old_panel["targets"]
+
+        # 图例迁移
+        old_legend = old_panel.get("legend", {})
+        legend_type_map = {"Under graph": "bottom", "Right side": "right", "On graph": "right"}
+        legend_values = []
+        if old_legend.get("percentage"):
+            legend_values.append("percent")
+        if old_legend.get("values"):
+            legend_values.append("value")
+        legend = {
+            "showLegend": old_legend.get("show", True),
+            "displayMode": "table",  # 旧版没有这个相关配置字段，直接是表格形式展示
+            "placement": legend_type_map[old_panel.get("legendType", "Right side")],
+            "values": legend_values if legend_values else ["percent"],
+        }
+        panel["options"] = {
+            # 以下是使用新版饼图的默认配置
+            "reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": ""},
+            "tooltip": {"mode": "single", "sort": "none"},
+            # 以下是与旧版饼图映射后的配置
+            "legend": legend,
+            "displayLabels": ["name", "value", "percent"] if old_panel.get("legendType") == "On graph" else [],
+            "pieType": old_panel.get("pieType", "pie"),
+        }
+
+        # 自定义配置，使用新版饼图的默认配置
+        panel["fieldConfig"] = {
+            "defaults": {
+                "custom": {"hideFrom": {"tooltip": False, "viz": False, "legend": False}},
+                "color": {"mode": "palette-classic"},
+                "mappings": [],
+                "links": [],
+            },
+            "overrides": [],
+        }
+
+    def migrate_panel(self, panel: Dict, is_migrate: bool, migrated_panels_details: Dict):
         """
         将旧版 panels 迁移到新版本
         """
         panel_type = panel.get("type")
+        old_panel = deepcopy(panel)
 
-        # 面板为 graph 时，进行转换为 timeseries 面板
-        if panel_type == "graph":
-            self.graph_to_timeseries(panel)
-            is_migrate = True
-        # 面板为老版 table-old 时，进行转换为新版的 table 面板
-        elif panel_type == "table-old":
-            self.oldtable_to_newtable(panel)
-            is_migrate = True
+        for panel_migration in self.PANEL_MIGRATIONS:
+            if panel_type == panel_migration.old_type:
+                try:
+                    migrated_method = getattr(self, panel_migration.method_name)
+                    migrated_method(panel)
+                except Exception as exc_info:  # noqa
+                    logger.error(f"Old Pannel migrates failed: {panel['id']} failed. " f"{traceback.format_exc()}")
+                    panel.clear()
+                    panel.update(old_panel)
+                    migrated_panels_details["failed_details"][panel_migration.old_type]["count"] += 1
+                    migrated_panels_details["failed_details"][panel_migration.old_type]["details"].append(
+                        {"id": panel["id"], "title": panel.get("title", "Panel Title"), "error_message": str(exc_info)}
+                    )
+                else:
+                    is_migrate = True
+                    migrated_panels_details["success_details"][panel_migration.old_type]["count"] += 1
+                    migrated_panels_details["success_details"][panel_migration.old_type]["details"].append(
+                        {"id": panel["id"], "title": panel.get("title", "Panel Title")}
+                    )
+                break
         return is_migrate
 
     def perform_request(self, params):
@@ -632,26 +711,75 @@ class MigrateOldPanels(Resource):
 
         # 2. 遍历 panels 进行转换更新面板配置
         is_migrate = False
+        migrated_panels_details = {
+            "success_total": 0,
+            "failed_total": 0,
+            "success_details": {
+                panel_migration.old_type: {"count": 0, "details": []} for panel_migration in self.PANEL_MIGRATIONS
+            },
+            "failed_details": {
+                panel_migration.old_type: {"count": 0, "details": []} for panel_migration in self.PANEL_MIGRATIONS
+            },
+        }
         for panel in dashboard.get("panels", []):
             if panel.get("type") == "row":
                 for raw_panel in panel.get("panels", []):
-                    is_migrate = self.migrate_panel(raw_panel, is_migrate)
-            is_migrate = self.migrate_panel(panel, is_migrate)
+                    is_migrate = self.migrate_panel(raw_panel, is_migrate, migrated_panels_details)
+            is_migrate = self.migrate_panel(panel, is_migrate, migrated_panels_details)
+
+        # 统计迁移成功和迁移失败的 pannel 总数
+        migrated_panels_details["success_total"] = sum(
+            details["count"] for details in migrated_panels_details["success_details"].values()
+        )
+        migrated_panels_details["failed_total"] = sum(
+            details["count"] for details in migrated_panels_details["failed_details"].values()
+        )
 
         # 3. 更新仪表盘
-        if is_migrate:
-            dashboard_info.data = json.dumps(dashboard)
-            dashboard_info.save()
+        if migrated_panels_details["failed_total"]:
+            # 3.1 如果仪表盘内的面板迁移有失败的情况
+            result = api.grafana.create_or_update_dashboard_by_uid(
+                org_id=org_id,
+                dashboard=dashboard,
+                folderId=dashboard_info.folder_id,
+                overwrite=False,
+            )
+
+            if not result["result"]:
+                return {
+                    "result": False,
+                    "message": result["message"],
+                    "code": 500,
+                    "data": {},
+                }
+            else:
+                return {
+                    "result": True,
+                    "message": "Migration completed. Some panels may have failed to migrate.",
+                    "code": 200,
+                    "data": migrated_panels_details,
+                }
+        elif is_migrate:
+            # 3.1 仪表盘内的面板都成功迁移的情况
+            result = api.grafana.create_or_update_dashboard_by_uid(
+                org_id=org_id,
+                dashboard=dashboard,
+                folderId=dashboard_info.folder_id,
+                overwrite=False,
+            )
             return {
-                "result": True,
-                "message": "Migrate success.",
+                "result": result["result"],
+                "message": "Migrate success." if result["result"] else result["message"],
                 "code": 200,
-                "data": {},
+                "data": migrated_panels_details,
             }
         else:
+            # 3.2 仪表盘内的面板没有任务迁移的情况
+            old_types = [migration.old_type for migration in self.PANEL_MIGRATIONS]
             return {
                 "result": True,
-                "message": "Nothing to Migrate.",
+                "message": f"Nothing to Migrate. Only these types of panel are supported to migrate: "
+                f"{', '.join(old_types)}",
                 "code": 200,
                 "data": {},
             }
@@ -700,5 +828,37 @@ class GetRelatedStrategy(Resource):
                     "invalid_type": strategy.invalid_type,
                 }
             )
+
+        return result
+
+
+class MigrateOldPanelsByBiz(Resource):
+    """
+    全业务仪表盘旧图表迁移
+    """
+
+    class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(label="业务ID", required=True)
+
+    def perform_request(self, params):
+        org_id = get_or_create_org(str(params['bk_biz_id']))["id"]
+        task = migrate_all_panels_task.delay(params['bk_biz_id'], org_id)
+
+        return {'task_id': task.id}
+
+
+class MigratePanelsInfo(Resource):
+    """查询全业务仪表盘旧图表迁移情况"""
+
+    class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(label="业务ID", required=True)
+
+    def perform_request(self, params):
+        config = ApplicationConfig.objects.get(
+            cc_biz_id=params["bk_biz_id"],
+            key=f"{params['bk_biz_id']}_migrate_all_panels",
+        )
+        result = config.value
+        result.update({"data_updated": config.data_updated, "data_created": config.data_created})
 
         return result

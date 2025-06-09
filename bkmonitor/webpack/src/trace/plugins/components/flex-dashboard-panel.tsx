@@ -42,7 +42,7 @@ export default defineComponent({
   name: 'FlexDashboardPanelMigrated',
   props: {
     // 视图集合
-    panels: { required: true, type: Array as PropType<IPanelModel[]> },
+    panels: { required: false, type: Array as PropType<IPanelModel[]> },
     // dashboard id
     id: { required: true, type: String },
     // 自动展示初始化列数
@@ -78,7 +78,7 @@ export default defineComponent({
       () => props.panels,
       () => {
         if (!props.panels) return;
-        handleInitPanelsGridpos(props.panels);
+        handleInitPanelsGridPosition(props.panels);
         localPanels.value = handleInitLocalPanels(props.panels);
       },
       {
@@ -90,26 +90,26 @@ export default defineComponent({
       () => props.column,
       () => {
         echarts.disconnect(props.id.toString());
-        handleInitPanelsGridpos(localPanels.value);
-        handleConentEcharts();
+        handleInitPanelsGridPosition(localPanels.value);
+        handleConnectEcharts();
       }
     );
 
     onMounted(() => {
       // 等待所以子视图实例创建完进行视图示例的关联 暂定5000ms 后期进行精细化配置
-      handleConentEcharts();
+      handleConnectEcharts();
     });
 
     onBeforeUnmount(() => {
       echarts.disconnect(props.id.toString());
     });
 
-    function handleConentEcharts() {
+    function handleConnectEcharts() {
       setTimeout(() => {
         if (localPanels.value?.length < 300) {
           echarts.connect(props.id.toString());
         }
-      }, 3000);
+      }, 1500);
     }
 
     /**
@@ -117,27 +117,28 @@ export default defineComponent({
      * @param {*}
      * @return {*}
      */
-    function handleInitPanelsGridpos(panels: IPanelModel[]) {
+    function handleInitPanelsGridPosition(panels: IPanelModel[]) {
       if (!panels) return;
-      const updatePanelsGridpos = (list: IPanelModel[]) => {
-        // debugger
-        list.forEach(item => {
+      const updatePanelsGridPosition = (list: IPanelModel[]) => {
+        for (const item of list) {
           if (item.type === 'row') {
             if (item.panels?.length) {
-              updatePanelsGridpos(item.panels);
+              updatePanelsGridPosition(item.panels);
             }
           } else {
+            const displayMode = props.column === 1 ? item.options?.legend?.displayMode || 'table' : 'list';
+            const placement = props.column === 1 ? item.options?.legend?.placement || 'right' : 'bottom';
             item.options = {
               ...item.options,
               legend: {
-                displayMode: props.column === 1 ? 'table' : 'list',
-                placement: props.column === 1 ? 'right' : 'bottom',
+                displayMode,
+                placement,
               },
             } as any;
           }
-        });
+        }
       };
-      updatePanelsGridpos(panels);
+      updatePanelsGridPosition(panels);
     }
 
     function getUnGroupPanel(y: number): IPanelModel {
@@ -278,6 +279,7 @@ export default defineComponent({
               <div class={['single-chart-main', { 'has-btn': !!props.backToType }]}>
                 <div class='single-chart-wrap'>
                   <ChartWrapper
+                    groupId={props.id}
                     isAlarmView={props.isAlarmView}
                     panel={singleChartPanel.value}
                   />
@@ -286,7 +288,10 @@ export default defineComponent({
             </div>
           ) : (
             [
-              <div class='flex-dashboard'>
+              <div
+                key='flex-dashboard'
+                class='flex-dashboard'
+              >
                 {localPanels.value.map(panel => (
                   <div
                     id={`${panel.id}__key__`}
@@ -306,6 +311,7 @@ export default defineComponent({
                   >
                     <ChartWrapper
                       key={`${panel.id}__key__`}
+                      groupId={props.id}
                       isAlarmView={props.isAlarmView}
                       panel={panel}
                       onChartCheck={v => handleChartCheck(v, panel)}

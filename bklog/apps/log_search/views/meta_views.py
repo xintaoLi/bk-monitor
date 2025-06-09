@@ -24,7 +24,7 @@ import copy
 from django.conf import settings
 from django.template import engines
 from django.utils import translation
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.response import Response
 
@@ -99,7 +99,7 @@ class MetaViewSet(APIViewSet):
             "result": true
         }
         """
-        return Response(MetaHandler.get_user_spaces(get_request_username()))
+        return Response(MetaHandler.get_user_spaces())
 
     @list_route(methods=["GET"], url_path="projects")
     def list_projects(self, request):

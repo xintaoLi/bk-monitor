@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making 蓝鲸智云 - 监控平台 (BlueKing - Monitor) available.
 Copyright (C) 2017-2022 THL A29 Limited, a Tencent company. All rights reserved.
@@ -8,8 +7,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 import json
-from typing import Optional
 
 from celery import shared_task
 from django.conf import settings
@@ -24,6 +23,7 @@ from opentelemetry.semconv.trace import SpanAttributes
 
 from apm_web.constants import (
     APM_IS_SLOW_ATTR_KEY,
+    DEFAULT_APM_APP_EVENT_CONFIG,
     DEFAULT_APM_APP_QPS,
     DEFAULT_DB_CONFIG,
     DEFAULT_DB_CONFIG_CUT_KEY,
@@ -48,12 +48,14 @@ from bkm_space.api import SpaceApi
 from bkmonitor.iam import Permission, ResourceEnum
 from bkmonitor.middlewares.source import get_source_app_code
 from bkmonitor.utils import group_by
+from bkmonitor.utils.cache import lru_cache_with_ttl
 from bkmonitor.utils.db import JsonField
 from bkmonitor.utils.model_manager import AbstractRecordModel
-from bkmonitor.utils.request import get_request
+from bkmonitor.utils.request import get_request, get_request_tenant_id
 from bkmonitor.utils.time_tools import get_datetime_range
 from common.log import logger
 from constants.apm import OtlpKey, SpanKindKey, TelemetryDataType
+from constants.common import DEFAULT_TENANT_ID
 from core.drf_resource import api, resource
 
 tracer = trace.get_tracer(__name__)
@@ -74,6 +76,7 @@ class Application(AbstractRecordModel):
         ES_STORAGE_CLUSTER = "es_storage_cluster"
         ES_NUMBER_OF_REPLICAS = "es_number_of_replicas"
 
+    EVENT_CONFIG_KEY = "application_event_config"
     APDEX_CONFIG_KEY = "application_apdex_config"
     SAMPLER_CONFIG_KEY = "application_sampler_config"
     INSTANCE_NAME_CONFIG_KEY = "application_instance_name_config"
@@ -174,7 +177,7 @@ class Application(AbstractRecordModel):
         no_data_period = "no_data_period"
 
     application_id = models.IntegerField("应用Id", primary_key=True)
-    bk_biz_id = models.IntegerField("业务id")
+    bk_biz_id = models.IntegerField("业务id", db_index=True)
     app_name = models.CharField("应用名称", max_length=50)
     app_alias = models.CharField("应用别名", max_length=128)
     description = models.CharField("应用描述", max_length=255)
@@ -195,9 +198,12 @@ class Application(AbstractRecordModel):
     log_data_status = models.CharField("Log 数据状态", default=DataStatus.DISABLED, max_length=50)
     # ↓ 1 个数据字段 (由定时任务刷新)
     service_count = models.IntegerField("服务个数", default=0)
+    # 租户id
+    bk_tenant_id = models.CharField("租户ID", max_length=64, default=DEFAULT_TENANT_ID)
 
     class Meta:
         ordering = ["-update_time", "-application_id"]
+        index_together = [["bk_biz_id", "app_name"], ["update_time", "application_id"]]
 
     def __str__(self):
         return self.__repr__()
@@ -252,6 +258,13 @@ class Application(AbstractRecordModel):
                 application_id=self.application_id, relation_key=self.DEPLOYMENT_KEY
             ).values_list("relation_value", flat=True)
         )
+
+    @cached_property
+    def event_config(self):
+        config = self.get_config_by_key(self.EVENT_CONFIG_KEY)
+        if not config:
+            return DEFAULT_APM_APP_EVENT_CONFIG
+        return config.config_value
 
     @cached_property
     def apdex_config(self):
@@ -386,38 +399,44 @@ class Application(AbstractRecordModel):
         return ApmMetaConfig.get_application_config_value(self.application_id, key)
 
     @classmethod
+    @lru_cache_with_ttl(maxsize=128, ttl=60 * 10, decision_to_drop_func=lambda v: v is None)
     def get_metric_table_id(cls, bk_biz_id, app_name):
-        instance = cls.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).first()
-        if not instance:
+        try:
+            return cls.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).values_list(
+                "metric_result_table_id", flat=True
+            )[0]
+        except IndexError:
             return None
-        return instance.metric_result_table_id
 
     @classmethod
+    @lru_cache_with_ttl(maxsize=128, ttl=60 * 10, decision_to_drop_func=lambda v: v is None)
     def get_trace_table_id(cls, bk_biz_id, app_name):
-        instance = cls.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).first()
-        if not instance:
+        try:
+            return cls.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).values_list(
+                "trace_result_table_id", flat=True
+            )[0]
+        except IndexError:
             return None
-        return instance.trace_result_table_id
 
     @classmethod
     def get_application_id_by_app_name(cls, app_name: str):
         request = get_request()
-        biz_id: Optional[int] = request.biz_id
+        biz_id: int | None = request.biz_id
 
         if biz_id is None:
             try:
                 data = json.loads(request.body.decode("utf-8"))
             except (TypeError, json.JSONDecodeError):
-                raise ValueError("application({}) not found".format(app_name))
+                raise ValueError(f"application({app_name}) not found")
 
             # space_uid to biz_id
             if "space_uid" in data:
                 biz_id = SpaceApi.get_space_detail(space_uid=data["space_uid"]).bk_biz_id
 
         try:
-            return cls.objects.get(app_name=app_name, bk_biz_id=biz_id).application_id
-        except cls.DoesNotExist:
-            raise ValueError("application({}) not found".format(app_name))
+            return cls.objects.filter(bk_biz_id=biz_id, app_name=app_name).values_list("application_id", flat=True)[0]
+        except IndexError:
+            raise ValueError(f"application({app_name}) not found")
 
     @classmethod
     def get_application_by_app_id(cls, application_id):
@@ -646,6 +665,9 @@ class Application(AbstractRecordModel):
         }
         ApmMetaConfig.application_config_setup(self.application_id, self.SAMPLER_CONFIG_KEY, sampler_value)
 
+    def set_init_event_config(self):
+        ApmMetaConfig.application_config_setup(self.application_id, self.EVENT_CONFIG_KEY, DEFAULT_APM_APP_EVENT_CONFIG)
+
     def fetch_datasource_info(self, datasource_type: str, attr_name: str):
         if getattr(self, f"{datasource_type}_{attr_name}", None):
             return getattr(self, f"{datasource_type}_{attr_name}")
@@ -661,7 +683,7 @@ class Application(AbstractRecordModel):
             )
             Application.authorization_to_maintainers.delay(self.update_user, self.application_id)
         except Exception as e:  # pylint: disable=broad-except
-            logger.warning("application->({}) grant creator action failed, reason: {}".format(self.application_id, e))
+            logger.warning(f"application->({self.application_id}) grant creator action failed, reason: {e}")
 
     @property
     def is_create_finished(self):
@@ -670,12 +692,16 @@ class Application(AbstractRecordModel):
     @classmethod
     def q_filter_create_finished(cls):
         """
-        获取过滤应用未创建完成的过滤条件 (是否有 trace_table_id 和 metric_table_id)
+        获取过滤应用未开启 Trace 或 未创建完成的过滤条件 (是否有 trace_table_id 和 metric_table_id)
         """
-        return Q(
-            trace_result_table_id__isnull=False,
-            metric_result_table_id__isnull=False,
-        ) & ~(Q(trace_result_table_id="") | Q(metric_result_table_id=""))
+        return (
+            Q(is_enabled_trace=True)
+            & Q(
+                trace_result_table_id__isnull=False,
+                metric_result_table_id__isnull=False,
+            )
+            & ~(Q(trace_result_table_id="") | Q(metric_result_table_id=""))
+        )
 
     @staticmethod
     @shared_task()
@@ -689,7 +715,7 @@ class Application(AbstractRecordModel):
         except Exception as e:
             raise ValueError("get maintainers failed with error: %s", e)
 
-        permission = Permission(username=creator)
+        permission = Permission(username=creator, bk_tenant_id=get_request_tenant_id())
         for user in list(maintainers):
             permission.grant_creator_action(
                 ResourceEnum.APM_APPLICATION.create_simple_instance(app_id, {"bk_biz_id": application.bk_biz_id}),
@@ -898,9 +924,12 @@ class Application(AbstractRecordModel):
 
 
 class ApplicationRelationInfo(models.Model):
-    application_id = models.IntegerField("应用Id")
-    relation_key = models.CharField("关联Key", max_length=255)
+    application_id = models.IntegerField("应用Id", db_index=True)
+    relation_key = models.CharField("关联Key", max_length=255, db_index=True)
     relation_value = models.CharField("关联值", max_length=255)
+
+    class Meta:
+        index_together = [["application_id", "relation_key"]]
 
     @classmethod
     def add_relation(cls, application_id: int, relation_key: str, relation_value: str):
@@ -929,7 +958,7 @@ class ApmMetaConfig(models.Model):
 
     class Meta:
         unique_together = [["config_level", "level_key", "config_key"]]
-        app_label = 'apm_web'
+        app_label = "apm_web"
 
     @classmethod
     def get_all_application_config_value(cls, application_id):
@@ -1002,3 +1031,6 @@ class ApplicationCustomService(AbstractRecordModel):
     type = models.CharField(max_length=32, choices=CustomServiceType.choices(), verbose_name="服务类型")
     match_type = models.CharField(max_length=32, choices=CustomServiceMatchType.choices(), verbose_name="匹配类型")
     rule = JsonField(verbose_name="匹配规则")
+
+    class Meta:
+        index_together = [["bk_biz_id", "app_name"]]

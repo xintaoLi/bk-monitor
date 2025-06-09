@@ -93,7 +93,8 @@ export interface ITopoNode {
 export interface IDiffInfo {
   baseline: number;
   comparison: number;
-  mark: string;
+  mark: 'added' | 'changed' | 'removed' | 'unchanged';
+  diff: number;
 }
 
 export interface ITopoRelation {
@@ -118,6 +119,7 @@ export interface ITraceListItem {
 
 export interface ITraceData extends ITraceListItem {
   [key: string]: any;
+  ebpf_enabled?: boolean;
   original_data: any[];
   span_classify: ISpanClassifyItem[];
   topo_nodes: ITopoNode[];
@@ -350,6 +352,7 @@ export interface IQueryParams {
   start: number;
   end: number;
   data_type?: string;
+  agg_method?: string;
   global_query: boolean;
   profile_id?: string;
   diff_profile_id?: string;

@@ -31,11 +31,15 @@ from bkmonitor.documents import AlertDocument
 from bkmonitor.models import NO_DATA_TAG_DIMENSION, AlgorithmModel, MetricListCache
 from bkmonitor.strategy.new_strategy import parse_metric_id
 from bkmonitor.utils.range import load_agg_condition_instance
-from constants.alert import CLUSTER_PATTERN
+from constants.alert import CLUSTER_PATTERN, EventSeverity
 from constants.data_source import DataSourceLabel, DataTypeLabel
 from constants.strategy import SPLIT_DIMENSIONS
 from core.drf_resource import api
-from core.errors.alert import AIOpsFunctionAccessedError, AIOpsResultError
+from core.errors.alert import (
+    AIOpsAccessedError,
+    AIOpsFunctionAccessedError,
+    AIOpsResultError,
+)
 from core.errors.api import BKAPIError
 from core.unit import load_unit
 
@@ -43,7 +47,9 @@ logger = logging.getLogger("bkmonitor")
 
 
 class AIOPSManager(abc.ABC):
-    AIOPS_FUNCTION_NOT_ACCESSED_CODE = 1513810
+    AIOPS_FUNCTION_NOT_ACCESSED_CODE = "1513810"
+    AIOPS_FUNCTION_ACCESS_ERROR_CODE = "1513817"
+    AIOPS_FUNCTION_LOGIC_ERROR_CODE = "1583136"
     AVAILABLE_DATA_LABEL = (
         (DataSourceLabel.BK_DATA, DataTypeLabel.TIME_SERIES),
         (DataSourceLabel.BK_LOG_SEARCH, DataTypeLabel.TIME_SERIES),
@@ -238,7 +244,7 @@ class AIOPSManager(abc.ABC):
                     where = []
                     agg_dimension = []
                     metrics = []
-                    filter_dict = dimensions
+                    filter_dict = { key: value for key, value in dimensions.items() if key not in ["__NO_DATA_DIMENSION__"]}
                 else:
                     where = cls.create_where_with_dimensions(
                         query_config["agg_condition"],
@@ -268,7 +274,9 @@ class AIOPSManager(abc.ABC):
                     if algorithm["level"] == alert.severity and algorithm["type"] in AlgorithmModel.AIOPS_ALGORITHMS
                 ]
 
-                intelligent_detect_accessed = bool(query_config.get("intelligent_detect", {}).get("result_table_id"))
+                intelligent_detect_accessed = bool(
+                    query_config.get("intelligent_detect", {}).get("result_table_id")
+                ) and not query_config.get("intelligent_detect", {}).get("use_sdk", False)
 
                 extra_metrics = []
                 if not use_raw_query_config and intelligent_algorithm_list and intelligent_detect_accessed:
@@ -492,7 +500,13 @@ class DimensionDrillManager(AIOPSManager):
         }
 
         # 维度中文名映射
-        dim_mappings = {item["id"]: item["name"] for item in metric.dimensions if item.get("is_dimension", True)}
+        dim_mappings = {}
+        if metric:
+            dim_mappings = {
+                item["id"]: item["name"]
+                for item in metric.dimensions
+                if item.get("is_dimension", True)
+            }
 
         anomaly_dimensions = []
         for root_dimension in root_dimensions:
@@ -550,7 +564,13 @@ class DimensionDrillManager(AIOPSManager):
         graph_panels = []
 
         # 维度中文名映射
-        dim_mappings = {item["id"]: item["name"] for item in metric.dimensions if item.get("is_dimension", True)}
+        dim_mappings = {}
+        if metric:
+            dim_mappings = {
+                item["id"]: item["name"]
+                for item in metric.dimensions
+                if item.get("is_dimension", True)
+            }
 
         for dimension in graph_dimensions:
             base_graph_panel = copy.deepcopy(graph_panel)
@@ -558,6 +578,7 @@ class DimensionDrillManager(AIOPSManager):
             base_graph_panel["type"] = "aiops-dimension-lint"
             base_graph_panel["subTitle"] = " "
             base_graph_panel["anomaly_score"] = round(float(dimension["score"]), 2)
+            base_graph_panel["anomaly_level"] = generate_anomaly_level(base_graph_panel["anomaly_score"])
             base_graph_panel["targets"][0]["api"] = "alert.alertGraphQuery"
             base_graph_panel["targets"][0]["alias"] = ""
             base_graph_panel["targets"][0]["data"]["id"] = alert.id
@@ -572,6 +593,9 @@ class DimensionDrillManager(AIOPSManager):
             base_graph_panel["title"] = "_".join(
                 map(lambda x: f"{dim_mappings.get(x, x)}: {dimension['root'][x]}", dimension_keys)
             )
+            base_graph_panel["dimensions"] = {
+                dim_mappings.get(key, key): value for key, value in dimension["root"].items()
+            }
             base_graph_panel["anomaly_dimension_class"] = "&".join(dimension_keys)
             for condition_key in dimension_keys:
                 condition_value = dimension["root"][condition_key]
@@ -741,6 +765,7 @@ class DimensionDrillManager(AIOPSManager):
                 [
                     {
                         "anomaly_score": round(anomaly_score, 2),
+                        "anomaly_level": generate_anomaly_level(round(anomaly_score, 2)),
                         "is_anomaly": distribution_item["is_anomaly"],
                         "dimension_details": distribution_item["details"],
                     }
@@ -767,11 +792,14 @@ class DimensionDrillManager(AIOPSManager):
         :param dimension_keys: 维度列表
         :param dimension_data: 异常维度数据
         """
+        dimensions = dict(zip(dimension_keys, dimension_data[0]))
         return {
-            "id": cls.generate_id_by_dimension_dict(dict(zip(dimension_keys, dimension_data[0]))),
+            "id": cls.generate_id_by_dimension_dict(dimensions),
+            "dimensions": dimensions,
             "dimension_value": "|".join(dimension_data[0]),
             "metric_value": float(dimension_data[1]) if not math.isnan(float(dimension_data[1])) else "NaN",
             "anomaly_score": max(round(float(dimension_data[2]), 2), 0),  # 如果异常分值小于0，说明维度是正常的，则取0来作展示
+            "anomaly_level": generate_anomaly_level(max(round(float(dimension_data[2]), 2), 0)),
         }
 
     def is_enable(self):
@@ -833,6 +861,8 @@ class DimensionDrillManager(AIOPSManager):
 
             if e.data.get("code") == self.AIOPS_FUNCTION_NOT_ACCESSED_CODE:
                 raise AIOpsFunctionAccessedError({"func": _("维度下钻")})
+            elif e.data.get("code") == self.AIOPS_FUNCTION_ACCESS_ERROR_CODE:
+                raise AIOpsAccessedError({"func": _("维度下钻")})
             else:
                 raise AIOpsResultError({"err": str(e)})
 
@@ -845,6 +875,9 @@ class DimensionDrillManager(AIOPSManager):
         graph_panel = AIOPSManager.get_graph_panel(self.alert, use_raw_query_config=True)
         # 获取当前告警的指标详情
         metric_info = parse_metric_id(self.alert.event["metric"][0])
+        if "index_set_id" in metric_info:
+            metric_info["related_id"] = metric_info["index_set_id"]
+            del metric_info["index_set_id"]
         metric = MetricListCache.objects.filter(**metric_info).first()
 
         serving_output = self.get_serving_output(metric, graph_panel)
@@ -913,6 +946,8 @@ class RecommendMetricManager(AIOPSManager):
             )
             if not response["result"]:
                 logger.exception(f"aiops api serving return error: ({processing_id}): {response['message']}")
+                if self.AIOPS_FUNCTION_LOGIC_ERROR_CODE in response["message"]:
+                    return {"info": {}, "recommended_metrics": []}
                 raise AIOpsResultError({"err": response['message']})
 
             if len(response["data"]["data"][0]["output"]) == 0:
@@ -921,7 +956,9 @@ class RecommendMetricManager(AIOPSManager):
             logger.exception(f'failed to call aiops api serving({processing_id}): {e}')
 
             if e.data.get("code") == self.AIOPS_FUNCTION_NOT_ACCESSED_CODE:
-                raise AIOpsFunctionAccessedError({"func": _("指标推荐")})
+                raise AIOpsFunctionAccessedError({"func": _("维度下钻")})
+            elif e.data.get("code") == self.AIOPS_FUNCTION_ACCESS_ERROR_CODE:
+                raise AIOpsAccessedError({"func": _("维度下钻")})
             else:
                 raise AIOpsResultError({"err": str(e)})
 
@@ -1037,9 +1074,13 @@ class RecommendMetricManager(AIOPSManager):
                 }
 
                 # 维度中文名映射
-                dim_mappings = {
-                    item["id"]: item["name"] for item in metric.dimensions if item.get("is_dimension", True)
-                }
+                dim_mappings = {}
+                if metric:
+                    dim_mappings = {
+                        item["id"]: item["name"]
+                        for item in metric.dimensions
+                        if item.get("is_dimension", True)
+                    }
                 dimension_keys = sorted(dimensions.keys())
 
                 base_graph_panel["id"] = recommend_metric[0]
@@ -1048,6 +1089,7 @@ class RecommendMetricManager(AIOPSManager):
                 base_graph_panel["title"] = "_".join(
                     map(lambda x: f"{dim_mappings.get(x, x)}: {dimensions[x]}", dimension_keys)
                 )
+                base_graph_panel["dimensions"] = dimensions
                 base_graph_panel["subTitle"] = metric_name
                 base_graph_panel["bk_biz_id"] = alert.event.bk_biz_id
                 base_graph_panel["recommend_info"] = recommend_info
@@ -1184,3 +1226,18 @@ def parse_anomaly(anomaly_str, config):
         """
         result.append(item)
     return result
+
+
+def generate_anomaly_level(anomaly_score) -> str:
+    """根据异常分值生成异常级别
+
+    :param anomaly_score: 异常分值
+    :return: 异常级别
+    """
+    if anomaly_score >= 0.8:
+        return EventSeverity.FATAL
+
+    if anomaly_score >= 0.2:
+        return EventSeverity.WARNING
+
+    return EventSeverity.REMIND

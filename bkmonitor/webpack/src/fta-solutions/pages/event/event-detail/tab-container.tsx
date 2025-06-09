@@ -226,7 +226,11 @@ export default class TabContainer extends tsc<ITabContainerProps> {
     });
     return condition;
   }
-
+  // 判断当前panel是否是Promql类型的 是则不展示aiops指标推荐等功能
+  get checkPromqlPanel() {
+    const { promql, data_source_label } = this.detail?.extra_info?.strategy?.items?.[0]?.query_configs?.[0] ?? {};
+    return promql && data_source_label === 'prometheus';
+  }
   get panelsFilter() {
     /* 是否显示主机tab */
     const hasPerformance = this.detail?.dimensions?.some(item => ['bk_target_ip', 'ip'].includes(item.key));
@@ -381,62 +385,64 @@ export default class TabContainer extends tsc<ITabContainerProps> {
           ))}
         </bk-tab>
         {this.active === EPanelsNames.circulationRecord ? this.getCirculationFilterComponent() : undefined}
-        <ViewInfo
-          alertId={this.alertId}
-          detail={this.detail}
-          isScrollEnd={this.isScrollEnd}
-          show={this.active === EPanelsNames.viewInfo}
-        />
-        {!!(window as any).enable_aiops && !this.isHostAnomalyDetection && (
-          <AiopsContainer
+        <div class='tab-panel-main'>
+          <ViewInfo
+            alertId={this.alertId}
             detail={this.detail}
+            isScrollEnd={this.isScrollEnd}
             show={this.active === EPanelsNames.viewInfo}
           />
-        )}
-        <HandleExperiences
-          detail={this.detail}
-          show={this.active === EPanelsNames.handleExperience}
-        />
-        <CirculationRecord
-          actions={this.actions}
-          conditions={this.getConditions}
-          detail={this.detail}
-          isScrollEnd={this.isScrollEnd}
-          show={this.active === EPanelsNames.circulationRecord}
-          on-related-events={this.handleRelatedEvents}
-        />
-        <RelatedEvents
-          alertId={this.alertId}
-          detail={this.detail}
-          params={this.relatedEventsParams}
-          show={this.active === EPanelsNames.relatedEvents}
-        />
-        <PerformanceView
-          detail={this.detail}
-          show={this.active === EPanelsNames.performance}
-        />
-        <PerformanceView
-          detail={this.detail}
-          isProcess={true}
-          show={this.active === EPanelsNames.hostProcess}
-        />
-        {/* 日志 tab */}
-        <LogInfo
-          detail={this.detail}
-          show={this.active === EPanelsNames.logInfo}
-        />
-        {/* trace tab */}
-        <TraceInfo
-          detail={this.detail}
-          show={this.active === EPanelsNames.traceInfo}
-          traceIds={this.traceIds}
-        />
-        <SceneView
-          detail={this.detail}
-          sceneId={this.sceneId}
-          sceneName={this.sceneName}
-          show={this.active === EPanelsNames.sceneView}
-        />
+          {/* {!!(window as any).enable_aiops && !this.isHostAnomalyDetection && !this.checkPromqlPanel && (
+            <AiopsContainer
+              detail={this.detail}
+              show={this.active === EPanelsNames.viewInfo}
+            />
+          )} */}
+          <HandleExperiences
+            detail={this.detail}
+            show={this.active === EPanelsNames.handleExperience}
+          />
+          <CirculationRecord
+            actions={this.actions}
+            conditions={this.getConditions}
+            detail={this.detail}
+            isScrollEnd={this.isScrollEnd}
+            show={this.active === EPanelsNames.circulationRecord}
+            on-related-events={this.handleRelatedEvents}
+          />
+          <RelatedEvents
+            alertId={this.alertId}
+            detail={this.detail}
+            params={this.relatedEventsParams}
+            show={this.active === EPanelsNames.relatedEvents}
+          />
+          <PerformanceView
+            detail={this.detail}
+            show={this.active === EPanelsNames.performance}
+          />
+          <PerformanceView
+            detail={this.detail}
+            isProcess={true}
+            show={this.active === EPanelsNames.hostProcess}
+          />
+          {/* 日志 tab */}
+          <LogInfo
+            detail={this.detail}
+            show={this.active === EPanelsNames.logInfo}
+          />
+          {/* trace tab */}
+          <TraceInfo
+            detail={this.detail}
+            show={this.active === EPanelsNames.traceInfo}
+            traceIds={this.traceIds}
+          />
+          <SceneView
+            detail={this.detail}
+            sceneId={this.sceneId}
+            sceneName={this.sceneName}
+            show={this.active === EPanelsNames.sceneView}
+          />
+        </div>
       </div>
     );
   }

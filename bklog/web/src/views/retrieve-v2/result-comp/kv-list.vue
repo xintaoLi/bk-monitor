@@ -28,7 +28,7 @@
   <div class="kv-list-wrapper">
     <div class="kv-content">
       <div
-        v-for="(field, index) in fieldKeyMap"
+        v-for="(field, index) in renderList"
         class="log-item"
         :key="index"
       >
@@ -37,37 +37,62 @@
           class="field-label"
         >
           <span
-            class="field-type-icon mr5"
-            v-bk-tooltips="fieldTypePopover(field)"
-            :class="getFieldIcon(field)"
-            :style="{ backgroundColor: getFieldIconColor(field) }"
+            v-if="hiddenFieldsSet.has(field)"
+            class="field-eye-icon bklog-icon bklog-eye-slash"
+            v-bk-tooltips="{ content: $t('隐藏') }"
+            @click="
+              e => {
+                e.stopPropagation();
+                handleShowOrHiddenItem(true, field);
+              }
+            "
           ></span>
-          <span class="field-text">{{ field }}</span>
+          <span
+            v-else
+            class="field-eye-icon bklog-icon bklog-eye"
+            v-bk-tooltips="{ content: $t('展示') }"
+            @click="
+              e => {
+                e.stopPropagation();
+                handleShowOrHiddenItem(false, field);
+              }
+            "
+          ></span>
+          <span
+            :style="{
+              backgroundColor: getFieldIconColor(field.field_type),
+              color: getFieldIconTextColor(field.field_type),
+            }"
+            class="field-type-icon mr5"
+            v-bk-tooltips="fieldTypePopover(field.field_name)"
+            :class="getFieldIcon(field.field_name)"
+          ></span>
+          <span class="field-text">{{ getFieldName(field) }}</span>
         </div>
         <div class="field-value">
-          <template v-if="isJsonFormat(formatterStr(data, field))">
+          <template v-if="isJsonFormat(formatterStr(data, field.field_name))">
             <JsonFormatter
-              :jsonValue="formatterStr(data, field)"
-              :fields="getFieldItem(field)"
-              @menu-click="agrs => handleJsonSegmentClick(agrs, field)"
+              :fields="getFieldItem(field.field_name)"
+              :json-value="formatterStr(data, field.field_name)"
+              @menu-click="agrs => handleJsonSegmentClick(agrs, field.field_name)"
             ></JsonFormatter>
           </template>
 
           <span
-            v-if="getRelationMonitorField(field)"
+            v-if="getRelationMonitorField(field.field_name)"
             class="relation-monitor-btn"
-            @click="handleViewMonitor(field)"
+            @click="handleViewMonitor(field.field_name)"
           >
-            <span>{{ getRelationMonitorField(field) }}</span>
+            <span>{{ getRelationMonitorField(field.field_name) }}</span>
             <i class="bklog-icon bklog-jump"></i>
           </span>
-          <template v-if="!isJsonFormat(formatterStr(data, field))">
+          <template v-if="!isJsonFormat(formatterStr(data, field.field_name))">
             <text-segmentation
-              :content="formatterStr(data, field)"
-              :field="getFieldItem(field)"
-              :forceAll="true"
-              :autoWidth="true"
-              @menu-click="agrs => handleJsonSegmentClick(agrs, field)"
+              :auto-width="true"
+              :content="formatterStr(data, field.field_name)"
+              :field="getFieldItem(field.field_name)"
+              :force-all="true"
+              @menu-click="agrs => handleJsonSegmentClick(agrs, field.field_name)"
             />
           </template>
         </div>
@@ -78,11 +103,14 @@
 
 <script>
   import { getTextPxWidth, TABLE_FOUNT_FAMILY } from '@/common/util';
+  import JsonFormatter from '@/global/json-formatter.vue';
+  import { getFieldNameByField } from '@/hooks/use-field-name';
   import tableRowDeepViewMixin from '@/mixins/table-row-deep-view-mixin';
   import _escape from 'lodash/escape';
   import { mapGetters, mapState } from 'vuex';
-  import JsonFormatter from '@/global/json-formatter.vue';
+
   import TextSegmentation from '../search-result-panel/log-result/text-segmentation';
+  import { BK_LOG_STORAGE } from '@/store/store.type';
 
   export default {
     components: {
@@ -112,18 +140,10 @@
         type: Array,
         require: true,
       },
-      // apmRelation: {
-      //   type: Object,
-      //   default: () => {},
-      // },
       sortList: {
         type: Array,
         require: true,
       },
-      // retrieveParams: {
-      //   type: Object,
-      //   require: true,
-      // },
       listData: {
         type: Object,
         default: () => {},
@@ -152,6 +172,7 @@
           is: '=',
           'is not': '!=',
         },
+        renderList: [],
       };
     },
     computed: {
@@ -160,13 +181,27 @@
         retrieveParams: 'retrieveParams',
       }),
       ...mapState({
-        formatJson: state => state.tableJsonFormat,
+        formatJson: state => state.storage[BK_LOG_STORAGE.TABLE_JSON_FORMAT],
+        showFieldAlias: state => state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS],
+        isAllowEmptyField: state => state.storage[BK_LOG_STORAGE.TABLE_ALLOW_EMPTY_FIELD],
       }),
       apmRelation() {
         return this.$store.state.indexSetFieldConfig.apm_relation;
       },
       bkBizId() {
         return this.$store.state.bkBizId;
+      },
+      showFieldList() {
+        return this.totalFields.filter(item => {
+          if (this.isAllowEmptyField) {
+            return this.kvShowFieldsList.includes(item.field_name);
+          }
+
+          return (
+            this.kvShowFieldsList.includes(item.field_name) &&
+            !['--', '{}', '[]'].includes(this.formatterStr(this.data, item.field_name))
+          );
+        });
       },
       fieldKeyMap() {
         return this.totalFields
@@ -182,6 +217,9 @@
       hiddenFields() {
         return this.fieldList.filter(item => !this.visibleFields.some(visibleItem => item === visibleItem));
       },
+      hiddenFieldsSet() {
+        return new Set(this.hiddenFields);
+      },
       filedSettingConfigID() {
         // 当前索引集的显示字段ID
         return this.$store.state.retrieve.filedSettingConfigID;
@@ -191,7 +229,28 @@
         return !!this.data?.bk_host_id;
       },
     },
+    watch: {
+      isAllowEmptyField() {
+        this.onMountedRender();
+      },
+    },
+    mounted() {
+      this.onMountedRender();
+    },
     methods: {
+      onMountedRender() {
+        const size = 40;
+        let startIndex = 0;
+        this.renderList = [];
+        const setRenderList = () => {
+          if (startIndex < this.showFieldList.length) {
+            this.renderList.push(...this.showFieldList.slice(startIndex, startIndex + size));
+            startIndex = startIndex + size;
+            setTimeout(setRenderList);
+          }
+        };
+        setRenderList();
+      },
       isJsonFormat(content) {
         return this.formatJson && /^\[|\{/.test(content);
       },
@@ -220,8 +279,10 @@
         };
       },
       getFieldIconColor(type) {
-        const fieldType = this.getFieldType(type);
-        return this.fieldTypeMap?.[fieldType] ? this.fieldTypeMap?.[fieldType]?.color : '#EAEBF0';
+        return this.fieldTypeMap?.[type] ? this.fieldTypeMap?.[type]?.color : '#EAEBF0';
+      },
+      getFieldIconTextColor(type) {
+        return this.fieldTypeMap?.[type]?.textColor;
       },
       checkDisable(id, field) {
         const type = this.getFieldType(field);
@@ -233,10 +294,10 @@
       handleJsonSegmentClick({ isLink, option }, fieldName) {
         // 为了兼容旧的逻辑，先这么写吧
         // 找时间梳理下这块，写的太随意了
-        const { operation, value, depth } = option;
+        const { operation, value, depth, isNestedField } = option;
         const operator = operation === 'not' ? 'is not' : operation;
         const field = this.totalFields.find(f => f.field_name === fieldName);
-        this.$emit('value-click', operator, value, isLink, field, depth);
+        this.$emit('value-click', operator, value, isLink, field, depth, isNestedField);
       },
 
       /**
@@ -245,6 +306,9 @@
        */
       handleViewMonitor(field) {
         const key = field.toLowerCase();
+        const trace_id = String(this.data[field])
+          .replace(/<mark>/g, '')
+          .replace(/<\/mark>/g, '');
         let path = '';
         switch (key) {
           // trace检索
@@ -252,7 +316,7 @@
           case 'traceid':
             if (this.apmRelation.is_active) {
               const { app_name: appName, bk_biz_id: bkBizId } = this.apmRelation.extra;
-              path = `/?bizId=${bkBizId}#/trace/home?app_name=${appName}&search_type=accurate&trace_id=${this.data[field]}`;
+              path = `/?bizId=${bkBizId}#/trace/home?app_name=${appName}&search_type=accurate&trace_id=${trace_id}`;
             } else {
               this.$bkMessage({
                 theme: 'warning',
@@ -265,7 +329,7 @@
           case 'ip':
           case 'bk_host_id':
             {
-              const endStr = `${this.data[field]}${field === 'bk_host_id' && this.isHaveBkHostIDAndHaveValue ? '' : '-0'}`;
+              const endStr = `${trace_id}${field === 'bk_host_id' && this.isHaveBkHostIDAndHaveValue ? '' : '-0'}`;
               path = `/?bizId=${this.bkBizId}#/performance/detail/${endStr}`;
             }
             break;
@@ -279,7 +343,7 @@
         }
 
         if (path) {
-          const url = `${window.__IS_MONITOR_APM__ ? location.origin : window.MONITOR_URL}${path}`;
+          const url = `${window.__IS_MONITOR_COMPONENT__ ? location.origin : window.MONITOR_URL}${path}`;
           window.open(url, '_blank');
         }
       },
@@ -332,6 +396,26 @@
       getFieldItem(fieldName) {
         return this.fieldList.find(item => item.field_name === fieldName);
       },
+      getFieldName(field) {
+        return getFieldNameByField(field, this.$store);
+      },
+      // 显示或隐藏字段
+      handleShowOrHiddenItem(visible, field) {
+        const displayFields = [];
+        this.visibleFields.forEach(child => {
+          if (field.field_name !== child.field_name) {
+            displayFields.push(child.field_name);
+          }
+        });
+
+        if (visible) {
+          displayFields.push(field.field_name);
+        }
+        this.$store.dispatch('userFieldConfigChange', { displayFields }).then(() => {
+          this.$store.commit('resetVisibleFields', displayFields);
+          this.$store.commit('updateIsSetDefaultTableColumn');
+        });
+      },
     },
   };
 </script>
@@ -342,27 +426,63 @@
     font-family: var(--table-fount-family);
     font-size: var(--table-fount-size);
 
+    .log-item:nth-child(even) {
+      background-color: #f5f7fa;
+    }
+
+    .log-item:nth-child(odd) {
+      background-color: #ffffff;
+    }
+
     .log-item {
       display: flex;
-      align-items: baseline;
+      align-items: center;
+      justify-content: center;
       min-height: 24px;
+      padding-left: 8px;
+
+      .field-value {
+        :deep(.valid-text) {
+          &:hover {
+            text-decoration: underline; /* 悬停时添加下划线 */
+            text-decoration-color: #498eff; /* 设置下划线颜色为蓝色 */
+          }
+        }
+      }
 
       .field-label {
         display: flex;
         flex-shrink: 0;
         flex-wrap: nowrap;
-        align-items: baseline;
+        align-items: stretch;
         height: 100%;
+        margin: 5px 0;
         margin-right: 18px;
+        align-self: flex-start;
+
+        .field-eye-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 12px;
+          margin-right: 8px;
+          font-size: 12px;
+          color: #4d4f56;
+          border-radius: 2px;
+
+          &:hover {
+            color: #3a84ff;
+          }
+        }
 
         .field-type-icon {
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          width: 16px;
           min-width: 16px;
-          height: 16px;
           margin: 0 5px 0 0;
-          font-size: 12px;
+          font-size: 14px;
           color: #63656e;
           background: #dcdee5;
           border-radius: 2px;
@@ -372,6 +492,8 @@
           display: block;
           width: auto;
           overflow: hidden;
+          font-family: Roboto-Regular;
+          color: #313238;
           word-break: normal;
           word-wrap: break-word;
         }
@@ -385,17 +507,28 @@
 
       .field-value {
         display: flex;
+        align-items: flex-start;
+        color: #16171a;
         word-break: break-all;
       }
     }
 
     .relation-monitor-btn {
+      display: flex;
+      column-gap: 2px;
+      align-items: center;
       min-width: fit-content;
+      padding-top: 1px;
       padding-right: 6px;
       // margin-left: 12px;
       font-size: 12px;
+      line-height: 22px;
       color: #3a84ff;
       cursor: pointer;
+
+      .bklog-jump {
+        font-size: 14px;
+      }
     }
   }
 </style>

@@ -67,7 +67,7 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
         value: true,
       },
       tools: {
-        refleshInterval: -1,
+        refreshInterval: -1,
         timeRange: 3600000,
       },
     }),
@@ -233,6 +233,8 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
   /** 是否禁用图表分栏布局按钮 */
   disabledLayout = true;
 
+  needMenu = true;
+
   /** 查询图表时长提示 */
   get searchTipsObj(): IDataRetrievalView.ISearchTipsObj {
     return {
@@ -289,8 +291,8 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
     return timeRange;
   }
 
-  @Emit('refleshIntervalChange')
-  handleRefleshChange(val: number) {
+  @Emit('refreshIntervalChange')
+  handleRefreshChange(val: number) {
     return val;
   }
 
@@ -438,7 +440,7 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
    * @description: 强制刷新图表
    */
   @Watch('refleshNumber')
-  handleImmediateReflesh() {
+  handleImmediateRefresh() {
     if (this.retrievalType === 'monitor') this.dashboardPanelsKey = random(8);
     if (this.retrievalType === 'event') this.eventRetrievalViewRef.updateViewData();
   }
@@ -460,6 +462,12 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
   @Emit('timeRangeChangeEvent')
   handleTimeRangeChange(timeRange: EventRetrievalViewType.IEvent['onTimeRangeChange']) {
     return timeRange;
+  }
+
+  @Emit('needMenuChangeEvent')
+  handleNeedMenuChange(needMenu: boolean) {
+    this.needMenu = needMenu;
+    return needMenu;
   }
 
   /** 展示索引面板 */
@@ -502,7 +510,7 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
             favCheckedValue={this.favCheckedValue}
             compareHide={this.retrievalType === 'event'}
             hasViewChangeIcon={this.retrievalType !== 'event'}
-            on-on-immediate-reflesh={this.handleImmediateReflesh}
+            on-on-immediate-refresh={this.handleImmediateRefresh}
             on-select-fav={this.emitSelectFav}
             on-delete-fav={this.handleDeleteFav}
             on-change={this.handleComparePanelChange}
@@ -517,15 +525,15 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
           {/* <PanelHeader
             // timeRangeList={this.timeRangeListFormatter}
             timeRange={this.compareValue.tools?.timeRange}
-            refleshInterval={this.compareValue.tools.refleshInterval}
+            refreshInterval={this.compareValue.tools.refreshInterval}
             favoritesList={this.favoritesList}
             favCheckedValue={this.favCheckedValue}
             showDownSample={false}
             downSampleRange={this.downSampleRange}
             onDownSampleChange={this.handleDownSampleChange}
-            onImmediateReflesh={this.handleImmediateReflesh}
+            onImmediateRefresh={this.handleImmediateRefresh}
             onTimeRangeChange={this.handelTimeRangeChange}
-            onRefleshIntervalChange={this.handleRefleshChange}
+            onRefreshIntervalChange={this.handleRefreshChange}
             onSelectFav={this.emitSelectFav}
             onDeleteFav={this.handleDeleteFav}>
             {this.leftShow ? undefined : (
@@ -536,7 +544,10 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
           </PanelHeader> */}
         </div>
         <div
-          class={['charts-view-wrapper', { 'is-event': this.retrievalType === 'event' }]}
+          class={[
+            'charts-view-wrapper',
+            { 'is-event': this.retrievalType === 'event', 'is-full-screen': !this.needMenu },
+          ]}
           v-bkloading={{ isLoading: this.loading }}
         >
           {this.hasTips ? (
@@ -640,6 +651,7 @@ export default class DataRetrievalView extends tsc<IDataRetrievalView.IProps, ID
                   onDrillSearch={this.handleDrillSearch}
                   onIntervalChange={this.handleEventChartIntervalChange}
                   onTimeRangeChange={this.handleTimeRangeChange}
+                  onNeedMenuChange={this.handleNeedMenuChange}
                 />
               ) : undefined}
             </div>

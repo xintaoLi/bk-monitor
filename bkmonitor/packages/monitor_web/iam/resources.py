@@ -10,28 +10,28 @@ specific language governing permissions and limitations under the License.
 """
 import logging
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Union
 from urllib.parse import urljoin
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from api.itsm.default import TokenVerifyResource
 from bk_dataview.permissions import GrafanaRole
-from bk_dataview.views import ProxyBaseView
 from bkm_space.api import SpaceApi
+from bkm_space.define import Space, SpaceTypeEnum
 from bkmonitor.iam import ActionEnum, Permission, ResourceEnum
 from bkmonitor.iam.resource import ApmApplication
 from bkmonitor.models.external_iam import (
     ExternalPermission,
     ExternalPermissionApplyRecord,
 )
-from bkmonitor.utils.request import get_request, get_request_username
+from bkmonitor.utils.request import get_request_username
 from bkmonitor.utils.user import get_local_username
 from core.drf_resource import Resource, api, resource
 from monitor.models import GlobalConfig
-from monitor_web.grafana.auth import GrafanaAuthSync
 from monitor_web.grafana.permissions import DashboardPermission
 from monitor_web.iam.serializers import (
     ExternalPermissionApplyRecordSerializer,
@@ -207,19 +207,6 @@ class TestResource(Resource):
         Permission(username="xxx").is_allowed_by_biz(2, ActionEnum.VIEW_BUSINESS, raise_exception=True)
 
 
-def update_dashboard_permission(bk_biz_id, authorized_users):
-    try:
-        request = get_request(peaceful=True)
-        for authorized_user in authorized_users:
-            external_user = f"external_{authorized_user}"
-            GrafanaAuthSync.sync(external_user, bk_biz_id, is_external=True)
-            ProxyBaseView().provision_user(request, external_user)
-            ProxyBaseView().provision_org(str(bk_biz_id), external_user, GrafanaRole.Viewer)
-
-    except Exception as e:
-        logger.error(f"更新仪表盘实例权限异常：{e}")
-
-
 def create_permission(authorized_users, params):
     """
     新增权限
@@ -244,7 +231,6 @@ def create_permission(authorized_users, params):
     ExternalPermission.objects.bulk_create(
         ExternalPermission(authorized_user=authorized_user, **params) for authorized_user in add_authorized_users
     )
-    update_dashboard_permission(params["bk_biz_id"], add_authorized_users)
 
 
 class CreateOrUpdateExternalPermission(Resource):
@@ -276,19 +262,17 @@ class CreateOrUpdateExternalPermission(Resource):
                 raise serializers.ValidationError(f"{authorizer}无此操作权限")
             return attrs
 
-    def create_approval_ticket(self, authorized_users, params):
+    def create_approval_ticket(self, space: Space, authorized_users, params):
         """
         创建ITSM审批单据并创建审批记录，保存单据号和跳转url
         1. 新增权限 - 被授权人视角
         2. 新增权限 - 实例视角
         """
-        biz = resource.cc.get_app_by_id(params["bk_biz_id"])
-        bk_biz_name = biz.bk_biz_name
         ticket_data = {
             "creator": get_request_username() or get_local_username(),
             "fields": [
-                {"key": "bk_biz_id", "value": params["bk_biz_id"]},
-                {"key": "bk_biz_name", "value": bk_biz_name},
+                {"key": "bk_biz_id", "value": space.bk_biz_id},
+                {"key": "bk_biz_name", "value": space.space_name},
                 {"key": "title", "value": "对外版监控平台授权审批"},
                 {"key": "expire_time", "value": params["expire_time"].strftime("%Y-%m-%d %H:%M:%S")},
                 {"key": "authorized_user", "value": ",".join(authorized_users)},
@@ -298,6 +282,7 @@ class CreateOrUpdateExternalPermission(Resource):
             "fast_approval": False,
             "meta": {"callback_url": urljoin(settings.BK_ITSM_CALLBACK_HOST, "/external_callback/")},
         }
+
         try:
             data = api.itsm.create_fast_approval_ticket(ticket_data)
         except Exception as e:
@@ -321,6 +306,14 @@ class CreateOrUpdateExternalPermission(Resource):
         2. 基于实例资源视角
            2.1 编辑：删除存量权限，如有新增则创建审批单据
         """
+        # 如果是非cmdb业务，尝试获取关联cmdb业务，用于审批单据
+        space: Space = SpaceApi.get_space_detail(bk_biz_id=validated_request_data["bk_biz_id"])
+        related_space: Union[Space, None] = SpaceApi.get_related_space(space.space_uid, SpaceTypeEnum.BKCC.value)
+        if not related_space:
+            raise ValidationError(
+                f"create approval ticket failed, related space not found, space_uid: {space.space_uid}"
+            )
+
         authorized_users = validated_request_data.pop("authorized_users")
         view_type = validated_request_data.pop("view_type", "user")
         operate_type = validated_request_data.pop("operate_type", "create")
@@ -388,7 +381,7 @@ class CreateOrUpdateExternalPermission(Resource):
             approval_users = add_authorized_users or authorized_users
             approval_resources = add_resources or resources
             validated_request_data["resources"] = approval_resources
-            self.create_approval_ticket(approval_users, validated_request_data)
+            self.create_approval_ticket(related_space, approval_users, validated_request_data)
         return {"need_approval": need_approval}
 
 

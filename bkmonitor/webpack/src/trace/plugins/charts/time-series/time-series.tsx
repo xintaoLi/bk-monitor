@@ -34,6 +34,7 @@ import {
   ref,
   watch,
   onUnmounted,
+  type ComputedRef,
 } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -60,7 +61,7 @@ import {
   useChartResize,
   useCommonChartWatch,
   useTimeOffsetInject,
-  useTimeRanceInject,
+  useTimeRangeInject,
   useViewOptionsInject,
 } from '../../hooks';
 import {
@@ -143,7 +144,7 @@ export default defineComponent({
     // 高度
     const height = ref<number>(100);
     const minBase = ref<number>(0);
-    const inited = ref<boolean>(false);
+    const initialized = ref<boolean>(false);
     const empty = ref<boolean>(true);
     const emptyText = ref<string>('');
     const errorMsg = ref<string>('');
@@ -159,31 +160,20 @@ export default defineComponent({
     let cancelTokens: (() => void)[] = [];
     // 自动粒度降采样
     const downSampleRange = 'auto';
-    const startTime = inject<Ref>('startTime') || ref('');
-    const endTime = inject<Ref>('endTime') || ref('');
-    const startTimeMinusOneHour = dayjs
-      .tz(startTime.value || undefined)
-      .subtract(1, 'hour')
-      .format('YYYY-MM-DD HH:mm:ss');
-    const endTimeMinusOneHour = dayjs
-      .tz(endTime.value || undefined)
-      .add(1, 'hour')
-      .format('YYYY-MM-DD HH:mm:ss');
-    const spanDetailActiveTab = inject<Ref>('SpanDetailActiveTab') || ref('');
+    const customTimeProvider = inject<ComputedRef<string[]>>(
+      'customTimeProvider',
+      computed(() => [])
+    );
     // 框选事件范围后需应用到所有图表(包含三个数据 框选方法 是否展示复位  复位方法)
-    const enableSelectionRestoreAll = inject<Ref<boolean>>('enableSelectionRestoreAll') || ref(false);
-    const handleChartDataZoom = inject<(value: any) => void>('handleChartDataZoom') || (() => null);
-    const handleRestoreEvent = inject<() => void>('handleRestoreEvent') || (() => null);
-    const showRestore = inject<Ref>('showRestore') || ref(false);
-
-    // 主机标签页需要特殊处理：因为这里的开始\结束时间是从当前 span 数据的开始时间（-1小时）和结束时间（+1小时）去进行提交、而非直接 inject 时间选择器的时间区间。
-    /**
-     * 20230807 注意：目前能打开主机标签页的方式有以下两种方式。
-     * 1. span 列表打开
-     * 2. trace 详情点击瀑布图打开
-     */
-    const timeRange =
-      spanDetailActiveTab.value === 'Host' ? ref([startTimeMinusOneHour, endTimeMinusOneHour]) : useTimeRanceInject();
+    const enableSelectionRestoreAll = inject<Ref<boolean>>('enableSelectionRestoreAll', ref(false));
+    const handleChartDataZoom = inject<(value: any) => void>('handleChartDataZoom', () => null);
+    const handleRestoreEvent = inject<() => void>('handleRestoreEvent', () => null);
+    const showRestore = inject<Ref>('showRestore', ref(false));
+    const defaultTimeRange = useTimeRangeInject();
+    const timeRange = computed(() => {
+      // 如果有自定义时间取自定义时间，否则使用默认的 timeRange inject
+      return customTimeProvider.value?.length ? customTimeProvider.value : defaultTimeRange?.value || [];
+    });
     const timeOffset = useTimeOffsetInject();
     const viewOptions = useViewOptionsInject();
     const options = ref<MonitorEchartOptions>();
@@ -275,7 +265,7 @@ export default defineComponent({
      */
     function handleTransformSeries(series: ITimeSeriesItem[]) {
       const legendDatas: ILegendItem[] = [];
-      const tranformSeries = series.map((item, index) => {
+      const transformSeries = series.map((item, index) => {
         const colorList = props.panel?.options?.time_series?.type === 'bar' ? COLOR_LIST_BAR : COLOR_LIST;
         const color = item.color || colorList[index % colorList.length];
         let showSymbol = false;
@@ -366,7 +356,7 @@ export default defineComponent({
         };
       });
       legendData.value = legendDatas;
-      return tranformSeries;
+      return transformSeries;
     }
     // 设置x轴label formatter方法
     function handleSetFormatterFunc(seriesData: any, onlyBeginEnd = false) {
@@ -407,11 +397,11 @@ export default defineComponent({
     /**
      * @description: 设置精确度
      * @param {number} data
-     * @param {ValueFormatter} formattter
+     * @param {ValueFormatter} formatter
      * @param {string} unit
      * @return {*}
      */
-    function handleGetMinPrecision(data: number[], formattter: ValueFormatter, unit: string) {
+    function handleGetMinPrecision(data: number[], formatter: ValueFormatter, unit: string) {
       if (!data || data.length === 0) {
         return 0;
       }
@@ -433,7 +423,7 @@ export default defineComponent({
       sampling = Array.from(new Set(sampling.filter(n => n !== undefined)));
       while (precision < 5) {
         const samp = sampling.reduce((pre, cur) => {
-          (pre as any)[formattter(cur, precision).text] = 1;
+          (pre as any)[formatter(cur, precision).text] = 1;
           return pre;
         }, {});
         if (Object.keys(samp).length >= sampling.length) {
@@ -448,7 +438,7 @@ export default defineComponent({
      * @param {number} num
      * @return {*}
      */
-    function handleYxisLabelFormatter(num: number): string {
+    function handleYAxisLabelFormatter(num: number): string {
       const si = [
         { value: 1, symbol: '' },
         { value: 1e3, symbol: 'K' },
@@ -497,7 +487,7 @@ export default defineComponent({
       }
     }
 
-    function handleSetThreholds() {
+    function handleSetThresholds() {
       const { markLine } = props.panel?.options?.time_series || {};
       const thresholdList = markLine?.data?.map?.(item => item.yAxis) || [];
       const max = Math.max(...thresholdList);
@@ -513,18 +503,18 @@ export default defineComponent({
       cancelTokens = [];
       if (!isInViewPort()) {
         if (intersectionObserver) {
-          unregisterOberver();
+          unregisterObserver();
         }
         registerObserver(start_time, end_time);
         return;
       }
-      if (inited.value) emit('loading', true);
+      if (initialized.value) emit('loading', true);
       if (!props.needChartLoading) {
         emptyText.value = t('加载中...');
       }
       isChartLoading.value = true;
       try {
-        unregisterOberver();
+        unregisterObserver();
         const series: any[] = [];
         const metricList: any[] = [];
         const [startTime, endTime] = handleTransformToTimestamp(timeRange!.value);
@@ -548,7 +538,7 @@ export default defineComponent({
           const list =
             props.panel?.targets?.map?.(item => {
               const stack = item?.data?.stack || '';
-              const newPrarams = {
+              const newParams = {
                 ...params,
                 ...variablesService.transformVariables(item.data, {
                   ...viewOptions?.value.filters,
@@ -567,7 +557,7 @@ export default defineComponent({
 
               if (!item.apiModule) return;
               return currentInstance?.appContext.config.globalProperties?.$api[item.apiModule]
-                [item.apiFunc](newPrarams, {
+                [item.apiFunc](newParams, {
                   cancelToken: new CancelToken((cb: () => void) => cancelTokens.push(cb)),
                   needMessage: false,
                 })
@@ -665,7 +655,7 @@ export default defineComponent({
             });
           }
           const formatterFunc = handleSetFormatterFunc(seriesList?.[0]?.data || []);
-          const { maxThreshold } = handleSetThreholds();
+          const { maxThreshold } = handleSetThresholds();
 
           const chartBaseOptions = MONITOR_LINE_OPTIONS;
 
@@ -689,7 +679,7 @@ export default defineComponent({
                         const obj = getValueFormat(item.unit)(v, item.precision);
                         return obj.text + (obj.suffix || '');
                       }
-                      return (v: number) => handleYxisLabelFormatter(v - minBase.value);
+                      return handleYAxisLabelFormatter(v - minBase.value);
                     },
                     /* formatter: seriesList.every((item: any) => item.unit === seriesList[0].unit)
                       ? (v: any) => {
@@ -699,7 +689,7 @@ export default defineComponent({
                           }
                           return v;
                         }
-                      : (v: number) => handleYxisLabelFormatter(v - minBase.value), */
+                      : (v: number) => handleYAxisLabelFormatter(v - minBase.value), */
                   },
                   splitNumber: height.value < 120 ? 2 : 4,
                   minInterval: 1,
@@ -716,7 +706,7 @@ export default defineComponent({
                         const obj = getValueFormat(item.unit)(v, item.precision);
                         return obj.text + (obj.suffix || '');
                       }
-                      return (v: number) => handleYxisLabelFormatter(v - minBase.value);
+                      return handleYAxisLabelFormatter(v - minBase.value);
                     },
                   },
                   splitNumber: height.value < 120 ? 2 : 4,
@@ -744,7 +734,7 @@ export default defineComponent({
           );
           metrics.value = metricList || [];
           // this.handleDrillDownOption(this.metrics);
-          inited.value = true;
+          initialized.value = true;
           empty.value = false;
           if (!hasSetEvent.value) {
             setTimeout(useLegendRet.handleSetLegendEvent, 500);
@@ -784,7 +774,7 @@ export default defineComponent({
       height
     );
     // 监听是否在可视窗口内
-    const { isInViewPort, registerObserver, unregisterOberver, intersectionObserver } = useChartIntersection(
+    const { isInViewPort, registerObserver, unregisterObserver, intersectionObserver } = useChartIntersection(
       timeSeriesRef! as Ref<HTMLDivElement>,
       getPanelData
     );
@@ -894,9 +884,9 @@ export default defineComponent({
       handleResize,
       isInViewPort,
       registerObserver,
-      unregisterOberver,
+      unregisterObserver,
       minBase,
-      inited,
+      initialized,
       empty,
       emptyText,
       errorMsg,
@@ -914,7 +904,7 @@ export default defineComponent({
       handleTimeOffset,
       handleSeriesName,
       handleTransformSeries,
-      handleYxisLabelFormatter,
+      handleYAxisLabelFormatter,
       handleSetFormatterFunc,
       handleGetMinPrecision,
       dataZoom,
@@ -945,7 +935,7 @@ export default defineComponent({
             {this.showChartHeader && this.panel && (
               <ChartTitle
                 class='draggable-handle'
-                draging={this.panel.draging}
+                dragging={this.panel.dragging}
                 drillDownOption={this.drillDownOptions}
                 isInstant={this.panel.instant}
                 menuList={this.menuList}
@@ -959,7 +949,7 @@ export default defineComponent({
                 onMenuClick={this.handleMenuClick}
                 onMetricClick={this.handleMetricClick}
                 onSelectChild={({ child }) => this.handleMenuClick(child)}
-                onUpdateDragging={() => this.panel?.updateDraging(false)}
+                onUpdateDragging={() => this.panel?.updateDragging(false)}
               />
             )}
             {!this.empty ? (
@@ -968,7 +958,7 @@ export default defineComponent({
                   ref='chartWrapperRef'
                   class={`chart-instance ${legend?.displayMode === 'table' ? 'is-table-legend' : ''}`}
                 >
-                  {this.inited && (
+                  {this.initialized && (
                     <BaseEchart
                       ref='baseChartRef'
                       width={this.width}

@@ -23,7 +23,7 @@ import datetime
 import time
 
 import arrow
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.exceptions import ValidationError
@@ -52,8 +52,8 @@ class TraceSearchAttrSerializer(serializers.Serializer):
     ip_chooser = serializers.DictField(default={}, required=False)
 
     # 时间选择器字段
-    start_time = DateTimeFieldWithEpoch(format="%Y-%m-%d %H:%M:%S")
-    end_time = DateTimeFieldWithEpoch(format="%Y-%m-%d %H:%M:%S")
+    start_time = DateTimeFieldWithEpoch()
+    end_time = DateTimeFieldWithEpoch()
     time_range = serializers.CharField(required=False, default=None)
 
     # 关键字填充条
@@ -74,8 +74,8 @@ class TraceSearchTraceIdAttrSerializer(serializers.Serializer):
 
 class AggsTermsSerializer(serializers.Serializer):
     # 时间选择器字段
-    start_time = DateTimeFieldWithEpoch(required=False, format="%Y-%m-%d %H:%M:%S")
-    end_time = DateTimeFieldWithEpoch(required=False, format="%Y-%m-%d %H:%M:%S")
+    start_time = DateTimeFieldWithEpoch(required=False)
+    end_time = DateTimeFieldWithEpoch(required=False)
     time_range = serializers.CharField(required=False, default=None)
 
     addition = serializers.ListField(allow_empty=True, required=False, default="")
@@ -125,6 +125,10 @@ class DateHistogramSerializer(TraceSearchAttrSerializer):
 
     fields = serializers.ListField(child=DateHistogramFieldSerializer(), required=False, default=[])
     interval = serializers.CharField(required=False, default="auto", max_length=16)
+
+    # 自定义索引列表 Eg. -> "2_bklog.0001,2_bklog.0002"
+    custom_indices = serializers.CharField(required=False, allow_null=True, allow_blank=True, default="")
+    group_field = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class UnionSearchDateHistogramSerializer(DateHistogramSerializer):
