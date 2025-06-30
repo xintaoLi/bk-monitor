@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
 Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -19,9 +18,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 We undertake not to change the open source license (MIT license) applicable to the current version of
 the project delivered to anyone in the future.
 """
+
 import re
 import time
-from typing import List
 
 import arrow
 from django.utils.module_loading import import_string
@@ -57,6 +56,7 @@ from apps.log_search.exceptions import (
     IndexSetDorisQueryException,
     SQLQueryException,
 )
+from apps.log_search.handlers.search.search_handlers_esquery import SearchHandler
 from apps.log_search.models import LogIndexSet
 from apps.log_search.utils import add_highlight_mark
 from apps.utils.grep_syntax_parse import grep_parser
@@ -65,7 +65,7 @@ from apps.utils.log import logger
 from apps.utils.lucene import EnhanceLuceneAdapter
 
 
-class ChartHandler(object):
+class ChartHandler:
     AND = "AND"
     OR = "OR"
 
@@ -85,9 +85,7 @@ class ChartHandler(object):
             SearchMode.SQL.value: "SQLChartHandler",
         }
         try:
-            chart_instance = import_string(
-                "apps.log_search.handlers.search.chart_handlers.{}".format(mapping.get(mode))
-            )
+            chart_instance = import_string(f"apps.log_search.handlers.search.chart_handlers.{mapping.get(mode)}")
             return chart_instance(index_set_id=index_set_id)
         except ImportError as error:
             raise NotImplementedError(f"{mode} class not implement, error: {error}")
@@ -114,7 +112,7 @@ class ChartHandler(object):
         return value
 
     @classmethod
-    def lucene_to_where_clause(cls, lucene_query):
+    def lucene_to_where_clause(cls, lucene_query, alias_mappings):
         # 解析 Lucene 查询
         query_tree = parser.parse(lucene_query, lexer=lexer.clone())
 
@@ -122,6 +120,9 @@ class ChartHandler(object):
         def build_condition(node):
             if isinstance(node, SearchField):
                 field_name = node.name
+                # 使用别名替换
+                if field_name in alias_mappings:
+                    field_name = alias_mappings[field_name]
                 # _ext.a.b的字段名需要转化为JSON_EXTRACT的形式
                 if "." in field_name:
                     field_list = field_name.split(".")
@@ -153,7 +154,7 @@ class ChartHandler(object):
                     ):
                         return f"{field_name} {value}"
                     value = cls.to_like_syntax(expr.value)
-                    return f"{field_name} LIKE '{value}'"
+                    return f"LOWER({field_name}) LIKE LOWER('{value}')"
                 elif isinstance(expr, AndOperation):
                     # 处理 AND 操作
                     conditions = []
@@ -225,7 +226,7 @@ class ChartHandler(object):
             elif isinstance(node, Word):
                 # 处理不带引号的短语
                 value = cls.to_like_syntax(node.value)
-                return f"log LIKE '{value}'"
+                return f"LOWER(log) LIKE LOWER('{value}')"
             elif isinstance(node, Not) or isinstance(node, Prohibit):
                 # 处理 NOT 操作
                 return f"NOT {build_condition(node.children[0])}"
@@ -241,6 +242,7 @@ class ChartHandler(object):
         sql_param=None,
         keyword=None,
         action=SQLGenerateMode.COMPLETE.value,
+        alias_mappings=None,
     ) -> dict:
         """
         根据过滤条件生成sql
@@ -250,9 +252,14 @@ class ChartHandler(object):
         :param end_time: 结束时间
         :param keyword: 搜索关键字
         :param action: 生成SQL的方式
+        :param alias_mappings: 别名映射
         """
-        start_date = arrow.get(start_time).format("YYYYMMDD")
-        end_date = arrow.get(end_time).format("YYYYMMDD")
+        alias_mappings = alias_mappings or {}
+
+        # 根据 bkbase 的规范，thedate 固定按东八区转换
+        start_date = arrow.get(start_time).to("Asia/Shanghai").format("YYYYMMDD")
+        end_date = arrow.get(end_time).to("Asia/Shanghai").format("YYYYMMDD")
+
         additional_where_clause = (
             f"thedate >= {start_date} AND thedate <= {end_date} AND "
             f"dtEventTimeStamp >= {start_time} AND dtEventTimeStamp <= {end_time}"
@@ -262,19 +269,25 @@ class ChartHandler(object):
             # 加上keyword的查询条件
             enhance_lucene_adapter = EnhanceLuceneAdapter(query_string=keyword)
             keyword = enhance_lucene_adapter.enhance()
-            where_clause = cls.lucene_to_where_clause(keyword)
+            where_clause = cls.lucene_to_where_clause(keyword, alias_mappings)
             if where_clause:
                 additional_where_clause += f" AND {where_clause}"
 
         sql = ""
         for condition in addition:
             field_name = condition["field"]
+            if field_name == "*":
+                # TODO: 全文检索字段需要支持动态调整
+                field_name = "log"
+
+            if field_name in alias_mappings:
+                field_name = alias_mappings[field_name]
             operator = condition["operator"]
             values = condition["value"]
             # 获取sql操作符
             sql_operator = SQL_CONDITION_MAPPINGS.get(operator)
             # 异常情况,跳过
-            if not sql_operator or field_name in ["*", "query_string"]:
+            if not sql_operator or field_name in ["__query_string__"]:
                 continue
 
             if sql:
@@ -300,6 +313,8 @@ class ChartHandler(object):
             if operator in ["&=~", "&!=~", "all contains match phrase", "all not contains match phrase"]:
                 condition_type = "AND"
 
+            if "LIKE" in sql_operator:
+                field_name = f"LOWER({field_name})"
             tmp_sql = ""
             for index, value in enumerate(values):
                 if operator in ["=~", "&=~", "!=~", "&!=~"]:
@@ -313,7 +328,9 @@ class ChartHandler(object):
                     tmp_sql += f" {condition_type} "
                 if isinstance(value, str):
                     value = value.replace("'", "''")
-                    value = f"\'{value}\'"
+                    value = f"'{value}'"
+                if "LIKE" in sql_operator:
+                    value = f"LOWER({value})"
                 tmp_sql += f"{field_name} {sql_operator} {value}"
 
             # 有两个以上的值时加括号
@@ -333,7 +350,7 @@ class ChartHandler(object):
         return {"sql": final_sql, "additional_where_clause": f"WHERE {additional_where_clause}"}
 
     @staticmethod
-    def convert_to_where_clause(grep_field, commands: List[dict]):
+    def convert_to_where_clause(grep_field, commands: list[dict]):
         """
         将解析后的grep命令转换为 doris SQL的where子句
         :param grep_field: grep查询字段
@@ -418,6 +435,7 @@ class SQLChartHandler(ChartHandler):
             end_time=params["end_time"],
             keyword=params.get("keyword"),
             action=SQLGenerateMode.WHERE_CLAUSE.value,
+            alias_mappings=params["alias_mappings"],
         )
         # 如果不存在FROM则添加,存在则覆盖
         pattern = (
@@ -459,7 +477,7 @@ class SQLChartHandler(ChartHandler):
                     errors_message = errors_message + ":" + errors
                 exc = errors_message
                 logger.info(
-                    "[doris query] QUERY ERROR! username: %s, execute sql: \"%s\", error info: %s",
+                    '[doris query] QUERY ERROR! username: %s, execute sql: "%s", error info: %s',
                     get_request_username(),
                     sql.replace("\n", " "),
                     errors_message,
@@ -491,7 +509,7 @@ class SQLChartHandler(ChartHandler):
         # 记录doris日志
         if result_data["data"]["timetaken"] < 5:
             logger.info(
-                "[doris query] username: %s, execute sql: \"%s\", total records: %s, time taken: %ss",
+                '[doris query] username: %s, execute sql: "%s", total records: %s, time taken: %ss',
                 get_request_username(),
                 sql.replace("\n", " "),
                 result_data["data"]["totalRecords"],
@@ -500,7 +518,7 @@ class SQLChartHandler(ChartHandler):
         else:
             # 大于 5s 的判定为慢查询
             logger.info(
-                "[doris query] SLOW QUERY! username: %s, execute sql: \"%s\", total records: %s, time taken: %ss",
+                '[doris query] SLOW QUERY! username: %s, execute sql: "%s", total records: %s, time taken: %ss',
                 get_request_username(),
                 sql.replace("\n", " "),
                 result_data["data"]["totalRecords"],
@@ -541,7 +559,14 @@ class SQLChartHandler(ChartHandler):
                         pattern = re.match(r"LOWER\((.*)\)", pattern).group(1)
                     pattern = pattern.strip("'")
                 where_clause += f" AND {grep_where_clause}"
-
+        # 加上排序条件
+        sort_list = params.get("sort_list", [])
+        if not sort_list:
+            sort_list = SearchHandler(self.index_set_id, {}).sort_list
+        # 构建 ORDER BY 子句
+        order_by_clause = ", ".join(f"{field} {direction.upper()}" for field, direction in sort_list)
+        if order_by_clause:
+            where_clause += f" ORDER BY {order_by_clause}"
         # 加上分页条件
         where_clause += f" LIMIT {params['size']} OFFSET {params['begin']}"
         sql = f"SELECT * FROM {self.data.doris_table_id} WHERE {where_clause}"

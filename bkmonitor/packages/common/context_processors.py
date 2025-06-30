@@ -160,6 +160,7 @@ def get_basic_context(request, space_list: list[dict[str, Any]], bk_biz_id: int)
             "SPACE_LIST": space_list,
             "BK_BIZ_ID": bk_biz_id,
             "BK_TENANT_ID": get_request_tenant_id(peaceful=True) or DEFAULT_TENANT_ID,
+            "ENABLE_MULTI_TENANT_MODE": settings.ENABLE_MULTI_TENANT_MODE,
             # 服务拨测设置最大 duration
             "MAX_AVAILABLE_DURATION_LIMIT": settings.MAX_AVAILABLE_DURATION_LIMIT,
             # 所有图表渲染必须
@@ -178,6 +179,8 @@ def get_basic_context(request, space_list: list[dict[str, Any]], bk_biz_id: int)
             "K8S_V2_BIZ_LIST": settings.K8S_V2_BIZ_LIST,
             # 是否开启AI助手
             "ENABLE_AI_ASSISTANT": "true" if settings.AIDEV_API_BASE_URL else "false",
+            # 新版小鲸后端访问地址
+            "AI_XIAO_JING_BASE_URL": settings.MONITOR_AI_AGENT_BACKEND_SERVICE_BASE_URL,
             # APM 日志转发接口 Url
             "APM_LOG_FORWARD_URL_PREFIX": "/apm_log_forward/bklog/",
             # 是否开启事件中心AIOps功能

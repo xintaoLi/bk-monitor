@@ -37,9 +37,9 @@ import 'monitor-ui/directive/index';
 import Api from 'monitor-api/api';
 import Axios from 'monitor-api/axios/axios';
 import { setVue } from 'monitor-api/utils/index';
-import { immediateRegister } from 'monitor-common/service-worker/service-wroker';
+import { immediateRegister } from 'monitor-common/service-worker/service-worker';
 import { getUrlParam, mergeSpaceList, setGlobalBizId } from 'monitor-common/utils';
-import { asignWindowField } from 'monitor-common/utils/asign-window';
+import { assignWindowField } from 'monitor-common/utils/assign-window';
 
 import './common/global-login';
 import App from './pages/app';
@@ -92,7 +92,7 @@ if (hasRouteHash) {
       })
       .then(data => {
         appLoadingNode && (appLoadingNode.style.display = 'none');
-        asignWindowField(data);
+        assignWindowField(data);
         mergeSpaceList(window.space_list);
         window.user_name = window.uin;
         window.username = window.uin;
@@ -120,7 +120,7 @@ if (hasRouteHash) {
           k8sV2EnableList: (!data.K8S_V2_BIZ_LIST?.length ? [] : data.K8S_V2_BIZ_LIST).slice(),
           defaultBizId: window.default_biz_id || '',
         });
-        window.mainComponent = new Vue({
+        new Vue({
           el: '#app',
           router,
           store,
@@ -140,7 +140,7 @@ if (hasRouteHash) {
             context_type: 'extra',
           })
           .then(data => {
-            asignWindowField(data);
+            assignWindowField(data);
             store.commit('app/SET_APP_STATE', {
               collectingConfigFileMaxSize: data.COLLECTING_CONFIG_FILE_MAXSIZE,
             });

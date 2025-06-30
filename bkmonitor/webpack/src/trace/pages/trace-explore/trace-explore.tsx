@@ -72,7 +72,7 @@ import FavoriteBox, { EditFavorite, type IFavoriteGroup } from './components/fav
 import TraceExploreHeader from './components/trace-explore-header';
 import TraceExploreLayout from './components/trace-explore-layout';
 import TraceExploreView from './components/trace-explore-view/trace-explore-view';
-import { getFilterByCheckboxFilter, safeParseJsonValueForWhere } from './utils';
+import { getFilterByCheckboxFilter, safeParseJsonValueForWhere, tryURLDecodeParse } from './utils';
 
 import type { ConditionChangeEvent, ExploreFieldList, IApplicationItem, ICommonParams } from './typing';
 const TRACE_EXPLORE_SHOW_FAVORITE = 'TRACE_EXPLORE_SHOW_FAVORITE';
@@ -355,8 +355,8 @@ export default defineComponent({
       getUrlParams();
       await getAllUserConfig();
       await getApplicationList();
-      handleQuery();
       await getViewConfig();
+      handleQuery();
     });
 
     onUnmounted(() => {
@@ -382,6 +382,8 @@ export default defineComponent({
         /** 兼容一下老版本的listType和query参数 */
         listType,
         query,
+        sortBy,
+        descending,
       } = route.query;
       try {
         store.init({
@@ -391,12 +393,16 @@ export default defineComponent({
           appName: app_name as string,
           refreshInterval: Number(refreshInterval) || -1,
           refreshImmediate: random(3),
+          tableSortContainer: {
+            sortBy: (sortBy as string) || '',
+            descending: descending === 'false' ? false : descending === 'true' ? true : null,
+          },
         });
-        where.value = JSON.parse(decodeURIComponent((queryWhere as string) || '[]'));
-        commonWhere.value = JSON.parse(decodeURIComponent((queryCommonWhere as string) || '[]'));
-        checkboxFilters.value = JSON.parse(decodeURIComponent((selectedType as string) || '[]'));
+        where.value = tryURLDecodeParse(queryWhere as string, []);
+        commonWhere.value = tryURLDecodeParse(queryCommonWhere as string, []);
+        checkboxFilters.value = tryURLDecodeParse(selectedType as string, []);
         queryString.value = (query || queryQueryString) as string;
-        showResidentBtn.value = JSON.parse((queryShowResidentBtn as string) || 'true');
+        showResidentBtn.value = tryURLDecodeParse<boolean>(queryShowResidentBtn as string, true);
         filterMode.value = (queryFilterMode as EMode) || EMode.ui;
         favorite_id && (defaultFavoriteId.value = Number(favorite_id));
         if (trace_id) {
@@ -427,6 +433,8 @@ export default defineComponent({
         showResidentBtn: String(showResidentBtn.value),
         filterMode: filterMode.value,
         selectedType: JSON.stringify(checkboxFilters.value),
+        sortBy: store.tableSortContainer?.sortBy || '',
+        descending: String(store.tableSortContainer?.descending),
       };
 
       const targetRoute = router.resolve({
@@ -568,6 +576,7 @@ export default defineComponent({
           timeRange: favoriteConfig?.componentData?.timeRange || DEFAULT_TIME_RANGE,
           refreshInterval: favoriteConfig?.componentData?.refreshInterval || -1,
         });
+        store.sortParamsToTableSortContainer(favoriteConfig?.queryParams?.sort || []);
       } else {
         where.value = [];
         queryString.value = '';
@@ -613,7 +622,7 @@ export default defineComponent({
             offset: 0,
             limit: 30,
             query: filterMode.value === EMode.queryString ? queryString.value : '',
-            sort: [],
+            sort: store.sortParams,
             mode: store.mode,
           },
         },
@@ -697,6 +706,21 @@ export default defineComponent({
       }
     }
 
+    function handleSetCommonWhereToFavoriteCache(whereP: IWhereItem[]) {
+      if (currentFavorite.value) {
+        currentFavorite.value = {
+          ...currentFavorite.value,
+          config: {
+            ...(currentFavorite.value?.config || {}),
+            componentData: {
+              ...(currentFavorite.value?.config?.componentData || {}),
+              commonWhere: whereP,
+            },
+          },
+        };
+      }
+    }
+
     return {
       t,
       traceExploreLayoutRef,
@@ -726,6 +750,7 @@ export default defineComponent({
       notSupportEnumKeys,
       showSlideDetail,
       retrievalFilterPlaceholder,
+      setUrlParams,
       handleQuery,
       handleAppNameChange,
       handleThumbtackChange,
@@ -749,6 +774,7 @@ export default defineComponent({
       handleCreateApp,
       handleClearRetrievalFilter,
       handleCopyWhereQueryString,
+      handleSetCommonWhereToFavoriteCache,
     };
   },
   render() {
@@ -806,6 +832,7 @@ export default defineComponent({
                 onQueryStringChange={this.handleQueryStringChange}
                 onQueryStringInputChange={this.handleQueryStringInputChange}
                 onSearch={this.handleFilterSearch}
+                onSetFavoriteCache={this.handleSetCommonWhereToFavoriteCache}
                 onShowResidentBtnChange={this.handleShowResidentBtnChange}
                 onWhereChange={this.handleWhereChange}
               />
@@ -851,6 +878,7 @@ export default defineComponent({
                         onCheckboxFiltersChange={this.handleCheckboxFiltersChange}
                         onClearRetrievalFilter={this.handleClearRetrievalFilter}
                         onConditionChange={this.handleConditionChange}
+                        onSetUrlParams={this.setUrlParams}
                       />
                     </div>
                   ),
