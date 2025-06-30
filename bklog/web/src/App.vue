@@ -279,8 +279,7 @@
             break;
           case 'off': {
             toggleList = [];
-            // const index = this.dialogSettingList.findIndex(item => item.id === 'masking-setting');
-            // const newSettingList = this.dialogSettingList.slice(index, 1);
+
             this.$store.commit('updateGlobalSettingList', []);
             break;
           }
