@@ -31,7 +31,6 @@ import Vue from 'vue';
 import LogButton from '@/components/log-button';
 import i18n from '@/language/i18n';
 import docsLinkMixin from '@/mixins/docs-link-mixin';
-
 import { debounce } from 'lodash';
 
 import App from './App';
@@ -41,15 +40,15 @@ import { renderHeader } from './common/util';
 import './directives/index';
 import JsonFormatWrapper from './global/json-format-wrapper.vue';
 import methods from './plugins/methods';
+import preload, { getExternalMenuListBySpace } from './preload';
 import getRouter from './router';
 import store from './store';
-import preload, { getExternalMenuListBySpace } from './preload';
+import { BK_LOG_STORAGE } from './store/store.type';
 
-import './static/style.css';
-import './static/font-face/index.css';
 import './scss/theme/theme-dark.scss';
 import './scss/theme/theme-light.scss';
-import { BK_LOG_STORAGE } from './store/store.type';
+import './static/font-face/index.css';
+import './static/style.css';
 
 Vue.prototype.$renderHeader = renderHeader;
 
@@ -80,7 +79,7 @@ const mountedVueInstance = () => {
     const bkBizId = store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID];
 
     let externalMenu = [];
-     if (window.IS_EXTERNAL && space) {
+    if (window.IS_EXTERNAL && space) {
       externalMenu = getExternalMenuListBySpace(space) ?? [];
       store.commit('updateExternalMenu', externalMenu);
     }

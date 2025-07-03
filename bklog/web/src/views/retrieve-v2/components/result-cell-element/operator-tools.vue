@@ -37,16 +37,12 @@
         >
         </span>
       </span>
-      <span
+      <LogContext
         class="handle-card"
-        v-bk-tooltips="{ allowHtml: true, content: '#contextLog-html' }"
+        :options="operatorConfig"
+        :row="rowData"
       >
-        <span
-          :class="`icon bklog-icon bklog-shangxiawen ${!isActiveLog && 'is-disable'}`"
-          @click.stop="handleCheckClick('contextLog', isActiveLog)"
-        >
-        </span>
-      </span>
+      </LogContext>
       <span
         v-if="isActiveWebConsole"
         class="handle-card"
@@ -87,33 +83,14 @@
           </span>
         </div>
       </div>
-      <div v-show="false">
-        <div id="contextLog-html">
-          <span>
-            <span
-              v-if="!isActiveLog"
-              class="bk-icon icon-exclamation-circle-shape"
-            ></span>
-            <span>{{ toolMessage.contextLog }}</span>
-            <!-- <i18n path="请前往 {0}">
-                <span class="clean-str">{{$t('清洗')}}</span>
-              </i18n>
-              <span class="clean-str" @click="handleGotoLink('logExtract')">{{$t('说明文档')}}</span> -->
-          </span>
-        </div>
-      </div>
     </template>
     <template v-else>
-      <span
+      <LogContext
         class="handle-card"
-        v-bk-tooltips="{ allowHtml: true, content: $t('上下文') }"
+        :options="operatorConfig"
+        :row="rowData"
       >
-        <span
-          :class="`icon bklog-icon bklog-shangxiawen ${!isActiveLog && 'is-disable'}` "
-          @click.stop="handleCheckClick('contextLog', isActiveLog)"
-        >
-        </span>
-      </span>
+      </LogContext>
       <span
         class="handle-card"
         v-bk-tooltips="
@@ -140,7 +117,12 @@
 
 <script>
   import { mapGetters } from 'vuex';
+  import LogContext from '../log-context';
+
   export default {
+    components: {
+      LogContext,
+    },
     props: {
       index: {
         type: Number,
