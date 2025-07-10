@@ -47,8 +47,13 @@ import { BK_LOG_STORAGE } from './store/store.type';
 
 import './scss/theme/theme-dark.scss';
 import './scss/theme/theme-light.scss';
+
 import './static/font-face/index.css';
 import './static/style.css';
+
+import './tailwind.css';
+
+import { BK_LOG_STORAGE } from './store/store.type';
 
 Vue.prototype.$renderHeader = renderHeader;
 
