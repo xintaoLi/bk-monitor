@@ -18,7 +18,11 @@
     "analyze": "npm run clean && bkmonitor-cli build -a",
     "lint": "eslint \"**/*.{js,ts,tsx}\" --fix",
     "prettier": "prettier --write ./ '!**/*.{css,scss,less}'",
-    "stylelint": "stylelint \"./src/**/*.(vue|scss|css)\" --fix"
+    "stylelint": "stylelint \"./src/**/*.(vue|scss|css)\" --fix",
+    "regression:init": "node scripts/regression-init.js",
+    "regression:record": "node scripts/regression-record.js",
+    "regression:analyze": "node scripts/regression-analyze.js",
+    "test:regression": "npm run regression:record && npm run regression:analyze"
   },
   "dependencies": {
     "@babel/helper-module-imports": "7.24.7",
