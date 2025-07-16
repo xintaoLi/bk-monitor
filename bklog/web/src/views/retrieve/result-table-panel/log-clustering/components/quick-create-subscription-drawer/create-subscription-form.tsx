@@ -532,7 +532,7 @@ class QuickCreateSubscription extends tsc<IProps> {
                   ? !item.subscribers.length
                   : // 检查订阅邮箱格式是否正确。
                     !item.subscribers.every(email => String(email.id).toLowerCase().match(this.emailRegex)) ||
-                    !item.subscribers.length),
+                    !item.subscribers.length)
             )?.channel_name;
             if (targetChannel) this.$refs?.[`${targetChannel}-input`]?.focus?.();
             else {
@@ -1242,7 +1242,10 @@ class QuickCreateSubscription extends tsc<IProps> {
                         }
                         const isHasDuplicatedNum = hourOption.find(item => item.id === inputNumber);
                         if (!isHasDuplicatedNum) {
-                          hourOption.push({ id: inputNumber, name: this.$t('{0}小时', [inputNumber]) });
+                          hourOption.push({
+                            id: inputNumber,
+                            name: this.$t('{0}小时', [inputNumber]),
+                          });
                         }
                         this.frequency.hour = inputNumber;
                         this.customHourInput = '';
@@ -1259,7 +1262,7 @@ class QuickCreateSubscription extends tsc<IProps> {
               )}
 
               {[FrequencyType.monthly, FrequencyType.weekly, FrequencyType.dayly].includes(
-                this.formData.frequency.type,
+                this.formData.frequency.type
               ) && (
                 <div style='display: flex; align-items: center;'>
                   {this.formData.frequency.type === 3 && (

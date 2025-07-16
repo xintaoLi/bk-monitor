@@ -169,7 +169,9 @@ class UseSegmentProp {
                       'div',
                       {
                         class: 'segment-new-link',
-                        on: { ...(item.link.onClick ? { click: item.link.onClick } : {}) },
+                        on: {
+                          ...(item.link.onClick ? { click: item.link.onClick } : {}),
+                        },
                         directives: item.link.tooltip
                           ? [
                               {
@@ -179,13 +181,13 @@ class UseSegmentProp {
                             ]
                           : [],
                       },
-                      [h('i', { class: item.link.iconName })],
+                      [h('i', { class: item.link.iconName })]
                     )
                   : null,
-              ],
+              ]
             ),
-          ],
-        ),
+          ]
+        )
       ),
     ]);
   }

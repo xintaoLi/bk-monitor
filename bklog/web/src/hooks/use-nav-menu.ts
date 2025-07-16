@@ -37,7 +37,7 @@ export function useNavMenu(options: {
   bkInfo: any;
   http: any;
   emit?: (event: string, ...args: any[]) => void;
-} ) {
+}) {
   const { t, bkInfo, http, emit } = options;
   const store = useStore();
   const route = useRoute();
@@ -59,7 +59,7 @@ export function useNavMenu(options: {
   // watch query.from
   watch(
     () => route.query.from,
-    (fromValue) => {
+    fromValue => {
       if (fromValue) {
         store.commit('updateAsIframe', fromValue);
         store.commit('updateIframeQuery', { from: fromValue });
@@ -178,11 +178,7 @@ export function useNavMenu(options: {
     } catch (e) {
       console.warn(e);
     } finally {
-      if (
-        isExternal.value &&
-        route.name === 'retrieve' &&
-        !externalMenu.value.includes('retrieve')
-      ) {
+      if (isExternal.value && route.name === 'retrieve' && !externalMenu.value.includes('retrieve')) {
         router.push({ name: 'extract-home' });
       } else if (
         isExternal.value &&
@@ -228,7 +224,9 @@ export function useNavMenu(options: {
     store.commit('updateStorage', { [BK_LOG_STORAGE.BK_SPACE_UID]: spaceUid });
     for (const item of mySpaceList.value) {
       if (item.space_uid === spaceUid) {
-        store.commit('updateStorage', { [BK_LOG_STORAGE.BK_BIZ_ID]: item.bk_biz_id });
+        store.commit('updateStorage', {
+          [BK_LOG_STORAGE.BK_BIZ_ID]: item.bk_biz_id,
+        });
         break;
       }
     }
@@ -325,9 +323,7 @@ export function useNavMenu(options: {
       } else {
         const firstRealSpaceUid = spaceList.find((item: any) => item.bk_biz_id !== demoId).space_uid;
         if (spaceUid || bizId) {
-          const matchProject = spaceList.find(
-            (item: any) => item.space_uid === spaceUid || item.bk_biz_id === bizId
-          );
+          const matchProject = spaceList.find((item: any) => item.space_uid === spaceUid || item.bk_biz_id === bizId);
           checkSpaceChange(matchProject ? matchProject.space_uid : firstRealSpaceUid);
         } else {
           const storageSpaceUid = store.state.storage[BK_LOG_STORAGE.BK_SPACE_UID];

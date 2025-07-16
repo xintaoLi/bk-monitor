@@ -50,9 +50,11 @@ interface IEvents {
 
 @Component
 export default class TimeRange extends tsc<IProps, IEvents> {
-  @Prop({ default: () => DEFAULT_TIME_RANGE, type: Array }) value: TimeRangeType; // 组件回显值
+  @Prop({ default: () => DEFAULT_TIME_RANGE, type: Array })
+  value: TimeRangeType; // 组件回显值
   @Prop({ default: 'simplicity', type: String }) type: TimeRangeDisplayType; // 组件回显值
-  @Prop({ default: window.timezone, type: String }) timezone: TimeRangeDisplayType; // 组件回显值
+  @Prop({ default: window.timezone, type: String })
+  timezone: TimeRangeDisplayType; // 组件回显值
   @Prop({ default: true, type: Boolean }) needTimezone: boolean; // 是否显示时区选择
   @Emit('change')
   handleModelValueChange(v: TimeRangeType) {

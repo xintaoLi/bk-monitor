@@ -475,7 +475,9 @@ export default class MaskingAddRule extends tsc<IProps> {
       <Sideslider
         width={640}
         is-show={this.value}
-        title={this.$t('{n}脱敏规则', { n: this.isEdit ? this.$t('编辑') : this.$t('新增') })}
+        title={this.$t('{n}脱敏规则', {
+          n: this.isEdit ? this.$t('编辑') : this.$t('新增'),
+        })}
         quick-close
         transfer
         {...{
@@ -544,7 +546,9 @@ export default class MaskingAddRule extends tsc<IProps> {
               >
                 <i
                   class='bklog-icon bklog-info-fill'
-                  v-bk-tooltips={{ content: this.$t('字段名与表达式至少填写 1 个') }}
+                  v-bk-tooltips={{
+                    content: this.$t('字段名与表达式至少填写 1 个'),
+                  }}
                 ></i>
               </div>
             </FormItem>
@@ -650,7 +654,12 @@ export default class MaskingAddRule extends tsc<IProps> {
               name='1'
             >
               <div class='debugging-title'>
-                <i class={{ 'bk-icon icon-play-shape': true, 'is-active': this.activeCollapse.length }}></i>
+                <i
+                  class={{
+                    'bk-icon icon-play-shape': true,
+                    'is-active': this.activeCollapse.length,
+                  }}
+                ></i>
                 <span>{this.$t('脱敏结果预览')}</span>
               </div>
               <div
@@ -692,7 +701,10 @@ export default class MaskingAddRule extends tsc<IProps> {
                   <span class='debug-title'>{this.$t('脱敏结果')}</span>
                   <div
                     class='effect-log'
-                    v-bkloading={{ isLoading: this.debugRequesting, size: 'mini' }}
+                    v-bkloading={{
+                      isLoading: this.debugRequesting,
+                      size: 'mini',
+                    }}
                   >
                     <TextHighlight
                       style='word-break: break-all; white-space:pre-line;'

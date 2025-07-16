@@ -31,7 +31,10 @@ const RawSource = require('webpack-sources/lib/RawSource');
 const CachedSource = require('webpack-sources/lib/CachedSource');
 module.exports = class LogWebpackPlugin {
   constructor(config, options = {}) {
-    this.defaultOption = { cacheVersionKey: '__cache_version___', staticUrlKey: '__STATIC_URL__' };
+    this.defaultOption = {
+      cacheVersionKey: '__cache_version___',
+      staticUrlKey: '__STATIC_URL__',
+    };
     this.options = Object.assign({}, this.defaultOption, options);
     this.cacheVersionKey = this.options.cacheVersionKey;
     this.staticUrlKey = this.options.staticUrlKey;
@@ -102,7 +105,7 @@ module.exports = class LogWebpackPlugin {
         let machUrl = url.replace(`${this.staticUrl}${this.modePath}/`, '');
         if (
           !/(data:|manifest\.json|http|\/\/)|\$\{BK_STATIC_URL\}| \$\{WEIXIN_STATIC_URL\} |\$\{SITE_URL\}/gim.test(
-            machUrl,
+            machUrl
           ) &&
           /\.(png|css|js)/gim.test(machUrl)
         ) {

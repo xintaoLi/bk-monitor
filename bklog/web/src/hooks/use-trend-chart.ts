@@ -53,7 +53,7 @@ export default ({ target, handleChartDataZoom, dynamicHeight }: TrandChartOption
 
   const retrieveParams = computed(() => store.getters.retrieveParams);
   const gradeOptionsGroups = computed(() =>
-    (store.state.indexFieldInfo.custom_config?.grade_options?.settings ?? []).filter(setting => setting.enable),
+    (store.state.indexFieldInfo.custom_config?.grade_options?.settings ?? []).filter(setting => setting.enable)
   );
 
   /**
@@ -203,11 +203,19 @@ export default ({ target, handleChartDataZoom, dynamicHeight }: TrandChartOption
 
       gradeOptionsGroups.value.forEach(group => {
         if (!dataset.has(group.id)) {
-          const dst = getSeriesData({ name: group.name, data: [], color: group.color });
+          const dst = getSeriesData({
+            name: group.name,
+            data: [],
+            color: group.color,
+          });
           options.series.push(dst);
           colors.push(group.color);
           const index = options.series.length - 1;
-          dataset.set(group.id, { group, dst: options.series[index], dataMap: new Map<string, number>() });
+          dataset.set(group.id, {
+            group,
+            dst: options.series[index],
+            dataMap: new Map<string, number>(),
+          });
         }
       });
 
@@ -282,7 +290,13 @@ export default ({ target, handleChartDataZoom, dynamicHeight }: TrandChartOption
     const data = keys.map(key => [key, opt_data.get(key)[0], opt_data.get(key)[1]]);
 
     if (isInit) {
-      series.push(getSeriesData({ name: '', data: data.length ? data : getDefData(), color: '#A4B3CD' }));
+      series.push(
+        getSeriesData({
+          name: '',
+          data: data.length ? data : getDefData(),
+          color: '#A4B3CD',
+        })
+      );
       options.series = series;
     } else {
       options.series[0].data = data;
@@ -369,9 +383,15 @@ export default ({ target, handleChartDataZoom, dynamicHeight }: TrandChartOption
       } else {
         RetrieveHelper.fire(RetrieveEvent.TREND_GRAPH_SEARCH);
         // 更新Store中的时间范围
-        store.dispatch('handleTrendDataZoom', { start_time: timeFrom, end_time: timeTo, format: true }).then(() => {
-          store.dispatch('requestIndexSetQuery');
-        });
+        store
+          .dispatch('handleTrendDataZoom', {
+            start_time: timeFrom,
+            end_time: timeTo,
+            format: true,
+          })
+          .then(() => {
+            store.dispatch('requestIndexSetQuery');
+          });
       }
     }
   });

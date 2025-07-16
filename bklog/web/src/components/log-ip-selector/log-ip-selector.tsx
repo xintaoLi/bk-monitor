@@ -184,7 +184,11 @@ export function toSelectorNode(nodes: ITarget[], nodeType: INodeType) {
         // 增量数据只需使用host_id
         if (item.bk_host_id) return { host_id: item.bk_host_id };
         // 兼容旧数据 没有bk_host_id的情况下 把ip和cloud_id传给组件 提供组件内部定位host_id
-        return { host_id: undefined, ip: item.ip, cloud_area: { id: item.bk_cloud_id } };
+        return {
+          host_id: undefined,
+          ip: item.ip,
+          cloud_area: { id: item.bk_cloud_id },
+        };
       });
     case 'TOPO':
       return nodes.map(item => ({
@@ -327,7 +331,8 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
   panelList: string[];
   @Prop({ default: () => ({}), type: Object }) value: Record<string, any>;
   // 自定义主机列表列
-  @Prop({ type: Array }) hostTableCustomColumnList: IpSelectorHostTableCustomColumn[];
+  @Prop({ type: Array })
+  hostTableCustomColumnList: IpSelectorHostTableCustomColumn[];
   // 自定义menu
   @Prop({ type: Array }) hostMemuExtends: IpSelectorHostMemuExtend[];
   // 主机列表显示列（默认值：['ip', 'ipv6', 'alive', 'osName']），按配置顺序显示列
@@ -440,7 +445,9 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
   // 拉取topology
   async fetchTopologyHostCount(_node?: INode): Promise<ITreeItem[]> {
     const serviceModule = this.extractScene ? 'extract' : 'ipChooser';
-    const res = await $http.request(`${serviceModule}/trees`, { data: { scope_list: this.scopeList } });
+    const res = await $http.request(`${serviceModule}/trees`, {
+      data: { scope_list: this.scopeList },
+    });
     return res?.data || [];
   }
 
@@ -463,7 +470,9 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
       ...(search_content ? params : p),
     };
     const serviceModule = this.extractScene ? 'extract' : 'ipChooser';
-    const res = await $http.request(`${serviceModule}/queryHostIdInfos`, { data });
+    const res = await $http.request(`${serviceModule}/queryHostIdInfos`, {
+      data,
+    });
     return res?.data || [];
   }
 
@@ -504,7 +513,9 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
   }
   // 获取动态分组列表
   async fetchDynamicGroup(): Promise<Array<IGroupItem>[]> {
-    const res = await $http.request('ipChooser/dynamicGroups', { data: { scope_list: this.scopeList } });
+    const res = await $http.request('ipChooser/dynamicGroups', {
+      data: { scope_list: this.scopeList },
+    });
     return res?.data || [];
   }
   // 获取动态分组下的主机列表
@@ -569,7 +580,9 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
       template_type: 'SERVICE_TEMPLATE',
       ...query,
     };
-    const res = await $http.request('ipChooser/templateAgentStatistics', { data });
+    const res = await $http.request('ipChooser/templateAgentStatistics', {
+      data,
+    });
     return res?.data || [];
   }
   // 获取集群模板列表
@@ -611,7 +624,9 @@ export default class MonitorIpSelector extends tsc<IMonitorIpSelectorProps> {
       template_type: 'SET_TEMPLATE',
       ...query,
     };
-    const res = await $http.request('ipChooser/templateAgentStatistics', { data });
+    const res = await $http.request('ipChooser/templateAgentStatistics', {
+      data,
+    });
     return res?.data || [];
   }
   async fetchCustomSettings(params: CommomParams) {

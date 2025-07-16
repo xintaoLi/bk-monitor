@@ -31,7 +31,7 @@ export default (
   target: (() => HTMLElement | string) | Ref<HTMLElement> | string,
   callbackFn: (entry: ResizeObserverEntry) => void,
   delayCallback: boolean | number = 120,
-  immediateStart = true,
+  immediateStart = true
 ) => {
   const debounceCallback = debounce(entry => {
     callbackFn?.(entry);
@@ -113,5 +113,11 @@ export default (
 
   const getInstance = () => resizeObserver;
 
-  return { destoyResizeObserve, getInstance, observeElement, stopObserve, isStoped };
+  return {
+    destoyResizeObserve,
+    getInstance,
+    observeElement,
+    stopObserve,
+    isStoped,
+  };
 };

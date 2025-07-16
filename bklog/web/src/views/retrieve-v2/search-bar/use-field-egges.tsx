@@ -72,7 +72,13 @@ export default () => {
       setIsRequesting(true);
 
       const addition = value
-        ? [{ field: field.field_name, operator: '=~', value: getConditionValue() }].map(val => {
+        ? [
+            {
+              field: field.field_name,
+              operator: '=~',
+              value: getConditionValue(),
+            },
+          ].map(val => {
             const instance = new ConditionOperator(val);
             return instance.getRequestParam();
           })

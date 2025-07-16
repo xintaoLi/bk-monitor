@@ -222,7 +222,7 @@ const store = new Vuex.Store({
       Boolean(
         state.topMenu
           .find(item => item.id === 'manage')
-          ?.children.some(item => item.id === 'permissionGroup' && item.project_manage === true),
+          ?.children.some(item => item.id === 'permissionGroup' && item.project_manage === true)
       ),
     spaceBgColor: state => state.spaceBgColor,
     isEnLanguage: state => state.isEnLanguage,
@@ -367,7 +367,7 @@ const store = new Vuex.Store({
             state.indexItem[key].splice(
               0,
               state.indexItem[key].length,
-              ...(payload?.[key] ?? []).filter(v => v !== '' && v !== null && v !== undefined),
+              ...(payload?.[key] ?? []).filter(v => v !== '' && v !== null && v !== undefined)
             );
           } else {
             if (Object.prototype.hasOwnProperty.call(state.indexItem, key)) {
@@ -394,13 +394,17 @@ const store = new Vuex.Store({
      * @param {*} payload
      */
     resetIndexsetItemParams(state, payload) {
-      const defaultValue = { ...getDefaultRetrieveParams(), isUnionIndex: false, selectIsUnionSearch: false };
+      const defaultValue = {
+        ...getDefaultRetrieveParams(),
+        isUnionIndex: false,
+        selectIsUnionSearch: false,
+      };
       ['ids', 'items', 'catchUnionBeginList'].forEach(key => {
         if (Array.isArray(state.indexItem[key])) {
           state.indexItem[key].splice(
             0,
             state.indexItem[key].length,
-            ...(payload?.[key] ?? []).filter(v => v !== null && v !== undefined),
+            ...(payload?.[key] ?? []).filter(v => v !== null && v !== undefined)
           );
         }
       });
@@ -416,7 +420,7 @@ const store = new Vuex.Store({
           ...payload?.addition.map(item => {
             const instance = new ConditionOperator(item);
             return { ...item, ...instance.getRequestParam() };
-          }),
+          })
         );
       }
 
@@ -476,7 +480,7 @@ const store = new Vuex.Store({
           ...payload?.addition.map(item => {
             const instance = new ConditionOperator(item);
             return { ...item, ...instance.getRequestParam() };
-          }),
+          })
         );
       }
 
@@ -571,14 +575,25 @@ const store = new Vuex.Store({
     },
     updateMySpaceList(state, spaceList) {
       state.mySpaceList = spaceList.map(item => {
-        const defaultTag = { id: item.space_type_id, name: item.space_type_name, type: item.space_type_id };
+        const defaultTag = {
+          id: item.space_type_id,
+          name: item.space_type_name,
+          type: item.space_type_id,
+        };
         return {
           ...item,
           name: item.space_name.replace(/\[.*?\]/, ''),
           py_text: Vue.prototype.$bkToPinyin(item.space_name, true),
           tags:
             item.space_type_id === 'bkci' && item.space_code
-              ? [defaultTag, { id: 'bcs', name: window.mainComponent.$t('容器项目'), type: 'bcs' }]
+              ? [
+                  defaultTag,
+                  {
+                    id: 'bcs',
+                    name: window.mainComponent.$t('容器项目'),
+                    type: 'bcs',
+                  },
+                ]
               : [defaultTag],
         };
       });
@@ -767,7 +782,7 @@ const store = new Vuex.Store({
                           value: 0,
                           writable: true,
                         },
-                      },
+                      }
                     ),
                   });
                   fieldData = target[fullFieldKey];
@@ -801,7 +816,7 @@ const store = new Vuex.Store({
       state.notTextTypeFields = [];
 
       state.notTextTypeFields.push(
-        ...(payload.fields ?? []).filter(field => field.field_type !== 'text').map(item => item.field_name),
+        ...(payload.fields ?? []).filter(field => field.field_type !== 'text').map(item => item.field_name)
       );
     },
     updateTableLineIsWrap(state, payload) {
@@ -817,7 +832,7 @@ const store = new Vuex.Store({
           state.visibleFields,
           payload?.list ?? state.indexSetQueryResult.list,
           catchFieldsWidthObj,
-          staticWidth + 60,
+          staticWidth + 60
         );
         // request_counter 用于触发查询结果表格的更新
         state.indexFieldInfo.request_counter++;
@@ -1144,7 +1159,7 @@ const store = new Vuex.Store({
             query: !isUnionIndex ? queryData : undefined,
             data: isUnionIndex ? queryData : undefined,
           },
-          isUnionIndex ? {} : { catchIsShowMessage: false },
+          isUnionIndex ? {} : { catchIsShowMessage: false }
         )
         .then(res => {
           commit('updateIndexFieldInfo', res.data ?? {});
@@ -1194,7 +1209,7 @@ const store = new Vuex.Store({
             query: !isUnionIndex ? queryData : undefined,
             data: isUnionIndex ? queryData : undefined,
           },
-          isUnionIndex ? {} : { catchIsShowMessage: false },
+          isUnionIndex ? {} : { catchIsShowMessage: false }
         )
         .then(res => {
           commit('retrieve/updateCatchFieldCustomConfig', res.data.user_custom_config); // 更新用户个人配置
@@ -1218,7 +1233,11 @@ const store = new Vuex.Store({
      */
     requestIndexSetQuery(
       { commit, state, getters, dispatch },
-      payload = { isPagination: false, cancelToken: null, searchCount: undefined },
+      payload = {
+        isPagination: false,
+        cancelToken: null,
+        searchCount: undefined,
+      }
     ) {
       if (!payload?.isPagination) {
         commit('updateIndexSetQueryResult', {
@@ -1233,7 +1252,10 @@ const store = new Vuex.Store({
       ) {
         state.searchTotal = 0;
         commit('updateSqlQueryFieldList', []);
-        commit('updateIndexSetQueryResult', { is_error: false, exception_msg: '' });
+        commit('updateIndexSetQueryResult', {
+          is_error: false,
+          exception_msg: '',
+        });
         return; // Promise.reject({ message: `index_set_id is undefined` });
       }
       let begin = state.indexItem.begin;
@@ -1288,7 +1310,7 @@ const store = new Vuex.Store({
       // 更新联合查询的begin
       const unionConfigs = state.unionIndexList.map(item => ({
         begin: payload.isPagination
-          ? state.indexItem.catchUnionBeginList.find(cItem => String(cItem?.index_set_id) === item)?.begin ?? 0
+          ? (state.indexItem.catchUnionBeginList.find(cItem => String(cItem?.index_set_id) === item)?.begin ?? 0)
           : 0,
         index_set_id: item,
       }));
@@ -1303,7 +1325,7 @@ const store = new Vuex.Store({
             }
           : {
               union_configs: unionConfigs,
-            },
+            }
       );
       const params = {
         method: 'post',
@@ -1347,7 +1369,10 @@ const store = new Vuex.Store({
                 }
                 // 更新页数
                 commit('updateSqlQueryFieldList', logList);
-                commit('updateIndexItem', { catchUnionBeginList, begin: payload.isPagination ? begin : 0 });
+                commit('updateIndexItem', {
+                  catchUnionBeginList,
+                  begin: payload.isPagination ? begin : 0,
+                });
                 commit('updateIndexSetQueryResult', rsolvedData);
 
                 return {
@@ -1360,7 +1385,10 @@ const store = new Vuex.Store({
                 };
               }
 
-              commit('updateIndexSetQueryResult', { exception_msg: message, is_error: !result });
+              commit('updateIndexSetQueryResult', {
+                exception_msg: message,
+                is_error: !result,
+              });
 
               return {
                 data,
@@ -1379,7 +1407,10 @@ const store = new Vuex.Store({
           state.searchTotal = 0;
           commit('updateSqlQueryFieldList', []);
           if (e.code !== 'ERR_CANCELED') {
-            commit('updateIndexSetQueryResult', { is_error: true, exception_msg: e?.message ?? e?.toString() });
+            commit('updateIndexSetQueryResult', {
+              is_error: true,
+              exception_msg: e?.message ?? e?.toString(),
+            });
           }
         })
         .finally(() => {
@@ -1409,7 +1440,7 @@ const store = new Vuex.Store({
           },
           {
             cancelToken: requestCancelToken,
-          },
+          }
         )
         .then(resp => {
           commit('updateIndexSetFieldConfigList', {
@@ -1674,7 +1705,11 @@ const store = new Vuex.Store({
 
           let newSearchValue = null;
           if (searchMode === 'ui') {
-            const mapOperator = getAdditionMappingOperator({ field, operator, value });
+            const mapOperator = getAdditionMappingOperator({
+              field,
+              operator,
+              value,
+            });
             if (targetField?.is_virtual_obj_node) {
               newSearchValue = Object.assign({ field: '*', value }, { operator: mapOperator });
             } else {
@@ -1685,7 +1720,10 @@ const store = new Vuex.Store({
             if (targetField?.is_virtual_obj_node) {
               newSearchValue = `\"${value[0]}\"`;
             } else {
-              newSearchValue = getSqlAdditionMappingOperator({ field, operator })?.(value);
+              newSearchValue = getSqlAdditionMappingOperator({
+                field,
+                operator,
+              })?.(value);
             }
           }
           const isExist = searchValueIsExist(newSearchValue, searchMode);
@@ -1724,7 +1762,9 @@ const store = new Vuex.Store({
     },
 
     changeShowUnionSource({ commit, state }) {
-      commit('updateIndexSetOperatorConfig', { isShowSourceField: !state.indexSetOperatorConfig.isShowSourceField });
+      commit('updateIndexSetOperatorConfig', {
+        isShowSourceField: !state.indexSetOperatorConfig.isShowSourceField,
+      });
     },
 
     requestSearchTotal({ state, getters }) {
@@ -1746,7 +1786,7 @@ const store = new Vuex.Store({
           },
           {
             catchIsShowMessage: false,
-          },
+          }
         )
         .then(res => {
           const { data, code } = res;

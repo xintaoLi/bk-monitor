@@ -131,20 +131,26 @@ export default class AggChart extends tsc<object> {
     const route = this.$route;
     // const store = this.$store;
 
-    store.dispatch('setQueryCondition', { field: this.fieldName, operator, value: [value] }).then(() => {
-      const query = { ...route.query };
+    store
+      .dispatch('setQueryCondition', {
+        field: this.fieldName,
+        operator,
+        value: [value],
+      })
+      .then(() => {
+        const query = { ...route.query };
 
-      const resolver = new RetrieveUrlResolver({
-        keyword: store.getters.retrieveParams.keyword,
-        addition: store.getters.retrieveParams.addition,
+        const resolver = new RetrieveUrlResolver({
+          keyword: store.getters.retrieveParams.keyword,
+          addition: store.getters.retrieveParams.addition,
+        });
+
+        Object.assign(query, resolver.resolveParamsToUrl());
+
+        router.replace({
+          query,
+        });
       });
-
-      Object.assign(query, resolver.resolveParamsToUrl());
-
-      router.replace({
-        query,
-      });
-    });
   }
   getIconPopover(operator, value) {
     if (this.fieldType === '__virtual__') return this.t('该字段为平台补充 不可检索');

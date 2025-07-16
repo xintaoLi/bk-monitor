@@ -70,7 +70,9 @@ export default class CollectGroup extends tsc<IProps> {
     groupEditName: [
       {
         validator: this.checkName,
-        message: window.mainComponent.$t('{n}不规范, 包含特殊符号.', { n: window.mainComponent.$t('组名') }),
+        message: window.mainComponent.$t('{n}不规范, 包含特殊符号.', {
+          n: window.mainComponent.$t('组名'),
+        }),
         trigger: 'blur',
       },
       {
@@ -141,7 +143,7 @@ export default class CollectGroup extends tsc<IProps> {
     if (this.verifyData.groupEditName.trim() === '') return true;
 
     return /^[\u4e00-\u9fa5_a-zA-Z0-9`~!@#$%^&*()_\-+=<>?:"{}|,.\/;'\\[\]·~！@#￥%……&*（）——\-+={}|《》？：“”【】、；‘'，。、]+$/im.test(
-      this.verifyData.groupEditName.trim(),
+      this.verifyData.groupEditName.trim()
     );
   }
 
@@ -419,7 +421,9 @@ export default class CollectGroup extends tsc<IProps> {
         >
           {this.showGroupList.map(item => (
             <li
-              class={{ 'new-group-container': this.newGroupName === item.group_name }}
+              class={{
+                'new-group-container': this.newGroupName === item.group_name,
+              }}
               onClick={() => this.handleClickLi('move-favorite', item.group_id)}
             >
               <span>{item.group_name}</span>
@@ -552,7 +556,9 @@ export default class CollectGroup extends tsc<IProps> {
                 </span>
                 <Input
                   vModel={this.verifyData.groupEditName}
-                  placeholder={this.$t('{n}, （长度30个字符）', { n: this.$t('请输入') })}
+                  placeholder={this.$t('{n}, （长度30个字符）', {
+                    n: this.$t('请输入'),
+                  })}
                   clearable
                   onEnter={v => this.handleGroupKeyDown(v, 'reset')}
                 ></Input>

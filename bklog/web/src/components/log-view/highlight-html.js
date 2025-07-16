@@ -114,12 +114,19 @@ export default {
                 if (beforeMatch) {
                   tempResultArray.push({ str: beforeMatch, style: null });
                 }
-                tempResultArray.push({ str: matchedText, style: style, isHighLight: true });
+                tempResultArray.push({
+                  str: matchedText,
+                  style: style,
+                  isHighLight: true,
+                });
                 matchIndex = match.index + matchedText.length;
               }
 
               if (matchIndex < segment.str.length) {
-                tempResultArray.push({ str: segment.str.slice(matchIndex), style: null });
+                tempResultArray.push({
+                  str: segment.str.slice(matchIndex),
+                  style: null,
+                });
               }
             } else {
               tempResultArray.push(segment);

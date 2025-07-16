@@ -343,7 +343,9 @@ export default class SearchComp extends tsc<IProps> {
     const { ip_chooser, isIPChooserOpen, addition, ...reset } = query;
     const filterQuery = reset; // 给query排序 让addition和ip_chooser排前面
     Object.assign(filterQuery, retrieveParams);
-    const newQueryObj = { addition: this.getFiledAdditionStr(linkAdditionList) }; // 新的query对象
+    const newQueryObj = {
+      addition: this.getFiledAdditionStr(linkAdditionList),
+    }; // 新的query对象
     const { ipChooser } = retrieveParams;
     const newIPChooser = Object.keys(ipChooser || {}).length ? ipChooser : ip_chooser;
 
@@ -421,7 +423,7 @@ export default class SearchComp extends tsc<IProps> {
       findOperatorItem = this.containsStrList.includes(operator) ? containsItem : notContainsItem;
     } else {
       findOperatorItem = findField?.operatorList.find(
-        item => item.operator === operator || item?.wildcard_operator === operator,
+        item => item.operator === operator || item?.wildcard_operator === operator
       );
     }
     const operatorItem = findOperatorItem ?? {}; // 找不到则是ip选择器
@@ -725,7 +727,12 @@ export default class SearchComp extends tsc<IProps> {
             onIsIncludeChange={v => this.handleIsIncludeChange(index, v)}
           />
         ))}
-        <div class={{ 'inquire-cascader-container': true, active: this.isShowFilterOption }}>
+        <div
+          class={{
+            'inquire-cascader-container': true,
+            active: this.isShowFilterOption,
+          }}
+        >
           <Button
             class='add-condition'
             theme='primary'

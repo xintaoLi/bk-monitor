@@ -76,7 +76,7 @@ axiosInstance.interceptors.request.use(
     // }
     return config;
   },
-  error => Promise.reject(error),
+  error => Promise.reject(error)
 );
 
 /**
@@ -121,7 +121,7 @@ axiosInstance.interceptors.response.use(
       }
 
       return Promise.reject(new Error(`${e}`));
-    }
+    };
     if (error?.response?.data instanceof Blob) {
       return readBlobRespToJson(error.response.data).then(resp => {
         return handleReject(
@@ -136,7 +136,7 @@ axiosInstance.interceptors.response.use(
     }
 
     return handleReject(error, { globalError: true, catchIsShowMessage: true, ...error.config }, reject);
-  },
+  }
 );
 
 const http = {
@@ -265,7 +265,11 @@ function handleReject(error, config, reject) {
   if (config.globalError && error.response) {
     // status 是 httpStatus
     const { status, data } = error.response;
-    const nextError = { message: error.message ?? '401 Authorization Required', response: error.response, status };
+    const nextError = {
+      message: error.message ?? '401 Authorization Required',
+      response: error.response,
+      status,
+    };
     // 弹出登录框不需要出 bkMessage 提示
     if (status === 401) {
       // 窗口登录，页面跳转交给平台返回302

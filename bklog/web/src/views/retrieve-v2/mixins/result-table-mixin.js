@@ -133,7 +133,9 @@ export default {
     ...mapState([
       'isNotVisibleFieldsShow',
       'indexSetQueryResult',
-      { tableLineIsWrap: state => state.storage[BK_LOG_STORAGE.TABLE_LINE_IS_WRAP] },
+      {
+        tableLineIsWrap: state => state.storage[BK_LOG_STORAGE.TABLE_LINE_IS_WRAP],
+      },
       'indexSetOperatorConfig',
       'indexFieldInfo',
       'indexItem',
@@ -200,8 +202,11 @@ export default {
     },
     fieldAliasMap() {
       return (this.indexFieldInfo.fields ?? []).reduce(
-        (out, field) => ({ ...out, [field.field_name]: field.field_alias || field.field_name }),
-        {},
+        (out, field) => ({
+          ...out,
+          [field.field_name]: field.field_alias || field.field_name,
+        }),
+        {}
       );
     },
     timeFieldType() {
@@ -350,12 +355,15 @@ export default {
                 directives: [
                   {
                     name: 'bk-tooltips',
-                    value: { allowHTML: false, content: isLackIndexFields ? unionContent : fieldName },
+                    value: {
+                      allowHTML: false,
+                      content: isLackIndexFields ? unionContent : fieldName,
+                    },
                   },
                 ],
                 class: { 'lack-index-filed': isLackIndexFields },
               },
-              [fieldName],
+              [fieldName]
             ),
             h(TimeFormatterSwitcher, {
               class: 'timer-formatter',
@@ -387,7 +395,7 @@ export default {
                 },
               },
             }),
-          ],
+          ]
         );
       }
     },
@@ -401,7 +409,13 @@ export default {
       const store = this.$store;
 
       this.$store
-        .dispatch('setQueryCondition', { field, operator, value, isLink, depth })
+        .dispatch('setQueryCondition', {
+          field,
+          operator,
+          value,
+          isLink,
+          depth,
+        })
         .then(([newSearchList, searchMode, isNewSearchPage]) => {
           if (isLink) {
             const openUrl = getConditionRouterParams(newSearchList, searchMode, isNewSearchPage);

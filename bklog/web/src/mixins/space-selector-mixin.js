@@ -63,12 +63,14 @@ export default {
             },
             [
               this.isUseMark &&
-                h('span', { class: `identify-icon ${this.isUseMark && item.is_use ? 'is-use' : 'not-use'}` }),
+                h('span', {
+                  class: `identify-icon ${this.isUseMark && item.is_use ? 'is-use' : 'not-use'}`,
+                }),
               h('span', { class: 'code-name' }, [
                 item.space_full_code_name,
                 this.isUseMark && item.is_use ? `（${this.$t('正在使用')}）` : '',
               ]),
-            ],
+            ]
           ),
           h(
             'div',
@@ -86,16 +88,16 @@ export default {
                         ...SPACE_TYPE_MAP[tag.id].light,
                       },
                     },
-                    tag.name,
-                  ),
+                    tag.name
+                  )
                 ),
               this.spaceMultiple &&
                 h('span', {
                   class: this.visibleBkBiz.includes(item.bk_biz_id) && 'bk-icon icon-check-1',
                 }),
-            ],
+            ]
           ),
-        ],
+        ]
       );
     },
   },

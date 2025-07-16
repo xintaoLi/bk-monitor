@@ -447,7 +447,7 @@ export default class MaskingField extends tsc<IProps> {
       const typeIndex = lItem.findIndex(item => item.field_class === fieldItem.field_class);
       // 找到对应fieldName的索引
       const fieldIndex = lItem[typeIndex].fieldList?.findIndex(
-        (item: IFieldItem) => item.field_name === fieldItem.field_name,
+        (item: IFieldItem) => item.field_name === fieldItem.field_name
       );
       callback(lItem[typeIndex].fieldList[fieldIndex]);
     });
@@ -721,7 +721,7 @@ export default class MaskingField extends tsc<IProps> {
       .map(fItem => ({
         ...fItem,
         fieldList: (fItem.fieldList as any).filter(item =>
-          item.field_name.toString().toLowerCase().includes(this.searchStr.toLowerCase()),
+          item.field_name.toString().toLowerCase().includes(this.searchStr.toLowerCase())
         ),
       }))
       .filter(item => !!item.fieldList.length);
@@ -755,7 +755,9 @@ export default class MaskingField extends tsc<IProps> {
             click: this.handleClearRule,
           },
         }),
-        h('span', { class: ['bklog-icon bklog-double-arrow', { 'is-show-sync': this.isShowSyncBtn }] }),
+        h('span', {
+          class: ['bklog-icon bklog-double-arrow', { 'is-show-sync': this.isShowSyncBtn }],
+        }),
         h(
           'span',
           {
@@ -764,9 +766,9 @@ export default class MaskingField extends tsc<IProps> {
               click: () => this.handleAllSync(),
             },
           },
-          this.$t('同步所有变更'),
+          this.$t('同步所有变更')
         ),
-      ],
+      ]
     );
   }
 
@@ -787,7 +789,7 @@ export default class MaskingField extends tsc<IProps> {
             },
           ],
         }),
-      ],
+      ]
     );
   }
 
@@ -853,7 +855,7 @@ export default class MaskingField extends tsc<IProps> {
         {
           fieldList: [],
           fieldObj: {},
-        },
+        }
       );
     } catch (err) {
       return {
@@ -874,7 +876,7 @@ export default class MaskingField extends tsc<IProps> {
         {
           params: { index_set_id: this.collectData?.index_set_id },
         },
-        { catchIsShowMessage: false },
+        { catchIsShowMessage: false }
       );
       return res.data.field_configs;
     } catch (err) {
@@ -1359,7 +1361,9 @@ export default class MaskingField extends tsc<IProps> {
           {rItem?.disabled && (
             <i
               class='bk-icon icon-info-circle-shape'
-              v-bk-tooltips={{ content: this.$t('脱敏规则暂未匹配到有效日志，无法预览结果') }}
+              v-bk-tooltips={{
+                content: this.$t('脱敏规则暂未匹配到有效日志，无法预览结果'),
+              }}
             ></i>
           )}
           {getMaskingRuleEndState(fieldItem, rItem, rIndex)}
@@ -1524,13 +1528,17 @@ export default class MaskingField extends tsc<IProps> {
       default: ({ row }) => (
         <div
           class='masking-preview-box'
-          v-bkloading={{ isLoading: this.isPreviewLoading && !this.previewLoadingField }}
+          v-bkloading={{
+            isLoading: this.isPreviewLoading && !this.previewLoadingField,
+          }}
         >
           {row.fieldList.map(item => (
             <div
               style={this.getFieldItemStyle(item)}
               class='preview'
-              v-bkloading={{ isLoading: this.isPreviewLoading && this.previewLoadingField === row.field_name }}
+              v-bkloading={{
+                isLoading: this.isPreviewLoading && this.previewLoadingField === row.field_name,
+              }}
               onMouseenter={() => this.handleHoverRow(item.field_name)}
               onMouseleave={() => this.handleLeaveRow()}
             >
@@ -1661,7 +1669,7 @@ export default class MaskingField extends tsc<IProps> {
                   })
                 : this.$t(
                     '当前规则【{n}】已进行了变更，同步该规则可能会导致命中结果变更，请确认是否需要同步该变更或忽略，也可重新选择规则',
-                    { n: this.currentOperateRule.rule_name },
+                    { n: this.currentOperateRule.rule_name }
                   )}
             </span>
             <div class={`rule-change-container rule-${this.currentRuleState}`}>

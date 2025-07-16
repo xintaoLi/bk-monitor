@@ -102,7 +102,10 @@ export default class HandleBtn extends tsc<object> {
     const { params: retrieveParams } = this.getRetrieveFavoriteData();
     const { params } = this.activeFavorite;
     const additions = params?.addition || [];
-    const favAddition = additions.map(item => ({ ...item, value: this.getAdditionValue(item.value) }));
+    const favAddition = additions.map(item => ({
+      ...item,
+      value: this.getAdditionValue(item.value),
+    }));
     const favoriteParams = {
       ip_chooser: params?.ip_chooser ?? {},
       addition: favAddition,
@@ -293,7 +296,10 @@ export default class HandleBtn extends tsc<object> {
             onClick={this.handleUpdateFavorite}
           >
             <span
-              v-bk-tooltips={{ content: this.$t('当前收藏有更新，点击保存当前修改'), disabled: !this.isFavoriteUpdate }}
+              v-bk-tooltips={{
+                content: this.$t('当前收藏有更新，点击保存当前修改'),
+                disabled: !this.isFavoriteUpdate,
+              }}
             >
               <span class='favorite-btn-text'>
                 <span

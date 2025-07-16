@@ -50,7 +50,9 @@ export default defineComponent({
     const handleJsonFormatDeepChange = val => {
       const value = Number(val);
       const target = value > 15 ? 15 : value < 1 ? 1 : value;
-      store.commit('updateStorage', { [BK_LOG_STORAGE.TABLE_JSON_FORMAT_DEPTH]: target });
+      store.commit('updateStorage', {
+        [BK_LOG_STORAGE.TABLE_JSON_FORMAT_DEPTH]: target,
+      });
     };
 
     return () => (

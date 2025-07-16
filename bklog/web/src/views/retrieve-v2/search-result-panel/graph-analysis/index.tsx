@@ -81,7 +81,12 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
   chartActiveType = GraphCategory.TABLE;
   xFields = [];
   yFields = [];
-  chartData: { data?: any; list?: any[]; result_schema?: any[]; select_fields_order?: string[] } = {};
+  chartData: {
+    data?: any;
+    list?: any[];
+    result_schema?: any[];
+    select_fields_order?: string[];
+  } = {};
   resultSchema = [];
   hiddenFields = [];
   dimensions = [];
@@ -119,11 +124,16 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
 
   debounceCallback = debounce(entry => {
     const { offsetWidth, offsetHeight } = entry.target;
-    Object.assign(this.canvasBodyStyle, { with: offsetWidth, height: offsetHeight });
+    Object.assign(this.canvasBodyStyle, {
+      with: offsetWidth,
+      height: offsetHeight,
+    });
   }, 120);
 
   throttleScrollCallback = throttle(event => {
-    Object.assign(this.canvasBodyStyle, { scrollTop: (event.target as HTMLElement).scrollTop });
+    Object.assign(this.canvasBodyStyle, {
+      scrollTop: (event.target as HTMLElement).scrollTop,
+    });
   });
 
   resizeObserver = null;
@@ -456,7 +466,12 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
 
     if (isNumber) {
       tips = this.$t('当前缺少维度');
-      return { showException: !this.yFields.length, message, showQuery: false, tips };
+      return {
+        showException: !this.yFields.length,
+        message,
+        showQuery: false,
+        tips,
+      };
     }
 
     if (!this.xFields.length && !this.yFields.length && !this.dimensions.length) {
@@ -482,15 +497,30 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
 
   getExceptionMessage() {
     if (this.isRequesting) {
-      return { showException: true, message: '请求中...', showQuery: false, tips: '' };
+      return {
+        showException: true,
+        message: '请求中...',
+        showQuery: false,
+        tips: '',
+      };
     }
 
     if (!this.errorResponse.result && this.errorResponse.message) {
-      return { showException: true, message: this.errorResponse.message, showQuery: true, tips: '' };
+      return {
+        showException: true,
+        message: this.errorResponse.message,
+        showQuery: true,
+        tips: '',
+      };
     }
 
     if (this.isSqlValueChanged) {
-      return { showException: true, message: this.$t('图表查询配置已变更'), showQuery: true, tips: '' };
+      return {
+        showException: true,
+        message: this.$t('图表查询配置已变更'),
+        showQuery: true,
+        tips: '',
+      };
     }
 
     return this.getChartConfigValidate();
@@ -584,11 +614,11 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
         item =>
           !/date|time/.test(item.field_alias) &&
           !this.xFields.includes(item.field_alias) &&
-          !this.dimensions.includes(item.field_alias),
+          !this.dimensions.includes(item.field_alias)
       );
 
       const defValue = filterList?.find(
-        item => /long|number|int|float|bigint|double/.test(item.field_type) && !this.xFields.includes(item.field_alias),
+        item => /long|number|int|float|bigint|double/.test(item.field_type) && !this.xFields.includes(item.field_alias)
       )?.field_alias;
 
       if (defValue) {
@@ -694,13 +724,17 @@ export default class GraphAnalysisIndex extends tsc<IProps> {
                   v-show={this.activeGraphCategory !== GraphCategory.TABLE}
                 >
                   <span
-                    class={{ active: this.chartActiveType !== GraphCategory.TABLE }}
+                    class={{
+                      active: this.chartActiveType !== GraphCategory.TABLE,
+                    }}
                     onClick={() => this.handleCanvasTypeChange(GraphCategory.CHART)}
                   >
                     <i class='bklog-icon bklog-bar'></i>
                   </span>
                   <span
-                    class={{ active: this.chartActiveType === GraphCategory.TABLE }}
+                    class={{
+                      active: this.chartActiveType === GraphCategory.TABLE,
+                    }}
                     onClick={() => this.handleCanvasTypeChange(GraphCategory.TABLE)}
                   >
                     <i class='bklog-icon bklog-table'></i>

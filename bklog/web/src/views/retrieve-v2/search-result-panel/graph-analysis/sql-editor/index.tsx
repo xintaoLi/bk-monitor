@@ -72,7 +72,11 @@ export default defineComponent({
       }
     };
     const { $t } = useLocale();
-    const { editorInstance } = useEditor({ refRootElement, sqlContent, onValueChange });
+    const { editorInstance } = useEditor({
+      refRootElement,
+      sqlContent,
+      onValueChange,
+    });
     const { alias_settings } = useFieldAliasRequestParams();
 
     const indexSetId = computed(() => store.state.indexId);
@@ -163,7 +167,9 @@ export default defineComponent({
             formatMonacoSqlCode();
           });
 
-          previewSqlContent.value = format(resp.data.additional_where_clause, { language: 'transactsql' });
+          previewSqlContent.value = format(resp.data.additional_where_clause, {
+            language: 'transactsql',
+          });
           isPreviewSqlShow.value = true;
           callback?.();
         })
@@ -185,7 +191,9 @@ export default defineComponent({
     };
 
     const formatMonacoSqlCode = (value?: string) => {
-      const val = format(value ?? editorInstance.value?.getValue() ?? '', { language: 'transactsql' });
+      const val = format(value ?? editorInstance.value?.getValue() ?? '', {
+        language: 'transactsql',
+      });
       editorInstance.value?.setValue([val].join('\n'));
     };
 
@@ -214,7 +222,10 @@ export default defineComponent({
 
           <BookmarkPop
             class='bklog-sqleditor-bookmark'
-            v-bk-tooltips={{ content: ($t('button-收藏') as string).replace('button-', ''), theme: 'light' }}
+            v-bk-tooltips={{
+              content: ($t('button-收藏') as string).replace('button-', ''),
+              theme: 'light',
+            }}
             addition={retrieveParams.value.addition ?? []}
             extendParams={props.extendParams}
             search-mode='sqlChart'
@@ -312,7 +323,7 @@ export default defineComponent({
         RetrieveEvent.LEFT_FIELD_INFO_UPDATE,
       ],
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onRefereceChange,
+      onRefereceChange
     );
     useResizeObserve(refSqlPreviewElement, debounceUpdateHeight);
 

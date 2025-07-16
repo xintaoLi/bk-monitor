@@ -46,8 +46,8 @@ export default (
     addInputListener = true,
     handleWrapperClick = undefined,
     onInputFocus = undefined,
-    afterShowKeyEnter = undefined
-  },
+    afterShowKeyEnter = undefined,
+  }
 ) => {
   const modelValue = ref([]);
   const sectionHeight = ref(0);
@@ -61,7 +61,14 @@ export default (
 
   let resizeObserver: ResizeObserver = null;
   const INPUT_MIN_WIDTH = 12;
-  const popInstanceUtil = new PopInstanceUtil({ refContent, onShowFn, onHiddenFn, arrow, newInstance, tippyOptions });
+  const popInstanceUtil = new PopInstanceUtil({
+    refContent,
+    onShowFn,
+    onHiddenFn,
+    arrow,
+    newInstance,
+    tippyOptions,
+  });
 
   const uninstallInstance = () => popInstanceUtil.uninstallInstance();
   const getTippyInstance = () => popInstanceUtil.getTippyInstance();
@@ -179,7 +186,7 @@ export default (
     () => {
       setModelValue(props.value);
     },
-    { deep: true, immediate: true },
+    { deep: true, immediate: true }
   );
 
   const handleWrapperClickCapture = e => {
@@ -199,7 +206,6 @@ export default (
   };
 
   const handleKeydown = event => {
-
     // 检查按下的键是否是斜杠 "/"（需兼容不同键盘布局）
     const isSlashKey = event.key === '/' || event.keyCode === 191;
     const isEscKey = event.key === 'Escape' || event.keyCode === 27;
@@ -232,7 +238,9 @@ export default (
 
   onMounted(() => {
     instance = getCurrentInstance();
-    document.addEventListener('mousedown', handleWrapperClickCapture, { capture: true });
+    document.addEventListener('mousedown', handleWrapperClickCapture, {
+      capture: true,
+    });
     document?.addEventListener('keydown', handleKeydown);
     document?.addEventListener('click', handleContainerClick);
 

@@ -117,7 +117,9 @@ class RetrieveHelper extends RetrieveBase {
     }
 
     const { caseSensitive } = this.markInstance.getMarkOptions();
-    this.markInstance.setObserverConfig({ root: document.getElementById(this.logRowsContainerId) });
+    this.markInstance.setObserverConfig({
+      root: document.getElementById(this.logRowsContainerId),
+    });
     this.markInstance.unmark();
     this.markInstance.highlight(
       (keywords ?? []).map((keyword, index) => {
@@ -128,7 +130,7 @@ class RetrieveHelper extends RetrieveBase {
           textReg: new RegExp(`^${keyword}$`, caseSensitive ? '' : 'i'),
         };
       }),
-      reset,
+      reset
     );
   }
 
@@ -437,4 +439,8 @@ const isFavoriteShow = localStorage.getItem(STORAGE_KEY.STORAGE_KEY_FAVORITE_SHO
 const isViewCurrentIndex = localStorage.getItem(STORAGE_KEY.STORAGE_KEY_FAVORITE_VIEW_CURRENT_CHANGE) !== 'false';
 const favoriteWidth = Number(localStorage.getItem(STORAGE_KEY.STORAGE_KEY_FAVORITE_WIDTH) ?? 240);
 
-export default new RetrieveHelper({ isFavoriteShow, favoriteWidth, isViewCurrentIndex });
+export default new RetrieveHelper({
+  isFavoriteShow,
+  favoriteWidth,
+  isViewCurrentIndex,
+});

@@ -35,7 +35,12 @@ import './field-item.scss';
 
 @Component
 export default class FieldItem extends tsc<object> {
-  @Prop({ type: String, default: 'visible', validator: v => ['visible', 'hidden'].includes(v as string) }) type: string;
+  @Prop({
+    type: String,
+    default: 'visible',
+    validator: v => ['visible', 'hidden'].includes(v as string),
+  })
+  type: string;
   @Prop({ type: Object, default: () => ({}) }) fieldItem: any;
   @Prop({ type: Object, default: () => ({}) }) fieldAliasMap: object;
   @Prop({ type: Boolean, default: false }) showFieldAlias: boolean;
@@ -173,7 +178,12 @@ export default class FieldItem extends tsc<object> {
         >
           <span class={['icon bklog-icon bklog-drag-dots', { 'hidden-icon': this.type === 'hidden' }]}></span>
           {/* 三角符号 */}
-          <span class={{ 'icon-right-shape': this.showFieldsChart, 'bk-icon': true }}></span>
+          <span
+            class={{
+              'icon-right-shape': this.showFieldsChart,
+              'bk-icon': true,
+            }}
+          ></span>
           {/* 字段类型对应的图标 */}
           <span
             class={[this.getFieldIcon(this.fieldItem.field_type) || 'bklog-icon bklog-unkown', 'field-type-icon']}

@@ -53,7 +53,8 @@ interface IEvents {
 
 @Component
 export default class TimeRange extends tsc<IProps, IEvents> {
-  @Prop({ default: () => DEFAULT_TIME_RANGE, type: Array }) value: TimeRangeType; // 组件回显值
+  @Prop({ default: () => DEFAULT_TIME_RANGE, type: Array })
+  value: TimeRangeType; // 组件回显值
   @Prop({ default: 'normal', type: String }) type: TimeRangeDisplayType; // 组件的样式类型
   @Prop({ default: 'bottom-end', type: String }) placement: string; // 参照组件库的date-picker
 
@@ -207,7 +208,11 @@ export default class TimeRange extends tsc<IProps, IEvents> {
             <div
               class={[
                 'time-range-trigger',
-                { active: this.isShow, simple: this.type === 'simple', border: this.type === 'border' },
+                {
+                  active: this.isShow,
+                  simple: this.type === 'simple',
+                  border: this.type === 'border',
+                },
               ]}
               onClick={() => (this.isShow = true)}
             >

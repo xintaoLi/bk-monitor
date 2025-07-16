@@ -62,7 +62,13 @@ export const getStorageCommonFilterAddition = () => {
     jsonValue = JSON.parse(value || '[]');
 
     if (!Array.isArray(jsonValue) && 'indexId' in jsonValue && 'value' in jsonValue) {
-      jsonValue = [{ indexSetIdList: [jsonValue.indexId], filterAddition: [jsonValue.value], t: new Date().getTime() }];
+      jsonValue = [
+        {
+          indexSetIdList: [jsonValue.indexId],
+          filterAddition: [jsonValue.value],
+          t: new Date().getTime(),
+        },
+      ];
     }
   } catch (e) {
     console.error('Failed to parse common filter addition:', e);
@@ -76,7 +82,7 @@ export const filterCommontAdditionByIndexSetId = (indexSetIdList: string[], list
   const formatList = indexSetIdList.map(id => `${id}`);
   return jsonValue?.find(
     item =>
-      item.indexSetIdList.length === formatList.length && item.indexSetIdList.every(id => formatList.includes(`${id}`)),
+      item.indexSetIdList.length === formatList.length && item.indexSetIdList.every(id => formatList.includes(`${id}`))
   );
 };
 

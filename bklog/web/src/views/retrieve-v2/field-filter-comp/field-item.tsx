@@ -38,7 +38,12 @@ import { axiosInstance } from '@/api';
 import './field-item.scss';
 @Component
 export default class FieldItem extends tsc<object> {
-  @Prop({ type: String, default: 'visible', validator: v => ['visible', 'hidden'].includes(v as string) }) type: string;
+  @Prop({
+    type: String,
+    default: 'visible',
+    validator: v => ['visible', 'hidden'].includes(v as string),
+  })
+  type: string;
   @Prop({ type: Object, default: () => ({}) }) fieldItem: any;
   @Prop({ type: Object, default: () => ({}) }) fieldAliasMap: object;
   @Prop({ type: Boolean, default: false }) showFieldAlias: boolean;

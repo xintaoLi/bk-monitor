@@ -54,7 +54,8 @@ export default class MaskingSelectRuleTable extends tsc<IProps> {
   @Prop({ type: Object, default: () => ({}) }) submitBoxStyle: object;
   @Prop({ type: Boolean, default: true }) isShowSubmitContent: boolean;
   @Prop({ type: Boolean, default: false }) isSyncSelect: boolean;
-  @Prop({ type: Array, default: () => [] }) defaultSelectRuleList: Array<number>;
+  @Prop({ type: Array, default: () => [] })
+  defaultSelectRuleList: Array<number>;
   @Prop({ type: Array, default: () => [] }) recommendRuleList: Array<number>;
   @Prop({ type: Object, default: () => ({}) }) propPagination: object;
   @Prop({ type: Boolean, default: true }) isPublicList: boolean;
@@ -297,7 +298,7 @@ export default class MaskingSelectRuleTable extends tsc<IProps> {
 
   searchRule() {
     this.tableSearchList = this.tableList.filter(item =>
-      item.rule_name.toString().toLowerCase().includes(this.searchStr.toLowerCase()),
+      item.rule_name.toString().toLowerCase().includes(this.searchStr.toLowerCase())
     );
     this.pageLimitChange(this.pagination.limit);
     this.selectList = this.tableSearchList.filter(v => this.selectList.includes(v.id)).map(item => item.id);
@@ -380,7 +381,9 @@ export default class MaskingSelectRuleTable extends tsc<IProps> {
 
   getShowRowStyle(rowObj: any) {
     if (rowObj.row.is_add) return { background: '#F2FFF4' };
-    return { background: this.recommendRuleList.includes(rowObj.row.id) ? '#F0F5FF' : '#FFF' };
+    return {
+      background: this.recommendRuleList.includes(rowObj.row.id) ? '#F0F5FF' : '#FFF',
+    };
   }
 
   render() {

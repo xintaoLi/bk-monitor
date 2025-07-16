@@ -100,7 +100,10 @@ export default class QuickOpenCluster extends tsc<IProps> {
     if (this.formData.filter_rules.length) {
       this.formData.filter_rules.forEach(rule => {
         const targetField = this.totalFields.find(f => f.field_name === fieldName);
-        Object.assign(rule, { ...targetField, fields_name: targetField.field_name });
+        Object.assign(rule, {
+          ...targetField,
+          fields_name: targetField.field_name,
+        });
       });
     }
   }

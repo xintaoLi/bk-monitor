@@ -43,7 +43,7 @@ export type ValueFormatter = (
   value: number,
   decimals?: DecimalCount,
   scaledDecimals?: DecimalCount,
-  timeZone?,
+  timeZone?
 ) => FormattedValue;
 
 export interface ValueFormat {
@@ -100,7 +100,7 @@ export function toFixedScaled(
   decimals: DecimalCount,
   scaledDecimals: DecimalCount,
   additionalDecimals: number,
-  ext?: string,
+  ext?: string
 ): FormattedValue {
   if (scaledDecimals === null || scaledDecimals === undefined) {
     return { text: toFixed(value, decimals), suffix: ext };
@@ -164,7 +164,9 @@ export function locale(value: number, decimals: DecimalCount): FormattedValue {
     return { text: '' };
   }
   return {
-    text: value.toLocaleString(undefined, { maximumFractionDigits: decimals as number }),
+    text: value.toLocaleString(undefined, {
+      maximumFractionDigits: decimals as number,
+    }),
   };
 }
 

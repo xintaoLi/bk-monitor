@@ -42,7 +42,12 @@ export default (target: Ref<HTMLElement>, callbackFn, options?) => {
         debounceCallback();
       });
 
-      resizeObserver?.observe(cellElement, { subtree: true, childList: true, attributes: false, ...(options ?? {}) });
+      resizeObserver?.observe(cellElement, {
+        subtree: true,
+        childList: true,
+        attributes: false,
+        ...(options ?? {}),
+      });
     }
   };
 

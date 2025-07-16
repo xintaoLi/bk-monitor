@@ -120,7 +120,12 @@ export default defineComponent({
     const fieldRequestCounter = computed(() => indexFieldInfo.value.request_counter);
     const isUnionSearch = computed(() => store.getters.isUnionSearch);
     const tableList = computed<Array<any>>(() => Object.freeze(indexSetQueryResult.value?.list ?? []));
-    const gradeOption = computed(() => store.state.indexFieldInfo.custom_config?.grade_options ?? { disabled: false });
+    const gradeOption = computed(
+      () =>
+        store.state.indexFieldInfo.custom_config?.grade_options ?? {
+          disabled: false,
+        }
+    );
     const indexSetType = computed(() => store.state.indexItem.isUnionIndex);
     const exceptionMsg = computed(() => {
       if (/^cancel$/gi.test(indexSetQueryResult.value?.exception_msg)) {
@@ -195,7 +200,7 @@ export default defineComponent({
                   innerHTML: RetrieveHelper.formatDateValue(row[timeField.value], timeFieldType.value),
                 },
               },
-              [],
+              []
             );
           },
         },
@@ -255,7 +260,9 @@ export default defineComponent({
                 return item;
               });
               store.commit('updateLocalSort', true);
-              store.commit('updateIndexFieldInfo', { sort_list: updatedSortList });
+              store.commit('updateIndexFieldInfo', {
+                sort_list: updatedSortList,
+              });
               store.commit('updateIndexItemParams', { sort_list: sortList });
               store.dispatch('requestIndexSetQuery');
             }
@@ -422,7 +429,7 @@ export default defineComponent({
                     type,
                     row,
                     indexSetOperatorConfig.value,
-                    tableRowConfig.get(row).value[ROW_INDEX] + 1,
+                    tableRowConfig.get(row).value[ROW_INDEX] + 1
                   );
                 }}
                 index={row[ROW_INDEX]}
@@ -439,7 +446,15 @@ export default defineComponent({
 
     // 替换原有的handleIconClick
     const handleIconClick = (type, content, field, row, isLink, depth, isNestedField) => {
-      handleOperation(type, { content, field, row, isLink, depth, isNestedField, operation: type });
+      handleOperation(type, {
+        content,
+        field,
+        row,
+        isLink,
+        depth,
+        isNestedField,
+        operation: type,
+      });
     };
 
     // 替换原有的handleMenuClick
@@ -491,7 +506,7 @@ export default defineComponent({
     const getRowConfigWithCache = () => {
       return [['expand', false]].reduce(
         (cfg, item: [keyof RowConfig, any]) => Object.assign(cfg, { [item[0]]: item[1] }),
-        {},
+        {}
       );
     };
 
@@ -508,7 +523,7 @@ export default defineComponent({
                 [ROW_INDEX]: index,
                 [ROW_F_JSON]: formatJson.value,
                 ...getRowConfigWithCache(),
-              }),
+              })
             );
           }
         }
@@ -564,7 +579,7 @@ export default defineComponent({
       () => [tableShowRowIndex.value],
       () => {
         computeRect();
-      },
+      }
     );
 
     watch(
@@ -577,7 +592,7 @@ export default defineComponent({
         renderList.value = [];
         setRenderList(50);
         computeRect();
-      },
+      }
     );
 
     watch(
@@ -586,7 +601,7 @@ export default defineComponent({
         scrollXOffsetLeft = 0;
         refScrollXBar.value?.scrollLeft(0);
         computeRect();
-      },
+      }
     );
 
     watch(
@@ -595,7 +610,7 @@ export default defineComponent({
         if (!visibleFields.value.length) {
           setFullColumns();
         }
-      },
+      }
     );
 
     watch(
@@ -616,7 +631,7 @@ export default defineComponent({
         if (!isLoading.value) {
           debounceSetLoading();
         }
-      },
+      }
     );
 
     watch(
@@ -626,13 +641,13 @@ export default defineComponent({
       },
       {
         immediate: true,
-      },
+      }
     );
 
     const handleColumnWidthChange = (w, col) => {
       const width = w > 40 ? w : 40;
       const longFiels = visibleFields.value.filter(
-        item => item.width >= 800 || item.field_name === 'log' || item.field_type === 'text',
+        item => item.width >= 800 || item.field_name === 'log' || item.field_type === 'text'
       );
       const logField = longFiels.find(item => item.field_name === 'log');
       const targetField = longFiels.length
@@ -652,7 +667,7 @@ export default defineComponent({
 
       const sourceObj = visibleFields.value.reduce(
         (acc, field) => Object.assign(acc, { [field.field_name]: field.width }),
-        {},
+        {}
       );
       const { fieldsWidth } = userSettingConfig.value;
       const newFieldsWidthObj = Object.assign(fieldsWidth, sourceObj, {
@@ -733,7 +748,7 @@ export default defineComponent({
         if (refTableHead.value) {
           refTableHead.value.style.transform = `translateX(-${scrollXOffsetLeft}px)`;
           const fixedRight = refTableHead.value?.querySelector(
-            '.bklog-list-row .bklog-row-cell.header-cell.right',
+            '.bklog-list-row .bklog-row-cell.header-cell.right'
           ) as HTMLElement;
           if (fixedRight) {
             fixedRight.style.transform = `translateX(${scrollXOffsetLeft}px)`;
@@ -783,7 +798,7 @@ export default defineComponent({
       () => {
         setRowboxTransform();
       },
-      { immediate: true },
+      { immediate: true }
     );
 
     const showHeader = computed(() => {
@@ -803,7 +818,7 @@ export default defineComponent({
             {allColumns.value.map((column, index) => {
               const cellStyle = getColumnWidth(
                 column,
-                !hasFullWidth && (column.width === '100%' || index === columnLength - 2),
+                !hasFullWidth && (column.width === '100%' || index === columnLength - 2)
               );
               hasFullWidth = hasFullWidth || column.width === '100%' || index === columnLength - 2;
 
@@ -852,7 +867,7 @@ export default defineComponent({
     };
 
     const allColumns = computed(() =>
-      [...leftColumns.value, ...getFieldColumns(), ...rightColumns.value].filter(item => !item.disabled),
+      [...leftColumns.value, ...getFieldColumns(), ...rightColumns.value].filter(item => !item.disabled)
     );
 
     const renderRowCells = (row, rowIndex) => {
@@ -869,7 +884,7 @@ export default defineComponent({
           {allColumns.value.map((column, index) => {
             const cellStyle = getColumnWidth(
               column,
-              !hasFullWidth && (column.width === '100%' || index === columnLength - 2),
+              !hasFullWidth && (column.width === '100%' || index === columnLength - 2)
             );
             hasFullWidth = hasFullWidth || column.width === '100%' || index === columnLength - 2;
 

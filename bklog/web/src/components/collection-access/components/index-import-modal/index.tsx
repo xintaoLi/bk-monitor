@@ -72,7 +72,7 @@ export default class IndexImportModal extends tsc<IProps> {
     let collect = this.collectList;
     if (this.keyword) {
       collect = collect.filter(item =>
-        item.collector_config_name.toString().toLowerCase().includes(this.keyword.toLowerCase()),
+        item.collector_config_name.toString().toLowerCase().includes(this.keyword.toLowerCase())
       );
     }
     this.emptyType = this.keyword ? 'search-empty' : 'empty';
@@ -227,7 +227,9 @@ export default class IndexImportModal extends tsc<IProps> {
           const collect = res.data;
           const isPhysics = collect.environment !== 'container';
           if (collect.collector_scenario_id !== 'wineventlog' && isPhysics && collect?.params.paths) {
-            collect.params.paths = collect.params.paths.map(item => ({ value: item }));
+            collect.params.paths = collect.params.paths.map(item => ({
+              value: item,
+            }));
           }
           this.$store.commit('collect/updateExportCollectObj', {
             collectID: this.currentCheckImportID,

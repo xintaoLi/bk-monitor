@@ -178,7 +178,9 @@ export default class LogViewControl extends tsc<IProps> {
               <div class='color-item'>
                 {item.color.map(cItem => (
                   <div
-                    style={{ backgroundColor: index === 3 ? cItem.dark : cItem[this.currentShowType] }}
+                    style={{
+                      backgroundColor: index === 3 ? cItem.dark : cItem[this.currentShowType],
+                    }}
                     class='color-block'
                   ></div>
                 ))}

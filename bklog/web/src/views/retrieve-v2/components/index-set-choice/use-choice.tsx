@@ -57,7 +57,10 @@ export default (props, { emit }) => {
         index_set_name: item.index_set_name,
         index_set_type: 'single',
       })),
-      ...unionFavoriteList.value.map(item => ({ ...item, index_set_type: 'union' })),
+      ...unionFavoriteList.value.map(item => ({
+        ...item,
+        index_set_type: 'union',
+      })),
     ];
   });
 
@@ -101,7 +104,10 @@ export default (props, { emit }) => {
           const list = [];
           resp.forEach(rows => {
             rows.forEach(row => {
-              list.push({ ...row, update_time: new Date(row.updated_at).getTime() });
+              list.push({
+                ...row,
+                update_time: new Date(row.updated_at).getTime(),
+              });
             });
           });
           historyList.value = list.sort((a, b) => b.update_time - a.update_time).slice(0, 20);

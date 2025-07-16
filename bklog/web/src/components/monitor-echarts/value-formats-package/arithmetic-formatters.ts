@@ -39,7 +39,10 @@ export function toPercentUnit(size: number, decimals?: DecimalCount): FormattedV
     return { text: '' };
   }
 
-  return { text: toFixed(100 * size, decimals < 3 ? decimals : 2), suffix: '%' };
+  return {
+    text: toFixed(100 * size, decimals < 3 ? decimals : 2),
+    suffix: '%',
+  };
 }
 
 export function toHex0x(value: number, decimals: DecimalCount = 2): FormattedValue {

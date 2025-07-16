@@ -61,7 +61,12 @@ export default defineComponent({
     const top = 2;
     const left = window.innerWidth - 900;
 
-    const startPosition = ref({ top, bottom: 4, left: left > 0 ? left : 100, right: 4 });
+    const startPosition = ref({
+      top,
+      bottom: 4,
+      left: left > 0 ? left : 100,
+      right: 4,
+    });
     const isShow = ref(false);
     const aiFixedLinkArgs = { index: null, id: null };
     const cachedArgs: Partial<IRowSendData> = {};
@@ -141,7 +146,7 @@ export default defineComponent({
       handleStart,
       handleReceiveMessage,
       handleEnd,
-      handleError,
+      handleError
     );
 
     const handleChoosePrompt = () => {};
@@ -215,7 +220,9 @@ export default defineComponent({
       };
 
       // ai 消息，id是唯一标识当前流，调用 chatHelper.stop 的时候需要传入
-      chatHelper.stream(streamArgs, chatid, { 'X-Requested-With': 'XMLHttpRequest' });
+      chatHelper.stream(streamArgs, chatid, {
+        'X-Requested-With': 'XMLHttpRequest',
+      });
     };
 
     // 外部调用启动首次聊天

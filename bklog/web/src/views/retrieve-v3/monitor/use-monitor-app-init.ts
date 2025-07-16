@@ -90,17 +90,27 @@ export default indexSetApi => {
     Object.assign(routeParams, { ids: [] });
 
     if (/^-?\d+$/.test(routeParams.index_id)) {
-      Object.assign(routeParams, { ids: [`${routeParams.index_id}`], isUnionIndex: false, selectIsUnionSearch: false });
+      Object.assign(routeParams, {
+        ids: [`${routeParams.index_id}`],
+        isUnionIndex: false,
+        selectIsUnionSearch: false,
+      });
       activeTab = 'single';
     }
 
     if (routeParams.unionList?.length) {
-      Object.assign(routeParams, { ids: [...routeParams.unionList], isUnionIndex: true, selectIsUnionSearch: true });
+      Object.assign(routeParams, {
+        ids: [...routeParams.unionList],
+        isUnionIndex: true,
+        selectIsUnionSearch: true,
+      });
       activeTab = 'union';
     }
 
     store.commit('updateIndexItem', routeParams);
-    store.commit('updateStorage', { [BK_LOG_STORAGE.INDEX_SET_ACTIVE_TAB]: activeTab });
+    store.commit('updateStorage', {
+      [BK_LOG_STORAGE.INDEX_SET_ACTIVE_TAB]: activeTab,
+    });
   };
 
   const getApmIndexSetList = async () => {
@@ -187,13 +197,16 @@ export default indexSetApi => {
         }
 
         if (indexSetItems.length) {
-          store.commit('updateIndexItem', { ids: [...indexSetIds], items: [...indexSetItems] });
+          store.commit('updateIndexItem', {
+            ids: [...indexSetIds],
+            items: [...indexSetItems],
+          });
         }
       }
 
       const { addition, keyword, items } = store.state.indexItem;
       // 初始化时，判断当前单选索引集是否有默认条件
-      if(items.length === 1 && !addition.length && !keyword) {
+      if (items.length === 1 && !addition.length && !keyword) {
         let searchMode = 'ui';
         let defaultKeyword = '';
         let defaultAddition = [];
@@ -204,11 +217,22 @@ export default indexSetApi => {
           defaultAddition = [...items[0].addition];
           searchMode = 'ui';
         }
-        store.commit('updateStorage', { [BK_LOG_STORAGE.SEARCH_TYPE]: ['ui', 'sql'].indexOf(searchMode ?? 'ui') });
-        store.commit('updateIndexItem', { addition: defaultAddition, keyword: defaultKeyword, search_mode: searchMode });
+        store.commit('updateStorage', {
+          [BK_LOG_STORAGE.SEARCH_TYPE]: ['ui', 'sql'].indexOf(searchMode ?? 'ui'),
+        });
+        store.commit('updateIndexItem', {
+          addition: defaultAddition,
+          keyword: defaultKeyword,
+          search_mode: searchMode,
+        });
         router.replace({
-          query: { ...route.query, addition: JSON.stringify(defaultAddition), keyword: defaultKeyword, search_mode: searchMode}
-        })
+          query: {
+            ...route.query,
+            addition: JSON.stringify(defaultAddition),
+            keyword: defaultKeyword,
+            search_mode: searchMode,
+          },
+        });
       }
 
       if (emptyIndexSetList.length === 0) {
@@ -235,7 +259,9 @@ export default indexSetApi => {
       ...routeParams,
       datePickerValue: store.state.indexItem.datePickerValue,
     });
-    router.replace({ query: { ...route.query, ...resolver.resolveParamsToUrl() } });
+    router.replace({
+      query: { ...route.query, ...resolver.resolveParamsToUrl() },
+    });
   };
 
   reoverRouteParams();
@@ -271,7 +297,7 @@ export default indexSetApi => {
     entry => {
       scrollContainerHeight.value = (entry.target as HTMLElement).offsetHeight;
     },
-    0,
+    0
   );
 
   /**
@@ -297,7 +323,7 @@ export default indexSetApi => {
         });
       }
     },
-    { immediate: true },
+    { immediate: true }
   );
 
   onUnmounted(() => {

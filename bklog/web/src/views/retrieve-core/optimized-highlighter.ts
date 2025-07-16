@@ -169,7 +169,11 @@ export default class OptimizedHighlighter {
 
     this.sections.push(target);
     const instance = this.initMarkInsntance(target);
-    this.chunkMap.set(target, { instance, highlighted: false, isIntersecting: true });
+    this.chunkMap.set(target, {
+      instance,
+      highlighted: false,
+      isIntersecting: true,
+    });
     this.instanceExecMark(instance);
   }
 
@@ -257,7 +261,9 @@ export default class OptimizedHighlighter {
   }
 
   private createObserver(): IntersectionObserver {
-    return new IntersectionObserver(this.onIntersect.bind(this), { ...this.config.observer });
+    return new IntersectionObserver(this.onIntersect.bind(this), {
+      ...this.config.observer,
+    });
   }
 
   private prepareSections(): void {
@@ -314,7 +320,11 @@ export default class OptimizedHighlighter {
 
       if (!this.chunkMap.get(element)?.instance) {
         const instance = this.initMarkInsntance(element);
-        this.chunkMap.set(element, { instance, highlighted: true, isIntersecting: true });
+        this.chunkMap.set(element, {
+          instance,
+          highlighted: true,
+          isIntersecting: true,
+        });
       }
 
       await this.highlightChunk(element, this.chunkMap.get(element).instance);

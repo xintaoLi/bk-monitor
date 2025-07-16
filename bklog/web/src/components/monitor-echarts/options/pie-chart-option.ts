@@ -39,10 +39,10 @@ export default class MonitorPieSeries extends MonitorBaseSeries implements IChar
         {
           color: this.colors,
         },
-        { arrayMerge: this.overwriteMerge },
+        { arrayMerge: this.overwriteMerge }
       ),
       this.chartOption,
-      { arrayMerge: this.overwriteMerge },
+      { arrayMerge: this.overwriteMerge }
     );
   }
   public getOptions(data: any, otherOptions = {}) {
@@ -92,9 +92,15 @@ export default class MonitorPieSeries extends MonitorBaseSeries implements IChar
         : [],
     };
     return {
-      options: deepMerge(deepMerge(this.defaultOption, otherOptions, { arrayMerge: this.overwriteMerge }), options, {
-        arrayMerge: this.overwriteMerge,
-      }),
+      options: deepMerge(
+        deepMerge(this.defaultOption, otherOptions, {
+          arrayMerge: this.overwriteMerge,
+        }),
+        options,
+        {
+          arrayMerge: this.overwriteMerge,
+        }
+      ),
       legendData,
     };
   }

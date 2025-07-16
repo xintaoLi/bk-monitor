@@ -228,9 +228,15 @@ export default class MonitorPieSeries extends MonitorBaseSeries implements IChar
         : [],
     };
     return {
-      options: deepMerge(deepMerge(this.defaultOption, otherOptions, { arrayMerge: this.overwriteMerge }), options, {
-        arrayMerge: this.overwriteMerge,
-      }),
+      options: deepMerge(
+        deepMerge(this.defaultOption, otherOptions, {
+          arrayMerge: this.overwriteMerge,
+        }),
+        options,
+        {
+          arrayMerge: this.overwriteMerge,
+        }
+      ),
       legendData,
     };
   }

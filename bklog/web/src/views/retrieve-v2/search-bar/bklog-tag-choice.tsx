@@ -789,7 +789,7 @@ export default defineComponent({
         calcItemEllipsis().then(() => {
           autoFocusInput();
         });
-      },
+      }
     );
 
     watch(
@@ -801,7 +801,7 @@ export default defineComponent({
         }
 
         emit('blur', isInputFocused.value);
-      },
+      }
     );
 
     onMounted(() => {
@@ -1012,13 +1012,21 @@ export default defineComponent({
           class={[
             'bklog-tag-choice-input',
             props.template,
-            { 'is-focus': isInputFocused.value, 'is-ellipsis': isFixedOverflowY.value },
+            {
+              'is-focus': isInputFocused.value,
+              'is-ellipsis': isFixedOverflowY.value,
+            },
           ]}
           data-placeholder={placeholderText.value}
         >
           {renderValueList()}
           <li
-            class={['bklog-choice-value-item', { 'is-hidden': hiddenItemCount.value === 0 || isInputFocused.value }]}
+            class={[
+              'bklog-choice-value-item',
+              {
+                'is-hidden': hiddenItemCount.value === 0 || isInputFocused.value,
+              },
+            ]}
             data-ignore-element
           >
             +{hiddenItemCount.value}

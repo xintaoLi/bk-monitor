@@ -58,7 +58,12 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
-    const navMenu = useNavMenu({ t, bkInfo: (window as any).bkInfo, http: (window as any).$http, emit });
+    const navMenu = useNavMenu({
+      t,
+      bkInfo: (window as any).bkInfo,
+      http: (window as any).$http,
+      emit,
+    });
 
     const mySpaceList = navMenu.mySpaceList;
     const checkSpaceChange = navMenu.checkSpaceChange;
@@ -158,13 +163,13 @@ export default defineComponent({
         if (!show) return false;
         if (!item.permission?.[authorityMap.VIEW_BUSINESS]) return false;
         return true;
-      }),
+      })
     );
 
     const commonList = computed(
       () =>
         commonListIdsLog.value.map(id => authorizedList.value.find(item => Number(item.id) === id)).filter(Boolean) ||
-        [],
+        []
     );
 
     // 初始化业务列表
@@ -244,7 +249,9 @@ export default defineComponent({
       return debounce(60, (space: any) => {
         if (`${space.bk_biz_id}` !== route.query.bizId || space.space_uid !== route.query.spaceUid) {
           store.commit('updateSpace', space.space_uid);
-          store.commit('updateStorage', { [BK_LOG_STORAGE.BK_SPACE_UID]: space.space_uid });
+          store.commit('updateStorage', {
+            [BK_LOG_STORAGE.BK_SPACE_UID]: space.space_uid,
+          });
           router.push({
             params: {
               ...(route.params ?? {}),
@@ -295,7 +302,9 @@ export default defineComponent({
       // 将当前 id 插入第一位
       cacheIds.unshift(id);
 
-      store.commit('updateStorage', { [BK_LOG_STORAGE.COMMON_SPACE_ID_LIST]: cacheIds.slice(0, maxLen) });
+      store.commit('updateStorage', {
+        [BK_LOG_STORAGE.COMMON_SPACE_ID_LIST]: cacheIds.slice(0, maxLen),
+      });
     };
 
     // 点击体验demo按钮
@@ -426,7 +435,8 @@ export default defineComponent({
               {isSetBizIdDefault.value ? '是否将该业务设为默认业务？' : '是否取消默认业务？'}
             </div>
             <div class='confirm-dialog__bd'>
-              业务名称：<span class='confirm-dialog__bd-name'>{defaultSpace.value?.name || ''}</span>
+              业务名称：
+              <span class='confirm-dialog__bd-name'>{defaultSpace.value?.name || ''}</span>
             </div>
             <div class='confirm-dialog__ft'>
               {isSetBizIdDefault.value

@@ -125,12 +125,15 @@ export default () => {
               directives: [
                 {
                   name: 'bk-tooltips',
-                  value: { allowHTML: false, content: isLackIndexFields ? unionContent : fieldName },
+                  value: {
+                    allowHTML: false,
+                    content: isLackIndexFields ? unionContent : fieldName,
+                  },
                 },
               ],
               class: { 'lack-index-filed': isLackIndexFields },
             },
-            [fieldName],
+            [fieldName]
           ),
           h(TimeFormatterSwitcher, {
             class: 'timer-formatter',
@@ -173,7 +176,7 @@ export default () => {
               },
             },
           }),
-        ],
+        ]
       );
     }
   };

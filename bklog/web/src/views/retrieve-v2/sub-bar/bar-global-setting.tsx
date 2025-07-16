@@ -240,7 +240,12 @@ export default defineComponent({
       );
     }
 
-    return { popoverInstance, settingContainerRender, handleSettingPopoverShow, t: $t };
+    return {
+      popoverInstance,
+      settingContainerRender,
+      handleSettingPopoverShow,
+      t: $t,
+    };
   },
   render() {
     const { popoverInstance, settingContainerRender, handleSettingPopoverShow, t } = this;

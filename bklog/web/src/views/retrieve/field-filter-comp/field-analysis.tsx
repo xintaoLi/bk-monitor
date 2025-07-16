@@ -175,7 +175,7 @@ export default class FieldAnalysis extends Vue {
           cancelToken: new CancelToken(c => {
             this.getInfoCancelFn = c;
           }),
-        },
+        }
       );
       Object.assign(this.fieldData, res.data);
     } catch (error) {
@@ -206,7 +206,7 @@ export default class FieldAnalysis extends Vue {
           cancelToken: new CancelToken(c => {
             this.getChartsCancelFn = c;
           }),
-        },
+        }
       );
       this.isShowEmpty = false;
       // 分折线图和柱状图显示
@@ -497,7 +497,7 @@ export default class FieldAnalysis extends Vue {
         notMerge: true,
         lazyUpdate: false,
         silent: true,
-      },
+      }
     );
     setTimeout(() => {
       this.chart.resize();
@@ -529,7 +529,9 @@ export default class FieldAnalysis extends Vue {
             </span>
             <span
               class='appear-num'
-              v-bk-tooltips={{ content: window.mainComponent.$t('字段在该事件范围内有数据的日志条数') }}
+              v-bk-tooltips={{
+                content: window.mainComponent.$t('字段在该事件范围内有数据的日志条数'),
+              }}
             >
               {window.mainComponent.$t('出现行数')} : {formatNumberWithRegex(this.fieldData.field_count)}
             </span>
@@ -615,7 +617,9 @@ export default class FieldAnalysis extends Vue {
                           onClick={e => this.handleLegendEvent(e, 'click', legend)}
                         >
                           <span
-                            style={{ backgroundColor: legend.show ? legend.color : '#ccc' }}
+                            style={{
+                              backgroundColor: legend.show ? legend.color : '#ccc',
+                            }}
                             class='legend-icon'
                           ></span>
                           <div

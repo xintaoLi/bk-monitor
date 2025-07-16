@@ -365,14 +365,17 @@ export default class Condition extends tsc<object> {
     if (isCompared) this.localValue = this.localValue[0] ? [this.localValue[0]] : []; // 多输入的值变为单填时 拿下标为0的值
     const isQuery = !!this.localValue.length || isExists; // 值不为空 或 存在与不存在 的情况下才自动检索请求
     let newOperator = operatorItem.operator;
-    if (this.isTextField && !isExists) newOperator = this.getTextOperator({ operatorVal: operatorItem.operator });
+    if (this.isTextField && !isExists)
+      newOperator = this.getTextOperator({
+        operatorVal: operatorItem.operator,
+      });
     this.handleAdditionChange(
       {
         value: isExists ? [''] : queryValue, // 更新值
         operatorItem, // 更新操作元素
         operator: newOperator, // 更新操作符
       },
-      isQuery,
+      isQuery
     );
   }
 

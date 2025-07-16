@@ -118,7 +118,7 @@ module.exports = (baseConfig, { app, mobile, production, fta, log, email = false
             MONITOR_APP: JSON.stringify(`${process.env.MONITOR_APP}`),
           },
         },
-      }),
+      })
     );
   } else if (!email && !isMonitorRetrieveBuild) {
     config.plugins.push(new LogWebpackPlugin({ ...logPluginConfig, mobile, fta }));
@@ -130,7 +130,7 @@ module.exports = (baseConfig, { app, mobile, production, fta, log, email = false
             to: path.resolve(distUrl, './img'),
           },
         ],
-      }),
+      })
     );
     config.plugins.push(
       new webpack.DefinePlugin({
@@ -140,7 +140,7 @@ module.exports = (baseConfig, { app, mobile, production, fta, log, email = false
             APP: JSON.stringify(`${app}`),
           },
         },
-      }),
+      })
     );
   }
   // 监控检索构建

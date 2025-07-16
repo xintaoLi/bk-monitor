@@ -54,7 +54,11 @@ export type WordListItem = {
   line?: number;
 };
 
-export type SegmentAppendText = { text: string; onClick?: (...args) => void; attributes?: Record<string, string> };
+export type SegmentAppendText = {
+  text: string;
+  onClick?: (...args) => void;
+  attributes?: Record<string, string>;
+};
 export default class UseTextSegmentation {
   getSegmentContent: (keyRef: object, fn: (...args) => void) => Ref<HTMLElement>;
   onSegmentClick: (...args) => void;
@@ -81,7 +85,10 @@ export default class UseTextSegmentation {
   getTextCellClickHandler(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains('valid-text')) {
       const { offsetY, offsetX } = getClickTargetElement(e);
-      const offsetTarget = setPointerCellClickTargetHandler(e, { offsetY, offsetX });
+      const offsetTarget = setPointerCellClickTargetHandler(e, {
+        offsetY,
+        offsetX,
+      });
       this.handleSegmentClick(offsetTarget, (e.target as HTMLElement).textContent);
     }
   }

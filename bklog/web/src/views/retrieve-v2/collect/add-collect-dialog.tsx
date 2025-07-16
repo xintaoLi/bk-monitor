@@ -109,7 +109,9 @@ export default class CollectDialog extends tsc<IProps> {
       },
       {
         validator: this.checkSpecification,
-        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', { n: window.mainComponent.$t('收藏名') }),
+        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', {
+          n: window.mainComponent.$t('收藏名'),
+        }),
         trigger: 'blur',
       },
       {
@@ -134,7 +136,9 @@ export default class CollectDialog extends tsc<IProps> {
     groupName: [
       {
         validator: this.checkName,
-        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', { n: window.mainComponent.$t('组名') }),
+        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', {
+          n: window.mainComponent.$t('组名'),
+        }),
         trigger: 'blur',
       },
       {
@@ -166,7 +170,6 @@ export default class CollectDialog extends tsc<IProps> {
   get favStrList() {
     const favoriteItem = this.favoriteList.find(item => item.group_id === this.favoriteData.group_id);
     return favoriteItem?.favorites.map(group => group.name) || [];
-     
   }
 
   get unionIndexList() {
@@ -262,7 +265,7 @@ export default class CollectDialog extends tsc<IProps> {
   checkName() {
     if (this.verifyData.groupName.trim() === '') return true;
     return /^[\u4e00-\u9fa5_a-zA-Z0-9`~!@#$%^&*()_\-+=<>?:"{}|\s,.\/;'\\[\]·~！@#￥%……&*（）——\-+={}|《》？：“”【】、；‘'，。、]+$/im.test(
-      this.verifyData.groupName.trim(),
+      this.verifyData.groupName.trim()
     );
   }
 
@@ -272,13 +275,17 @@ export default class CollectDialog extends tsc<IProps> {
 
   /** 判断是否收藏名是否重复 */
   checkRepeatName() {
-    if (this.currentFavoriteName === this.favoriteData.name && this.currentFavoriteGroupID === this.favoriteData.group_id) return true;
+    if (
+      this.currentFavoriteName === this.favoriteData.name &&
+      this.currentFavoriteGroupID === this.favoriteData.group_id
+    )
+      return true;
     return !this.favStrList.includes(this.favoriteData.name);
   }
   /** 检查收藏语法是否正确 */
   checkSpecification() {
     return /^[\u4e00-\u9fa5_a-zA-Z0-9`~!@#$%^&*()_\-+=<>?:"{}|\s,.\/;'\\[\]·~！@#￥%……&*（）——\-+={}|《》？：“”【】、；‘'，。、]+$/im.test(
-      this.favoriteData.name.trim(),
+      this.favoriteData.name.trim()
     );
   }
   /** 检查是否有内置名称不能使用 */
@@ -311,7 +318,10 @@ export default class CollectDialog extends tsc<IProps> {
   /** 新增组 */
   handleCreateGroup() {
     this.checkInputFormRef.validate().then(async () => {
-      const data = { name: this.verifyData.groupName, space_uid: this.spaceUid };
+      const data = {
+        name: this.verifyData.groupName,
+        space_uid: this.spaceUid,
+      };
       try {
         const res = await $http.request('favorite/createGroup', {
           data,
@@ -356,7 +366,10 @@ export default class CollectDialog extends tsc<IProps> {
     const searchParams =
       search_mode === 'sql'
         ? { keyword, addition: [] }
-        : { addition: addition.filter(v => v.field !== '_ip-select_'), keyword: '*' };
+        : {
+            addition: addition.filter(v => v.field !== '_ip-select_'),
+            keyword: '*',
+          };
 
     const data = {
       name,
@@ -414,7 +427,9 @@ export default class CollectDialog extends tsc<IProps> {
   /** 获取收藏详情 */
   async getFavoriteData(id) {
     try {
-      const res = await $http.request('favorite/getFavorite', { params: { id } });
+      const res = await $http.request('favorite/getFavorite', {
+        params: { id },
+      });
       Object.assign(this.favoriteData, {
         ...res.data,
         ...res.data.params,
@@ -472,14 +487,19 @@ export default class CollectDialog extends tsc<IProps> {
               <Input
                 class='collect-name'
                 vModel={this.favoriteData.name}
-                placeholder={this.$t('{n}, （长度30个字符）', { n: this.$t('填写收藏名') })}
+                placeholder={this.$t('{n}, （长度30个字符）', {
+                  n: this.$t('填写收藏名'),
+                })}
               ></Input>
             </FormItem>
           </div>
           <div class='form-item-container-new'>
             <FormItem label={this.$t('所属分组')}>
               <span
-                v-bk-tooltips={{ content: this.$t('私有的只支持默认的“个人收藏”'), disabled: !this.isDisableSelect }}
+                v-bk-tooltips={{
+                  content: this.$t('私有的只支持默认的“个人收藏”'),
+                  disabled: !this.isDisableSelect,
+                }}
               >
                 <Select
                   vModel={this.favoriteData.group_id}
@@ -524,7 +544,9 @@ export default class CollectDialog extends tsc<IProps> {
                           <FormItem property='groupName'>
                             <Input
                               vModel={this.verifyData.groupName}
-                              placeholder={this.$t('{n}, （长度30个字符）', { n: this.$t('请输入组名') })}
+                              placeholder={this.$t('{n}, （长度30个字符）', {
+                                n: this.$t('请输入组名'),
+                              })}
                               clearable
                             ></Input>
                           </FormItem>

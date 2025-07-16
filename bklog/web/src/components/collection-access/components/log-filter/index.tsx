@@ -228,7 +228,7 @@ export default class LogFilter extends tsc<object> {
         return;
       }
       let isCanSubmit = true;
-      
+
       for (const fIndex in this.filterData) {
         const container = this.$refs[`filterTableRef-${fIndex}`] as any;
         for (const iIndex in this.filterData[fIndex]) {
@@ -256,13 +256,19 @@ export default class LogFilter extends tsc<object> {
         const newData = (fItem as any).map((item: ITableRowItem, index: number) => {
           const { tableIndex, ...reset } = item;
           // 将数组中第一组的内容为and，后面的分组第一个logic_op参数为or来区分组与组
-          return { ...reset, logic_op: fIndex === 0 || index !== 0 ? 'and' : 'or' };
+          return {
+            ...reset,
+            logic_op: fIndex === 0 || index !== 0 ? 'and' : 'or',
+          };
         });
         return newData;
       });
     let submitFlatData = submitData.flat();
     if (this.isMatchType) {
-      submitFlatData = submitFlatData.map(item => ({ ...item, fieldindex: '-1' }));
+      submitFlatData = submitFlatData.map(item => ({
+        ...item,
+        fieldindex: '-1',
+      }));
     }
     let conditions = {};
     if (!this.filterSwitcher || !submitFlatData.length) {
@@ -288,7 +294,7 @@ export default class LogFilter extends tsc<object> {
         },
         {
           catchIsShowMessage: false,
-        },
+        }
       )
       .then(res => {
         if (res.data?.length) {

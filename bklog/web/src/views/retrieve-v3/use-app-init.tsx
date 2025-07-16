@@ -64,19 +64,29 @@ export default () => {
     Object.assign(routeParams, { ids: [] });
 
     if (/^-?\d+$/.test(routeParams.index_id)) {
-      Object.assign(routeParams, { ids: [`${routeParams.index_id}`], isUnionIndex: false, selectIsUnionSearch: false });
+      Object.assign(routeParams, {
+        ids: [`${routeParams.index_id}`],
+        isUnionIndex: false,
+        selectIsUnionSearch: false,
+      });
       activeTab = 'single';
     }
 
     if (routeParams.unionList?.length) {
-      Object.assign(routeParams, { ids: [...routeParams.unionList], isUnionIndex: true, selectIsUnionSearch: true });
+      Object.assign(routeParams, {
+        ids: [...routeParams.unionList],
+        isUnionIndex: true,
+        selectIsUnionSearch: true,
+      });
       activeTab = 'union';
     }
 
     store.commit('updateIndexItem', routeParams);
     store.commit('updateSpace', routeParams.spaceUid);
     store.commit('updateIndexId', routeParams.index_id);
-    store.commit('updateStorage', { [BK_LOG_STORAGE.INDEX_SET_ACTIVE_TAB]: activeTab });
+    store.commit('updateStorage', {
+      [BK_LOG_STORAGE.INDEX_SET_ACTIVE_TAB]: activeTab,
+    });
   };
 
   RetrieveHelper.setScrollSelector('.v3-bklog-content');
@@ -139,8 +149,13 @@ export default () => {
     if (!search_mode) {
       if (addition?.length > 4 && keyword?.length > 0) {
         // 这里不好做同步请求，所以直接设置 search_mode 为 sql
-        router.push({ query: { ...route.query, search_mode: 'sql', addition: '[]' } });
-        const resolver = new RouteUrlResolver({ route, resolveFieldList: ['addition'] });
+        router.push({
+          query: { ...route.query, search_mode: 'sql', addition: '[]' },
+        });
+        const resolver = new RouteUrlResolver({
+          route,
+          resolveFieldList: ['addition'],
+        });
         const target = resolver.convertQueryToStore<RouteParams>();
 
         if (target.addition?.length) {
@@ -153,7 +168,9 @@ export default () => {
             .then(res => {
               if (res.result) {
                 const newKeyword = `${keyword} AND ${res.data?.querystring}`;
-                router.replace({ query: { ...route.query, keyword: newKeyword, addition: [] } });
+                router.replace({
+                  query: { ...route.query, keyword: newKeyword, addition: [] },
+                });
                 store.commit('updateIndexItemParams', { keyword: newKeyword });
               }
             })
@@ -171,7 +188,10 @@ export default () => {
       }
 
       router.push({
-        query: { ...route.query, search_mode: store.state.storage[BK_LOG_STORAGE.SEARCH_TYPE] === 1 ? 'sql' : 'ui' },
+        query: {
+          ...route.query,
+          search_mode: store.state.storage[BK_LOG_STORAGE.SEARCH_TYPE] === 1 ? 'sql' : 'ui',
+        },
       });
     }
   };
@@ -191,7 +211,11 @@ export default () => {
     });
 
     return store
-      .dispatch('retrieve/getIndexSetList', { spaceUid: spaceUid.value, bkBizId: bkBizId.value, is_group: true })
+      .dispatch('retrieve/getIndexSetList', {
+        spaceUid: spaceUid.value,
+        bkBizId: bkBizId.value,
+        is_group: true,
+      })
       .then(resp => {
         isPreApiLoaded.value = true;
 
@@ -201,7 +225,7 @@ export default () => {
           const lastIndexSetIds = store.state.storage[BK_LOG_STORAGE.LAST_INDEX_SET_ID]?.[spaceUid.value];
           if (lastIndexSetIds?.length) {
             const validateIndexSetIds = lastIndexSetIds.filter(id =>
-              resp[1].some(item => `${item.index_set_id}` === `${id}`),
+              resp[1].some(item => `${item.index_set_id}` === `${id}`)
             );
             if (validateIndexSetIds.length) {
               store.commit('updateIndexItem', { ids: validateIndexSetIds });
@@ -246,7 +270,10 @@ export default () => {
           }
 
           if (indexSetItems.length) {
-            store.commit('updateIndexItem', { ids: [...indexSetIds], items: [...indexSetItems] });
+            store.commit('updateIndexItem', {
+              ids: [...indexSetIds],
+              items: [...indexSetItems],
+            });
           }
         }
 
@@ -255,7 +282,10 @@ export default () => {
 
           if (defaultId) {
             const strId = `${defaultId}`;
-            store.commit('updateIndexItem', { ids: [strId], items: [resp[1][0]] });
+            store.commit('updateIndexItem', {
+              ids: [strId],
+              items: [resp[1][0]],
+            });
             store.commit('updateIndexId', strId);
           }
         }
@@ -270,14 +300,20 @@ export default () => {
         if (emptyIndexSetList.length === 0) {
           RetrieveHelper.setSearchingValue(true);
 
-          const type = indexId ?? route.params.indexId ? 'single' : 'union';
+          const type = (indexId ?? route.params.indexId) ? 'single' : 'union';
           if (indexId && type === 'single') {
             store.commit('updateIndexId', indexId);
-            store.commit('updateUnionIndexList', { updateIndexItem: false, list: [] });
+            store.commit('updateUnionIndexList', {
+              updateIndexItem: false,
+              list: [],
+            });
           }
 
           if (type === 'union') {
-            store.commit('updateUnionIndexList', { updateIndexItem: false, list: [...(unionList ?? [])] });
+            store.commit('updateUnionIndexList', {
+              updateIndexItem: false,
+              list: [...(unionList ?? [])],
+            });
           }
 
           store.commit('updateIndexItem', { isUnionIndex: type === 'union' });
@@ -320,7 +356,10 @@ export default () => {
 
           if (defaultId) {
             const strId = `${defaultId}`;
-            store.commit('updateIndexItem', { ids: [strId], items: [resp[1][0]] });
+            store.commit('updateIndexItem', {
+              ids: [strId],
+              items: [resp[1][0]],
+            });
             store.commit('updateIndexId', strId);
           }
         }
@@ -328,12 +367,16 @@ export default () => {
         const queryTab = RetrieveHelper.routeQueryTabValueFix(
           store.state.indexItem.items?.[0],
           route.query.tab,
-          store.getters.isUnionSearch,
+          store.getters.isUnionSearch
         );
 
         router.replace({
           params: { ...route.params, indexId },
-          query: { ...route.query, ...queryTab, unionList: unionList ? JSON.stringify(unionList) : undefined },
+          query: {
+            ...route.query,
+            ...queryTab,
+            unionList: unionList ? JSON.stringify(unionList) : undefined,
+          },
         });
       });
   };
@@ -348,7 +391,9 @@ export default () => {
       spaceUid: store.state.storage[BK_LOG_STORAGE.BK_SPACE_UID],
     });
 
-    router.replace({ query: { ...route.query, ...resolver.resolveParamsToUrl() } });
+    router.replace({
+      query: { ...route.query, ...resolver.resolveParamsToUrl() },
+    });
   };
 
   const beforeMounted = () => {
@@ -423,7 +468,7 @@ export default () => {
     entry => {
       scrollContainerHeight.value = (entry.target as HTMLElement).offsetHeight;
     },
-    0,
+    0
   );
 
   /**

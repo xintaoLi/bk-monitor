@@ -96,7 +96,12 @@ export default class ManageInput extends tsc<IProps> {
               {this.inputStr}
             </span>
             {!this.favoriteData.is_active ? (
-              <span v-bk-tooltips={{ content: this.$t('数据源不存在'), placement: 'right' }}>
+              <span
+                v-bk-tooltips={{
+                  content: this.$t('数据源不存在'),
+                  placement: 'right',
+                }}
+              >
                 <span class='bk-icon bklog-icon bklog-shixiao'></span>
               </span>
             ) : undefined}

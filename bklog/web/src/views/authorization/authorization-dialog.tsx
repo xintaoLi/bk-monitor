@@ -59,8 +59,12 @@ export default class AuthorizationDialog extends tsc<IProps, IEvents> {
   @Prop({ required: true, type: [Number, String] }) spaceUid: number | string;
   @Prop({ required: true, type: String }) viewType: AngleType;
   @Prop({ required: true, type: String }) authorizer: string;
-  @Prop({ required: false, type: Object, default: null }) rowData: EditModel | null;
-  @Prop({ required: true, type: Array, default: [] }) actionList: { id: string; name: string }[];
+  @Prop({ required: false, type: Object, default: null })
+  rowData: EditModel | null;
+  @Prop({ required: true, type: Array, default: [] }) actionList: {
+    id: string;
+    name: string;
+  }[];
   @Ref() formRef: any;
   @Ref() actionFormRef: any;
 

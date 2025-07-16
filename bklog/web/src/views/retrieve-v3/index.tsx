@@ -37,7 +37,7 @@ import useAppInit from './use-app-init';
 import { BK_LOG_STORAGE } from '../../store/store.type';
 
 import './index.scss';
-import './global-en.scss'
+import './global-en.scss';
 export default defineComponent({
   name: 'RetrieveV3',
   setup() {
@@ -72,7 +72,10 @@ export default defineComponent({
         class={[
           'v3-bklog-root',
           { 'is-start-text-ellipsis': isStartTextEllipsis.value },
-          { 'is-sticky-top': isSearchContextStickyTop.value, 'is-sticky-top-result': isSearchResultStickyTop.value },
+          {
+            'is-sticky-top': isSearchContextStickyTop.value,
+            'is-sticky-top-result': isSearchResultStickyTop.value,
+          },
         ]}
       >
         <V3Collection></V3Collection>

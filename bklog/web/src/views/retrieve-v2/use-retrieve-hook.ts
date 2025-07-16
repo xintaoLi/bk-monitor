@@ -47,8 +47,18 @@ export default () => {
     // 同时设置 search_mode 为 sql
     if (!search_mode && addition?.length > 0 && (ignoreKeywodLength || keyword?.length > 0)) {
       // 这里不好做同步请求，所以直接设置 search_mode 为 sql
-      router.push({ query: { ...route.query, search_mode: 'sql', addition: '[]', tab: 'origin' } });
-      const resolver = new RouteUrlResolver({ route, resolveFieldList: ['addition'] });
+      router.push({
+        query: {
+          ...route.query,
+          search_mode: 'sql',
+          addition: '[]',
+          tab: 'origin',
+        },
+      });
+      const resolver = new RouteUrlResolver({
+        route,
+        resolveFieldList: ['addition'],
+      });
       const target = Array.isArray(addition)
         ? { addition }
         : resolver.convertQueryToStore<{ addition: ConsitionItem[] }>();
@@ -70,7 +80,14 @@ export default () => {
               }
 
               store.commit('updateIndexItemParams', { keyword: newKeyword });
-              return router.replace({ query: { ...route.query, keyword: newKeyword, addition: [], tab: 'origin' } });
+              return router.replace({
+                query: {
+                  ...route.query,
+                  keyword: newKeyword,
+                  addition: [],
+                  tab: 'origin',
+                },
+              });
             }
 
             return Promise.resolve(true);
@@ -85,7 +102,9 @@ export default () => {
     if (!search_mode) {
       if (keyword?.length > 0 && addition.length < 4) {
         store.commit('updateIndexItemParams', { keyword, search_mode: 'sql' });
-        return router.replace({ query: { ...route.query, keyword, addition: [] } });
+        return router.replace({
+          query: { ...route.query, keyword, addition: [] },
+        });
       }
 
       if (addition?.length >= 4 && keyword?.length === 0) {

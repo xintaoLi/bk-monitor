@@ -443,7 +443,7 @@ export default class SelectIndexSet extends tsc<object> {
         // 当前未全选中  则把过滤后的标签索引集id全放到缓存的id列表
         this.selectTagCatchIDList = [...new Set([...this.selectedItemIDlist, ...this.havValRenderIDSetList])].slice(
           0,
-          MAX_UNION_INDEXSET_LIMIT,
+          MAX_UNION_INDEXSET_LIMIT
         ); // 最多选10条数据
       } else {
         // 全选选中 清空 已有的过滤后的标签索引集id
@@ -586,7 +586,10 @@ export default class SelectIndexSet extends tsc<object> {
           if (window.__IS_MONITOR_COMPONENT__) {
             this.$emit('collection');
           } else {
-            this.$store.dispatch('retrieve/getIndexSetList', { spaceUid: this.spaceUid, isLoading: false });
+            this.$store.dispatch('retrieve/getIndexSetList', {
+              spaceUid: this.spaceUid,
+              isLoading: false,
+            });
           }
         });
     } finally {
@@ -710,7 +713,7 @@ export default class SelectIndexSet extends tsc<object> {
               this.multipleFavoriteSelectID = res.data.id;
             });
         },
-        () => {},
+        () => {}
       );
     } else {
       this.favoritePopoverRef.hideHandler();
@@ -1294,7 +1297,9 @@ export default class SelectIndexSet extends tsc<object> {
         style='max-width: 600px;'
         class={[
           'retrieve-index-select',
-          { 'is-default-trigger': !this.selectedItemList.length && !this.selectedItem.index_set_name },
+          {
+            'is-default-trigger': !this.selectedItemList.length && !this.selectedItem.index_set_name,
+          },
         ]}
         v-model={this.selectTagCatchIDList}
         v-bkloading={{ isLoading: this.basicLoading, size: 'mini', zIndex: 10 }}

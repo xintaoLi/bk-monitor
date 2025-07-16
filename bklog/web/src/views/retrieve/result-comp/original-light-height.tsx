@@ -82,7 +82,11 @@ export default class QueryStatement extends tsc<IProps> {
 
   @Emit('menu-click')
   handleEmitMenuClick(type, content, key, isLink) {
-    const option = { fieldName: key, operation: type === 'not' ? 'is not' : type, value: content };
+    const option = {
+      fieldName: key,
+      operation: type === 'not' ? 'is not' : type,
+      value: content,
+    };
     const newMenuObj = { option, isLink };
     return newMenuObj;
   }

@@ -124,7 +124,9 @@ export default class CollectIndex extends tsc<IProps> {
     groupName: [
       {
         validator: this.checkName,
-        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', { n: window.mainComponent.$t('组名') }),
+        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', {
+          n: window.mainComponent.$t('组名'),
+        }),
         trigger: 'blur',
       },
       {
@@ -245,7 +247,7 @@ export default class CollectIndex extends tsc<IProps> {
         group_name,
         group_type,
         favorites: favorites.filter(
-          fItem => fItem.created_by.includes(this.searchVal) || fItem.name.includes(this.searchVal),
+          fItem => fItem.created_by.includes(this.searchVal) || fItem.name.includes(this.searchVal)
         ),
       };
     };
@@ -377,7 +379,10 @@ export default class CollectIndex extends tsc<IProps> {
     const { ids, isUnionIndex } = routeParams;
     const params = isUnionIndex
       ? { ...this.$route.params, indexId: undefined }
-      : { ...this.$route.params, indexId: ids?.[0] ? `${ids?.[0]}` : this.$route.params?.indexId };
+      : {
+          ...this.$route.params,
+          indexId: ids?.[0] ? `${ids?.[0]}` : this.$route.params?.indexId,
+        };
 
     const query = { ...this.$route.query };
     const resolver = new RetrieveUrlResolver({
@@ -438,7 +443,7 @@ export default class CollectIndex extends tsc<IProps> {
     if (isUnionIndex) {
       this.$store.commit(
         'updateUnionIndexList',
-        cloneValue.index_set_ids.map(item => String(item)),
+        cloneValue.index_set_ids.map(item => String(item))
       );
     }
     if (JSON.stringify(ip_chooser) !== '{}') {
@@ -461,7 +466,10 @@ export default class CollectIndex extends tsc<IProps> {
     });
 
     this.setRouteParams(value);
-    this.$store.commit('updateChartParams', { ...cloneValue.params.chart_params, fromCollectionActiveTab: 'unused' });
+    this.$store.commit('updateChartParams', {
+      ...cloneValue.params.chart_params,
+      fromCollectionActiveTab: 'unused',
+    });
 
     this.$store.commit('updateIndexSetQueryResult', {
       origin_log_list: [],
@@ -554,7 +562,9 @@ export default class CollectIndex extends tsc<IProps> {
         break;
       case 'delete-favorite': // 删除收藏
         this.$bkInfo({
-          subTitle: this.$t('当前收藏名为 {n}，确认是否删除？', { n: value.name }),
+          subTitle: this.$t('当前收藏名为 {n}，确认是否删除？', {
+            n: value.name,
+          }),
           type: 'warning',
           confirmFn: async () => {
             await this.deleteFavorite(value.id);
@@ -564,7 +574,9 @@ export default class CollectIndex extends tsc<IProps> {
         break;
       case 'dismiss-group': // 解散分组
         this.$bkInfo({
-          title: this.$t('当前分组名为 {n}，确认是否解散？', { n: value.group_name }),
+          title: this.$t('当前分组名为 {n}，确认是否解散？', {
+            n: value.group_name,
+          }),
           subTitle: `${this.$t('解散分组后，原分组内的收藏将移至未分组中。')}`,
           type: 'warning',
           confirmFn: async () => {
@@ -649,7 +661,7 @@ export default class CollectIndex extends tsc<IProps> {
   checkName() {
     if (this.verifyData.groupName.trim() === '') return true;
     return /^[\u4e00-\u9fa5_a-zA-Z0-9`~!@#$%^&*()_\-+=<>?:"\s{}|,.\/;'\\[\]·~！@#￥%……&*（）——\-+={}|《》？：“”【】、；‘'，。、]+$/im.test(
-      this.verifyData.groupName.trim(),
+      this.verifyData.groupName.trim()
     );
   }
   checkExistName() {
@@ -660,7 +672,9 @@ export default class CollectIndex extends tsc<IProps> {
     if (clickType === 'add') {
       this.checkInputFormRef.validate().then(async () => {
         if (!this.verifyData.groupName.trim()) return;
-        await this.handleUpdateGroupName({ group_new_name: this.verifyData.groupName });
+        await this.handleUpdateGroupName({
+          group_new_name: this.verifyData.groupName,
+        });
         this.getFavoriteList();
         this.popoverGroupRef.hideHandler();
         setTimeout(() => {
@@ -916,7 +930,12 @@ export default class CollectIndex extends tsc<IProps> {
                 </bk-checkbox>
               </span>
               <div
-                style={{ marginTop: '1px', cursor: 'pointer', marginLeft: '0px', width: '72px' }}
+                style={{
+                  marginTop: '1px',
+                  cursor: 'pointer',
+                  marginLeft: '0px',
+                  width: '72px',
+                }}
                 class='fl-jcsb '
               >
                 <Popover

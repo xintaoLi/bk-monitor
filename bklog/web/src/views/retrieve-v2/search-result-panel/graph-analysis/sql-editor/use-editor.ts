@@ -87,7 +87,7 @@ export default ({ refRootElement, sqlContent, onValueChange }) => {
           model?: { state: number };
         }
         const suggestWidget = editorInstance.value.getContribution(
-          'editor.contrib.suggestController',
+          'editor.contrib.suggestController'
         ) as SuggestController;
         const isSuggestVisible = suggestWidget?.model?.state === 2 || suggestWidget?.model?.state === 1;
 
@@ -128,8 +128,12 @@ export default ({ refRootElement, sqlContent, onValueChange }) => {
   const setSuggestFields = () => {
     setDorisFields(() =>
       fieldList.value.map(field => {
-        return { name: field.field_name, type: field.field_type, description: field.description };
-      }),
+        return {
+          name: field.field_name,
+          type: field.field_type,
+          description: field.description,
+        };
+      })
     );
   };
 

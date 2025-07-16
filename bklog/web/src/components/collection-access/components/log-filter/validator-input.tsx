@@ -36,7 +36,8 @@ export default class LogFilter extends tsc<object> {
   @Prop({ type: String, default: '' }) activeType: string;
   @Prop({ type: String, default: 'text' }) inputType: string;
   @Prop({ type: Object, default: () => ({}) }) rowData: any;
-  @Prop({ type: Array, default: () => [] }) originalFilterItemSelect: Array<any>;
+  @Prop({ type: Array, default: () => [] })
+  originalFilterItemSelect: Array<any>;
   @Ref('input') readonly inputRef: any;
   @Ref('validateForm') readonly validateFormRef: any;
 
@@ -87,7 +88,7 @@ export default class LogFilter extends tsc<object> {
       if (!this.validateFormRef) reject(true);
       this.validateFormRef.validate().then(
         () => reject(true),
-        () => reject(false),
+        () => reject(false)
       );
     });
   }

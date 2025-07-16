@@ -121,7 +121,9 @@ export default class CollectIndex extends tsc<IProps> {
     groupName: [
       {
         validator: this.checkName,
-        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', { n: window.mainComponent.$t('组名') }),
+        message: window.mainComponent.$t('{n}不规范, 包含特殊符号', {
+          n: window.mainComponent.$t('组名'),
+        }),
         trigger: 'blur',
       },
       {
@@ -248,7 +250,9 @@ export default class CollectIndex extends tsc<IProps> {
         break;
       case 'delete-favorite': // 删除收藏
         this.$bkInfo({
-          subTitle: this.$t('当前收藏名为 {n}，确认是否删除？', { n: value.name }),
+          subTitle: this.$t('当前收藏名为 {n}，确认是否删除？', {
+            n: value.name,
+          }),
           type: 'warning',
           confirmFn: async () => {
             await this.deleteFavorite(value.id);
@@ -258,7 +262,9 @@ export default class CollectIndex extends tsc<IProps> {
         break;
       case 'dismiss-group': // 解散分组
         this.$bkInfo({
-          title: this.$t('当前分组名为 {n}，确认是否解散？', { n: value.group_name }),
+          title: this.$t('当前分组名为 {n}，确认是否解散？', {
+            n: value.group_name,
+          }),
           subTitle: `${this.$t('解散分组后，原分组内的收藏将移至未分组中。')}`,
           type: 'warning',
           confirmFn: async () => {
@@ -332,7 +338,10 @@ export default class CollectIndex extends tsc<IProps> {
           }
           $http.request('favorite/createFavorite', { data }).then(res => {
             this.showMessagePop(this.$t('创建成功'));
-            this.handleSubmitFavoriteData({ isCreate: true, resValue: res.data });
+            this.handleSubmitFavoriteData({
+              isCreate: true,
+              resValue: res.data,
+            });
           });
         }
         break;
@@ -342,7 +351,7 @@ export default class CollectIndex extends tsc<IProps> {
   checkName() {
     if (this.verifyData.groupName.trim() === '') return true;
     return /^[\u4e00-\u9fa5_a-zA-Z0-9`~!@#$%^&*()_\-+=<>?:"\s{}|,.\/;'\\[\]·~！@#￥%……&*（）——\-+={}|《》？：“”【】、；‘'，。、]+$/im.test(
-      this.verifyData.groupName.trim(),
+      this.verifyData.groupName.trim()
     );
   }
   checkExistName() {
@@ -353,7 +362,9 @@ export default class CollectIndex extends tsc<IProps> {
     if (clickType === 'add') {
       this.checkInputFormRef.validate().then(async () => {
         if (!this.verifyData.groupName.trim()) return;
-        await this.handleUpdateGroupName({ group_new_name: this.verifyData.groupName });
+        await this.handleUpdateGroupName({
+          group_new_name: this.verifyData.groupName,
+        });
         this.getFavoriteList();
         this.popoverGroupRef.hideHandler();
         setTimeout(() => {
@@ -394,7 +405,7 @@ export default class CollectIndex extends tsc<IProps> {
       .map(item => ({
         ...item,
         favorites: item.favorites.filter(
-          fItem => fItem.created_by.includes(this.searchVal) || fItem.name.includes(this.searchVal),
+          fItem => fItem.created_by.includes(this.searchVal) || fItem.name.includes(this.searchVal)
         ),
       }))
       .filter(item => item.favorites.length);
@@ -604,7 +615,9 @@ export default class CollectIndex extends tsc<IProps> {
                       <FormItem property='groupName'>
                         <Input
                           vModel={this.verifyData.groupName}
-                          placeholder={this.$t('{n}, （长度30个字符）', { n: this.$t('请输入组名') })}
+                          placeholder={this.$t('{n}, （长度30个字符）', {
+                            n: this.$t('请输入组名'),
+                          })}
                           clearable
                           onEnter={() => this.handleClickGroupBtn('add')}
                           onKeydown={this.handleGroupKeyDown}

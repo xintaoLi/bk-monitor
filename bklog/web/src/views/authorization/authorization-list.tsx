@@ -106,11 +106,41 @@ export const STATUS_LIST = [
     color2: '#3FC06D29',
     show: ['user', 'resource'],
   },
-  { id: 'success', name: $i18n.t('审批成功'), color1: '#3FC06D', color2: '#3FC06D29', show: ['approval'] },
-  { id: 'approval', name: $i18n.t('审批中'), color1: '#FF9C01', color2: '#FF9C0129', show: ['approval'] },
-  { id: 'expired', name: $i18n.t('过期'), color1: '#979BA5', color2: '#979BA529', show: ['user', 'resource'] },
-  { id: 'invalid', name: $i18n.t('失效'), color1: '#EA3636', color2: '#EA363629', show: ['user', 'resource'] },
-  { id: 'failed', name: $i18n.t('审批失败'), color1: '#EA3636', color2: '#EA363629', show: ['approval'] },
+  {
+    id: 'success',
+    name: $i18n.t('审批成功'),
+    color1: '#3FC06D',
+    color2: '#3FC06D29',
+    show: ['approval'],
+  },
+  {
+    id: 'approval',
+    name: $i18n.t('审批中'),
+    color1: '#FF9C01',
+    color2: '#FF9C0129',
+    show: ['approval'],
+  },
+  {
+    id: 'expired',
+    name: $i18n.t('过期'),
+    color1: '#979BA5',
+    color2: '#979BA529',
+    show: ['user', 'resource'],
+  },
+  {
+    id: 'invalid',
+    name: $i18n.t('失效'),
+    color1: '#EA3636',
+    color2: '#EA363629',
+    show: ['user', 'resource'],
+  },
+  {
+    id: 'failed',
+    name: $i18n.t('审批失败'),
+    color1: '#EA3636',
+    color2: '#EA363629',
+    show: ['approval'],
+  },
 ];
 
 export const ACTION_MAP = {
@@ -148,7 +178,11 @@ export default class AuthorizationList extends tsc<object> {
         prop: TableColumnEnum.resources,
         name: $i18n.t('操作实例'),
         hidden: false,
-        props: { minWidth: 200, filters: [], 'filter-method': this.filterMethod },
+        props: {
+          minWidth: 200,
+          filters: [],
+          'filter-method': this.filterMethod,
+        },
       },
       {
         prop: TableColumnEnum.authorizer,
@@ -240,7 +274,11 @@ export default class AuthorizationList extends tsc<object> {
         prop: TableColumnEnum.resources,
         name: $i18n.t('操作实例'),
         hidden: false,
-        props: { filters: [], 'filter-method': this.filterMethod, minWidth: 200 },
+        props: {
+          filters: [],
+          'filter-method': this.filterMethod,
+          minWidth: 200,
+        },
       },
       {
         prop: TableColumnEnum.created_at,
@@ -517,7 +555,7 @@ export default class AuthorizationList extends tsc<object> {
             view_type: this.angleType,
           },
         },
-        { signal },
+        { signal }
       );
       return [true, res?.data ?? []];
     } catch (error) {
@@ -539,7 +577,7 @@ export default class AuthorizationList extends tsc<object> {
             space_uid: this.spaceUid,
           },
         },
-        { signal },
+        { signal }
       );
       return [true, res?.data ?? []];
     } catch (error) {
@@ -620,7 +658,10 @@ export default class AuthorizationList extends tsc<object> {
             value: id,
           }));
         } else {
-          item.props.filters = Array.from(set).map(item => ({ text: item, value: item }));
+          item.props.filters = Array.from(set).map(item => ({
+            text: item,
+            value: item,
+          }));
         }
       }
     });
@@ -651,8 +692,14 @@ export default class AuthorizationList extends tsc<object> {
           }}
           scopedSlots={{
             default: ({ row }) => (
-              <div v-bk-overflow-tips={{ content: row.authorized_users?.join(',') }}>
-                {row.authorized_users?.map(item => <Tag class='user-tag'>{item}</Tag>)}
+              <div
+                v-bk-overflow-tips={{
+                  content: row.authorized_users?.join(','),
+                }}
+              >
+                {row.authorized_users?.map(item => (
+                  <Tag class='user-tag'>{item}</Tag>
+                ))}
               </div>
             ),
           }}
@@ -678,7 +725,7 @@ export default class AuthorizationList extends tsc<object> {
                     {row.resources?.map((id, ind) =>
                       ind < 3 || row.isExpand ? (
                         <div class='resource-item'>{resourceList.find(item => item.uid === id)?.text}</div>
-                      ) : undefined,
+                      ) : undefined
                     )}
                     {row.resources?.length > 3 && (
                       <p
@@ -834,7 +881,7 @@ export default class AuthorizationList extends tsc<object> {
         <div class='page-content'>
           <Alert
             title={this.$t(
-              '需遵循公司规范，禁止对外暴露用户或公司内部敏感信息（用户PII信息、账号密码、云AKSK、内部系统鉴权/Token、保密文档等），若因授权不当造成数据泄露须承担相应责任; ',
+              '需遵循公司规范，禁止对外暴露用户或公司内部敏感信息（用户PII信息、账号密码、云AKSK、内部系统鉴权/Token、保密文档等），若因授权不当造成数据泄露须承担相应责任; '
             )}
             type='error'
           />

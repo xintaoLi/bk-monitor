@@ -44,10 +44,10 @@ export default class MonitorLineSeries extends MonitorBaseSeries implements ICha
             },
           },
         },
-        { arrayMerge: this.overwriteMerge },
+        { arrayMerge: this.overwriteMerge }
       ),
       this.chartOption,
-      { arrayMerge: this.overwriteMerge },
+      { arrayMerge: this.overwriteMerge }
     );
   }
   public getOptions(data: any, otherOptions = {}): any {
@@ -113,9 +113,15 @@ export default class MonitorLineSeries extends MonitorBaseSeries implements ICha
         : [],
     };
     return {
-      options: deepMerge(deepMerge(this.defaultOption, otherOptions, { arrayMerge: this.overwriteMerge }), options, {
-        arrayMerge: this.overwriteMerge,
-      }),
+      options: deepMerge(
+        deepMerge(this.defaultOption, otherOptions, {
+          arrayMerge: this.overwriteMerge,
+        }),
+        options,
+        {
+          arrayMerge: this.overwriteMerge,
+        }
+      ),
       legendData,
     };
   }

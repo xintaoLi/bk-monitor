@@ -140,7 +140,7 @@ export default class FieldFilterComp extends tsc<object> {
       {
         headerList: [],
         filterHeaderBuiltFields: [],
-      },
+      }
     );
     let arr = [...headerList, ...this.sortHiddenList([filterHeaderBuiltFields])];
     let result = this.objectHierarchy(arr);
@@ -154,7 +154,7 @@ export default class FieldFilterComp extends tsc<object> {
         item.field_name.includes('.') ? objArr.push(item) : otherArr.push(item);
         return [objArr, otherArr];
       },
-      [[], []],
+      [[], []]
     );
     if (!objArr.length) {
       return arrData;
@@ -178,7 +178,11 @@ export default class FieldFilterComp extends tsc<object> {
     parts.forEach((part, index) => {
       let existingPart = currentLevel.find(item => item.field_name === part);
       if (!existingPart) {
-        existingPart = { field_name: part, filterVisible: true, field_type: 'object' };
+        existingPart = {
+          field_name: part,
+          filterVisible: true,
+          field_type: 'object',
+        };
         if (parentFieldName !== null) {
           existingPart.parentFieldName = parentFieldName;
         }
@@ -233,7 +237,7 @@ export default class FieldFilterComp extends tsc<object> {
       {
         initHiddenList: [],
         otherList: [],
-      },
+      }
     );
 
     const visibleBuiltLength = builtInFieldsValue.filter(item => item.filterVisible).length;
@@ -253,7 +257,7 @@ export default class FieldFilterComp extends tsc<object> {
   get showIndexSetFields() {
     if (this.searchKeyword) return this.objectHierarchy(this.indexSetFields());
     const result = this.objectHierarchy(
-      this.isShowAllIndexSet ? this.indexSetFields() : this.sliceFields(this.indexSetFields()),
+      this.isShowAllIndexSet ? this.indexSetFields() : this.sliceFields(this.indexSetFields())
     );
     return result;
   }
@@ -428,7 +432,7 @@ export default class FieldFilterComp extends tsc<object> {
         }
         return acc;
       },
-      { withDot: [], withoutDot: [] },
+      { withDot: [], withoutDot: [] }
     );
     return [...withDot, ...withoutDot.slice(0, 9)];
   }
@@ -480,7 +484,11 @@ export default class FieldFilterComp extends tsc<object> {
         default-expanded-nodes={defaultExpandedNodes}
         expand-on-click={true}
         filter-method={(keyword, node) => this.filterMethod(keyword, node)}
-        options={{ nameKey: 'fullName', idKey: 'fullName', childrenKey: 'children' }}
+        options={{
+          nameKey: 'fullName',
+          idKey: 'fullName',
+          childrenKey: 'children',
+        }}
         scopedSlots={scopedSlots}
         on-expand-change={node => this.expandChange(node, `bigTreeRef-${index}`)}
       ></bk-big-tree>
@@ -592,7 +600,7 @@ export default class FieldFilterComp extends tsc<object> {
                         type='hidden'
                         onToggleItem={({ type, fieldItem }) => this.handleToggleItem(type, fieldItem)}
                       />
-                    ),
+                    )
                   )}
                   {this.getIsShowIndexSetExpand() && (
                     <div
@@ -634,7 +642,7 @@ export default class FieldFilterComp extends tsc<object> {
                         type='hidden'
                         onToggleItem={({ type, fieldItem }) => this.handleToggleItem(type, fieldItem)}
                       />
-                    ),
+                    )
                   )}
                   {/* {this.builtInFieldsShowObj().isShowBuiltExpandBtn && (
                     <div

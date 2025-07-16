@@ -31,7 +31,7 @@ export default function useTextAction(emit?: Function, from?: string) {
     value: string,
     isLink: boolean,
     depth?: number,
-    isNestedField?: string,
+    isNestedField?: string
   ) => {
     const { getQueryAlias } = useFieldNameHook({ store });
     const fieldName = field?.field_name ? getQueryAlias(field) : field;
@@ -58,7 +58,14 @@ export default function useTextAction(emit?: Function, from?: string) {
   // 添加条件
   const handleAddCondition = (field, operator, value, isLink = false, depth = undefined, isNestedField = 'false') => {
     return store
-      .dispatch('setQueryCondition', { field, operator, value, isLink, depth, isNestedField })
+      .dispatch('setQueryCondition', {
+        field,
+        operator,
+        value,
+        isLink,
+        depth,
+        isNestedField,
+      })
       .then(([newSearchList, searchMode, isNewSearchPage]) => {
         setRouteParams();
         if (from === 'origin') {
@@ -101,7 +108,7 @@ export default function useTextAction(emit?: Function, from?: string) {
       fieldName?: string;
       operation?: string;
       displayFieldNames?: string[];
-    },
+    }
   ) => {
     const {
       content,

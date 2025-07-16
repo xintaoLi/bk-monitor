@@ -52,7 +52,11 @@ export default class LuceneSegment {
           if (tokenCount >= MAX_TOKENS && processedLength < plainText.length) {
             const remainText = plainText.slice(processedLength);
             if (remainText) {
-              result.push({ text: remainText, isMark: false, isCursorText: false });
+              result.push({
+                text: remainText,
+                isMark: false,
+                isCursorText: false,
+              });
             }
           }
         } else {
@@ -79,7 +83,11 @@ export default class LuceneSegment {
         if (tokenCount >= MAX_TOKENS && processedLength < plainText.length) {
           const remainText = plainText.slice(processedLength);
           if (remainText) {
-            result.push({ text: remainText, isMark: false, isCursorText: false });
+            result.push({
+              text: remainText,
+              isMark: false,
+              isCursorText: false,
+            });
           }
         }
       } else {
@@ -143,7 +151,7 @@ export default class LuceneSegment {
     }
     if (this.isMidNumLet(c)) {
       return Boolean(
-        prev && next && ((this.isLetter(prev) && this.isLetter(next)) || (this.isNumber(prev) && this.isNumber(next))),
+        prev && next && ((this.isLetter(prev) && this.isLetter(next)) || (this.isNumber(prev) && this.isNumber(next)))
       );
     }
     if (this.isMidNum(c)) {
@@ -158,7 +166,7 @@ export default class LuceneSegment {
   private static processBuffer(
     buffer: string,
     MAX_TOKENS: number,
-    currentTokenCount: number,
+    currentTokenCount: number
   ): { text: string; isMark: boolean; isCursorText: boolean }[] {
     const result: { text: string; isMark: boolean; isCursorText: boolean }[] = [];
     let currentToken = '';
@@ -180,7 +188,11 @@ export default class LuceneSegment {
         // 连续 Mid 字符触发切分
         if (currentMidSequence) {
           if (currentToken) {
-            result.push({ text: currentToken, isMark: false, isCursorText: true });
+            result.push({
+              text: currentToken,
+              isMark: false,
+              isCursorText: true,
+            });
             if (result.length + currentTokenCount >= MAX_TOKENS) return result;
           }
           // 分词符号本身也要保留，isCursorText: false
@@ -197,7 +209,11 @@ export default class LuceneSegment {
           currentToken += c;
         } else {
           if (currentToken) {
-            result.push({ text: currentToken, isMark: false, isCursorText: true });
+            result.push({
+              text: currentToken,
+              isMark: false,
+              isCursorText: true,
+            });
             if (result.length + currentTokenCount >= MAX_TOKENS) return result;
           }
           // 分词符号本身也要保留，isCursorText: false
@@ -208,7 +224,11 @@ export default class LuceneSegment {
       } else if (c === '-' || c === ' ' || c === '\t') {
         // 其它常见分隔符
         if (currentToken) {
-          result.push({ text: currentToken, isMark: false, isCursorText: true });
+          result.push({
+            text: currentToken,
+            isMark: false,
+            isCursorText: true,
+          });
           if (result.length + currentTokenCount >= MAX_TOKENS) return result;
         }
         result.push({ text: c, isMark: false, isCursorText: false });
@@ -223,7 +243,11 @@ export default class LuceneSegment {
         } else {
           // 其它所有符号都要保留，isCursorText: false
           if (currentToken) {
-            result.push({ text: currentToken, isMark: false, isCursorText: true });
+            result.push({
+              text: currentToken,
+              isMark: false,
+              isCursorText: true,
+            });
             if (result.length + currentTokenCount >= MAX_TOKENS) return result;
             currentToken = '';
           }

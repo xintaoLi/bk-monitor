@@ -136,7 +136,7 @@ export default defineComponent({
     const selectedValues = computed(() =>
       props.indexSetValue
         .map(v => props.indexSetList.find((i: any) => `${i.index_set_id}` === `${v}`))
-        .filter(c => c !== undefined),
+        .filter(c => c !== undefined)
     );
 
     const handleTabChange = (type: string) => {
@@ -206,7 +206,10 @@ export default defineComponent({
           style={rootStyle.value}
           class={[
             'bklog-v3-indexset-container',
-            { 'is-opened': isOpened.value, 'is-multi': props.indexSetValue.length > 1 },
+            {
+              'is-opened': isOpened.value,
+              'is-multi': props.indexSetValue.length > 1,
+            },
           ]}
           data-shortcut-key={shortcutKey}
           options={tippyOptions}
