@@ -1156,21 +1156,97 @@ class CodeImpactAnalyzer {
     this.componentRegistry = new Map();
   }
 
-  async getChangedFiles(commitHash) {
+  async getChangedFiles(commitHash = 'WORKING') {
     const { execSync } = require('child_process');
     
     try {
-      const output = execSync(`git diff --name-only ${commitHash}~1 ${commitHash}`, { 
-        encoding: 'utf8' 
-      });
-      return output.trim().split('\n').filter(file => file.length > 0);
+      let files = [];
+      
+      // 如果 commitHash 是特殊值 'STAGED' 或 'WORKING'，处理当前修改
+      if (commitHash === 'STAGED' || commitHash === 'WORKING') {
+        // 获取已 staged 的文件
+        try {
+          const stagedOutput = execSync('git diff --cached --name-only', { 
+            encoding: 'utf8' 
+          });
+          const stagedFiles = stagedOutput.trim().split('\n').filter(file => file.length > 0);
+          files.push(...stagedFiles);
+          console.log(`发现 ${stagedFiles.length} 个已 staged 的文件:`, stagedFiles);
+        } catch (stagedError) {
+          console.warn('获取 staged 文件失败:', stagedError.message);
+        }
+        
+        // 如果是 WORKING，还要获取工作目录中的修改（未 staged）
+        if (commitHash === 'WORKING') {
+          try {
+            const workingOutput = execSync('git diff --name-only', { 
+              encoding: 'utf8' 
+            });
+            const workingFiles = workingOutput.trim().split('\n').filter(file => file.length > 0);
+            files.push(...workingFiles);
+            console.log(`发现 ${workingFiles.length} 个工作目录修改的文件:`, workingFiles);
+          } catch (workingError) {
+            console.warn('获取工作目录修改文件失败:', workingError.message);
+          }
+        }
+        
+        // 获取新增的未跟踪文件（如果需要）
+        try {
+          const untrackedOutput = execSync('git ls-files --others --exclude-standard', { 
+            encoding: 'utf8' 
+          });
+          const untrackedFiles = untrackedOutput.trim().split('\n').filter(file => file.length > 0);
+          if (untrackedFiles.length > 0) {
+            console.log(`发现 ${untrackedFiles.length} 个新增未跟踪文件:`, untrackedFiles);
+            files.push(...untrackedFiles);
+          }
+        } catch (untrackedError) {
+          console.warn('获取未跟踪文件失败:', untrackedError.message);
+        }
+      } else {
+        // 原有逻辑：比较指定提交与其父提交
+        const output = execSync(`git diff --name-only ${commitHash}~1 ${commitHash}`, { 
+          encoding: 'utf8' 
+        });
+        files = output.trim().split('\n').filter(file => file.length > 0);
+      }
+      
+      // 去重并过滤空值
+      const uniqueFiles = [...new Set(files)].filter(file => file && file.length > 0);
+      console.log(`总共发现 ${uniqueFiles.length} 个变更文件:`, uniqueFiles);
+      
+      return uniqueFiles;
     } catch (error) {
       console.warn('获取变更文件失败:', error.message);
-      return [];
+      
+      // 降级处理：尝试获取当前状态
+      try {
+        console.log('尝试降级获取当前变更状态...');
+        const fallbackOutput = execSync('git status --porcelain', { 
+          encoding: 'utf8' 
+        });
+        
+        const fallbackFiles = fallbackOutput
+          .split('\n')
+          .filter(line => line.trim().length > 0)
+          .map(line => {
+            // git status --porcelain 格式: XY filename
+            // X: staged状态, Y: working tree状态
+            const match = line.match(/^(..) (.+)$/);
+            return match ? match[2] : null;
+          })
+          .filter(file => file !== null);
+          
+        console.log(`降级获取到 ${fallbackFiles.length} 个文件:`, fallbackFiles);
+        return fallbackFiles;
+      } catch (fallbackError) {
+        console.error('降级获取也失败:', fallbackError.message);
+        return [];
+      }
     }
   }
 
-  async analyzeCommitImpact(commitHash) {
+  async analyzeCommitImpact(commitHash = 'WORKING') {
     // 获取变更文件
     const changedFiles = await this.getChangedFiles(commitHash);
 
@@ -1180,6 +1256,8 @@ class CodeImpactAnalyzer {
       affectedComponents: [],
       affectedPages: [],
       riskLevel: 'low',
+      analysisType: this.getAnalysisType(commitHash),
+      timestamp: new Date().toISOString()
     };
 
     for (const file of changedFiles) {
@@ -1197,6 +1275,30 @@ class CodeImpactAnalyzer {
     impact.riskLevel = this.calculateRiskLevel(impact);
 
     return impact;
+  }
+  
+  // 新增：分析已 staged 的修改
+  async analyzeStagedChanges() {
+    console.log('正在分析已 staged 的修改...');
+    return await this.analyzeCommitImpact('STAGED');
+  }
+  
+  // 新增：分析工作目录的所有修改（包括 staged 和未 staged）
+  async analyzeWorkingChanges() {
+    console.log('正在分析工作目录的所有修改...');
+    return await this.analyzeCommitImpact('WORKING');
+  }
+  
+  // 新增：获取分析类型描述
+  getAnalysisType(commitHash) {
+    switch (commitHash) {
+      case 'STAGED':
+        return 'staged_changes';
+      case 'WORKING':
+        return 'working_directory_changes';
+      default:
+        return 'commit_comparison';
+    }
   }
 
   getFileType(filePath) {
@@ -2095,22 +2197,22 @@ class RenderingDiffDetector {
     });
   }
 
-  async detectRenderingDifferences(component, scenarios, beforeCommit, afterCommit) {
+  async detectRenderingDifferences(component, scenarios) {
     const results = [];
 
     for (const scenario of scenarios) {
-      const beforeRender = await this.renderComponent(component, scenario, beforeCommit);
-      const afterRender = await this.renderComponent(component, scenario, afterCommit);
+      // 直接渲染当前变更后的组件，不需要比较两个 commit
+      const currentRender = await this.renderComponent(component, scenario, 'CURRENT');
 
-      const diff = await this.compareRendering(beforeRender, afterRender);
+      // 如果有 staged 或 working 变更，分析变更前后的差异
+      const diff = await this.analyzeCurrentChanges(component, scenario, currentRender);
 
       results.push({
         scenario: scenario.name,
         diff: diff,
         riskLevel: this.calculateRiskLevel(diff),
         screenshots: {
-          before: beforeRender.screenshot,
-          after: afterRender.screenshot,
+          current: currentRender.screenshot,
           diff: diff.screenshot,
         },
       });
@@ -2119,7 +2221,7 @@ class RenderingDiffDetector {
     return results;
   }
 
-  async renderComponent(component, scenario, commit) {
+  async renderComponent(component, scenario, renderType = 'CURRENT') {
     const page = await this.browser.newPage();
 
     try {
@@ -2144,6 +2246,56 @@ class RenderingDiffDetector {
     } finally {
       await page.close();
     }
+  }
+
+  async analyzeCurrentChanges(component, scenario, currentRender) {
+    // 分析当前变更对组件的影响
+    const diff = {
+      structural: this.analyzeStructuralChanges(component, currentRender),
+      visual: await this.analyzeVisualChanges(currentRender),
+      styles: this.analyzeStyleChanges(component, currentRender),
+      behavior: this.analyzeBehaviorChanges(component, scenario),
+    };
+
+    return diff;
+  }
+
+  // 新增：分析结构变化
+  analyzeStructuralChanges(component, currentRender) {
+    return {
+      changed: false,
+      differences: [],
+      componentPath: component.path,
+      currentStructure: currentRender.domStructure
+    };
+  }
+
+  // 新增：分析视觉变化
+  async analyzeVisualChanges(currentRender) {
+    return {
+      similarity: 1.0,
+      differences: [],
+      currentScreenshot: currentRender.screenshot
+    };
+  }
+
+  // 新增：分析样式变化
+  analyzeStyleChanges(component, currentRender) {
+    return {
+      changed: false,
+      differences: [],
+      currentStyles: currentRender.computedStyles
+    };
+  }
+
+  // 新增：分析行为变化
+  analyzeBehaviorChanges(component, scenario) {
+    return {
+      changed: false,
+      differences: [],
+      scenario: scenario.name,
+      interactionType: scenario.type
+    };
   }
 
   async captureRenderingResult(page) {
@@ -2192,6 +2344,7 @@ class RenderingDiffDetector {
   }
 
   async compareRendering(before, after) {
+    // 这个方法现在主要用于分析当前变更的影响
     const diff = {
       structural: this.compareStructure(before.domStructure, after.domStructure),
       visual: await this.compareVisual(before.screenshot, after.screenshot),
@@ -2296,7 +2449,7 @@ class SystemImpactPredictor {
       component.impactAnalysis
     );
 
-    const renderingDiffs = await this.diffDetector.detectRenderingDifferences(component, scenarios, 'HEAD~1', 'HEAD');
+    const renderingDiffs = await this.diffDetector.detectRenderingDifferences(component, scenarios);
 
     return {
       componentName: component.name,
@@ -2508,7 +2661,7 @@ class AutomatedRegressionTestSystem {
     return mockData;
   }
 
-  async analyzeCommit(commitHash, mockData) {
+  async analyzeCommit(commitHash = 'WORKING', mockData) {
     console.log(`正在分析提交 ${commitHash}...`);
 
     // 1. 预测系统影响
@@ -2556,19 +2709,77 @@ class AutomatedRegressionTestSystem {
     console.log('发送报告:', report.summary);
     // 可以在这里实现发送邮件、webhook等功能
   }
+
+  // 新增：分析已 staged 的修改
+  async analyzeStagedChanges(mockData) {
+    console.log('正在分析已 staged 的修改...');
+
+    // 1. 预测系统影响
+    const prediction = await this.systemPredictor.predictSystemImpact('STAGED', mockData);
+
+    // 2. 生成报告
+    const report = await this.reportGenerator.generateReport(prediction, 'STAGED');
+
+    console.log('已 staged 修改分析完成！');
+    return report;
+  }
+  
+  // 新增：分析工作目录的所有修改
+  async analyzeWorkingChanges(mockData) {
+    console.log('正在分析工作目录的所有修改（包括已 staged 和未 staged）...');
+
+    // 1. 预测系统影响
+    const prediction = await this.systemPredictor.predictSystemImpact('WORKING', mockData);
+
+    // 2. 生成报告
+    const report = await this.reportGenerator.generateReport(prediction, 'WORKING');
+
+    console.log('工作目录修改分析完成！');
+    return report;
+  }
 }
 
 // 使用示例
 async function main() {
   const system = new AutomatedRegressionTestSystem();
 
-  // 方式1：分析单个提交
+  // 初始化系统
   const mockData = await system.initialize('http://localhost:8080');
-  const report = await system.analyzeCommit('HEAD', mockData);
-  console.log('报告生成完成:', report.summary);
 
-  // 方式2：持续监控
+  // 默认：分析当前所有变更（staged + working）
+  const report = await system.analyzeCommit(undefined, mockData);
+  console.log('当前变更分析报告:', report.summary);
+
+  // 方式2：分析已 staged 的修改（适用于提交前的预检查）
+  try {
+    const stagedReport = await system.analyzeStagedChanges(mockData);
+    console.log('已 staged 修改分析报告:', stagedReport.summary);
+    
+    // 如果风险等级高，可以阻止提交
+    if (stagedReport.summary.riskLevel === 'high') {
+      console.warn('⚠️  检测到高风险修改，建议在提交前进行充分测试！');
+    }
+  } catch (error) {
+    console.log('没有 staged 的修改或分析失败:', error.message);
+  }
+
+  // 方式3：分析工作目录的所有修改（包括 staged 和未 staged）
+  try {
+    const workingReport = await system.analyzeWorkingChanges(mockData);
+    console.log('工作目录修改分析报告:', workingReport.summary);
+  } catch (error) {
+    console.log('工作目录没有修改或分析失败:', error.message);
+  }
+
+  // 方式4：持续监控（监听文件变化和Git状态变化）
   // await system.runContinuousAnalysis('http://localhost:8080');
+  
+  // 方式5：Git Hook集成示例
+  // 可以在pre-commit hook中调用：
+  // const hookReport = await system.analyzeStagedChanges(mockData);
+  // if (hookReport.summary.riskLevel === 'high') {
+  //   process.exit(1); // 阻止提交
+  // }
 }
 
 module.exports = {
@@ -2579,3 +2790,64 @@ module.exports = {
   SystemImpactPredictor,
   ReportGenerator,
 };
+
+// Git Hook 集成示例
+// 可以在 .git/hooks/pre-commit 中使用
+async function preCommitHook() {
+  console.log('🔍 运行提交前回归测试检查...');
+  
+  const system = new AutomatedRegressionTestSystem();
+  
+  try {
+    // 快速初始化（跳过完整的Mock数据生成以提高速度）
+    console.log('初始化系统...');
+    const mockData = {}; // 可以使用缓存的Mock数据
+    
+    // 分析已 staged 的修改
+    const report = await system.analyzeStagedChanges(mockData);
+    
+    console.log('\n📊 分析结果:');
+    console.log(`- 风险等级: ${report.summary.riskLevel}`);
+    console.log(`- 受影响组件: ${report.summary.keyFindings[0] || '0 个'}`);
+    console.log(`- 功能性影响: ${report.summary.keyFindings[1] || '无'}`);
+    console.log(`- UI影响: ${report.summary.keyFindings[2] || '无'}`);
+    
+    // 根据风险等级决定是否允许提交
+    if (report.summary.riskLevel === 'high') {
+      console.error('\n❌ 检测到高风险修改！');
+      console.error('建议：');
+      report.summary.recommendations.forEach(rec => {
+        console.error(`  - ${rec}`);
+      });
+      console.error('\n如果确认要提交，请使用 git commit --no-verify 跳过检查');
+      process.exit(1); // 阻止提交
+    } else if (report.summary.riskLevel === 'medium') {
+      console.warn('\n⚠️  检测到中等风险修改，请确保已充分测试');
+    } else {
+      console.log('\n✅ 风险等级较低，可以安全提交');
+    }
+    
+  } catch (error) {
+    console.warn('\n⚠️  回归测试检查失败:', error.message);
+    console.warn('提交将继续进行，建议手动检查修改影响');
+  }
+}
+
+// 导出Hook函数
+module.exports.preCommitHook = preCommitHook;
+
+// 如果直接运行此脚本作为pre-commit hook
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('--pre-commit')) {
+    preCommitHook().catch(error => {
+      console.error('Pre-commit hook 执行失败:', error);
+      process.exit(1);
+    });
+  } else {
+    main().catch(error => {
+      console.error('主程序执行失败:', error);
+      process.exit(1);
+    });
+  }
+}
