@@ -1154,8 +1154,639 @@ class CodeImpactAnalyzer {
   constructor() {
     this.dependencyGraph = new Map();
     this.componentRegistry = new Map();
+    this.functionCallGraph = new Map(); // 函数调用关系图
+    this.moduleRegistry = new Map(); // 模块注册表
+    this.importGraph = new Map(); // 导入关系图
   }
 
+  // 构建完整的依赖关系图
+  async buildDependencyGraph() {
+    console.log('🔍 构建依赖关系图...');
+    
+    // 1. 扫描所有源文件
+    const sourceFiles = await this.scanSourceFiles();
+    console.log(`发现 ${sourceFiles.length} 个源文件`);
+    
+    // 2. 分析每个文件的依赖关系
+    for (const file of sourceFiles) {
+      const dependencies = await this.analyzeFileDependencies(file);
+      this.dependencyGraph.set(file, dependencies);
+      
+      // 构建导入关系图
+      this.buildImportGraph(file, dependencies);
+      
+      // 构建函数调用图
+      await this.buildFunctionCallGraph(file);
+    }
+    
+    // 3. 构建模块注册表
+    await this.buildModuleRegistry();
+    
+    console.log('✅ 依赖关系图构建完成');
+    console.log(`- 文件依赖: ${this.dependencyGraph.size} 个文件`);
+    console.log(`- 函数调用: ${this.functionCallGraph.size} 个函数`);
+    console.log(`- 模块注册: ${this.moduleRegistry.size} 个模块`);
+  }
+
+  // 扫描所有源文件
+  async scanSourceFiles() {
+    const glob = require('glob');
+    const patterns = [
+      'bklog/web/src/**/*.js',
+      'bklog/web/src/**/*.ts',
+      'bklog/web/src/**/*.vue',
+      'bklog/web/src/**/*.jsx',
+      'bklog/web/src/**/*.tsx'
+    ];
+    
+    const files = [];
+    for (const pattern of patterns) {
+      try {
+        const matchedFiles = glob.sync(pattern);
+        files.push(...matchedFiles);
+      } catch (error) {
+        console.warn(`扫描模式 ${pattern} 失败:`, error.message);
+      }
+    }
+    
+    return [...new Set(files)];
+  }
+
+  // 分析单个文件的依赖关系
+  async analyzeFileDependencies(filePath) {
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const dependencies = {
+        imports: this.extractImports(content),
+        exports: this.extractExports(content),
+        functions: this.extractFunctions(content),
+        components: this.extractComponents(content),
+        modules: this.extractModules(content)
+      };
+      
+      return dependencies;
+    } catch (error) {
+      console.warn(`分析文件 ${filePath} 依赖失败:`, error.message);
+      return { imports: [], exports: [], functions: [], components: [], modules: [] };
+    }
+  }
+
+  // 提取导入语句
+  extractImports(content) {
+    const imports = [];
+    
+    // 匹配各种导入模式
+    const importPatterns = [
+      /import\s+(\{[^}]*\})\s+from\s+['"`]([^'"`]+)['"`]/g, // import { x, y } from 'module'
+      /import\s+(\w+)\s+from\s+['"`]([^'"`]+)['"`]/g, // import x from 'module'
+      /import\s+['"`]([^'"`]+)['"`]/g, // import 'module'
+      /require\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g, // require('module')
+    ];
+    
+    importPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        imports.push({
+          type: 'import',
+          module: match[1] || match[2] || match[0],
+          source: match[0]
+        });
+      }
+    });
+    
+    return imports;
+  }
+
+  // 提取导出语句
+  extractExports(content) {
+    const exports = [];
+    
+    // 匹配各种导出模式
+    const exportPatterns = [
+      /export\s+(?:default\s+)?(?:function|class|const|let|var)\s+(\w+)/g,
+      /export\s+\{([^}]+)\}/g,
+      /export\s+default\s+(\w+)/g,
+      /module\.exports\s*=\s*(\w+)/g,
+    ];
+    
+    exportPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        exports.push({
+          type: 'export',
+          name: match[1],
+          source: match[0]
+        });
+      }
+    });
+    
+    return exports;
+  }
+
+  // 提取函数定义
+  extractFunctions(content) {
+    const functions = [];
+    
+    // 匹配函数定义
+    const functionPatterns = [
+      /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g,
+      /(?:export\s+)?(?:async\s+)?(\w+)\s*[:=]\s*(?:async\s+)?function/g,
+      /(?:export\s+)?(?:async\s+)?(\w+)\s*[:=]\s*\([^)]*\)\s*=>/g,
+    ];
+    
+    functionPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        functions.push({
+          name: match[1],
+          type: 'function',
+          source: match[0]
+        });
+      }
+    });
+    
+    return functions;
+  }
+
+  // 提取组件定义
+  extractComponents(content) {
+    const components = [];
+    
+    // Vue组件模式
+    const vuePatterns = [
+      /export\s+default\s*\{[^}]*name\s*:\s*['"`](\w+)['"`]/g,
+      /components\s*:\s*\{([^}]+)\}/g,
+    ];
+    
+    vuePatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        components.push({
+          name: match[1],
+          type: 'vue_component',
+          source: match[0]
+        });
+      }
+    });
+    
+    return components;
+  }
+
+  // 提取模块信息
+  extractModules(content) {
+    const modules = [];
+    
+    // 匹配模块相关模式
+    const modulePatterns = [
+      /@module\s+(\w+)/g,
+      /@component\s+(\w+)/g,
+      /@service\s+(\w+)/g,
+    ];
+    
+    modulePatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        modules.push({
+          name: match[1],
+          type: 'module',
+          source: match[0]
+        });
+      }
+    });
+    
+    return modules;
+  }
+
+  // 构建导入关系图
+  buildImportGraph(file, dependencies) {
+    dependencies.imports.forEach(importItem => {
+      const importedModule = this.resolveModulePath(importItem.module, file);
+      if (importedModule) {
+        if (!this.importGraph.has(importedModule)) {
+          this.importGraph.set(importedModule, new Set());
+        }
+        this.importGraph.get(importedModule).add(file);
+      }
+    });
+  }
+
+  // 构建函数调用图
+  async buildFunctionCallGraph(file) {
+    try {
+      const content = await fs.readFile(file, 'utf8');
+      const functions = this.extractFunctions(content);
+      
+      functions.forEach(func => {
+        // 查找函数调用
+        const calls = this.findFunctionCalls(content, func.name);
+        
+        if (!this.functionCallGraph.has(func.name)) {
+          this.functionCallGraph.set(func.name, {
+            definition: file,
+            calls: new Set(),
+            callers: new Set()
+          });
+        }
+        
+        calls.forEach(call => {
+          this.functionCallGraph.get(func.name).calls.add(call);
+        });
+      });
+    } catch (error) {
+      console.warn(`构建函数调用图失败 ${file}:`, error.message);
+    }
+  }
+
+  // 查找函数调用
+  findFunctionCalls(content, functionName) {
+    const calls = [];
+    
+    // 匹配函数调用模式
+    const callPatterns = [
+      new RegExp(`\\b${functionName}\\s*\\(`, 'g'),
+      new RegExp(`\\.${functionName}\\s*\\(`, 'g'),
+    ];
+    
+    callPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        calls.push({
+          function: functionName,
+          position: match.index,
+          context: content.substring(Math.max(0, match.index - 50), match.index + 50)
+        });
+      }
+    });
+    
+    return calls;
+  }
+
+  // 构建模块注册表
+  async buildModuleRegistry() {
+    for (const [file, dependencies] of this.dependencyGraph) {
+      const moduleInfo = this.analyzeModuleInfo(file, dependencies);
+      if (moduleInfo) {
+        this.moduleRegistry.set(moduleInfo.name, {
+          file: file,
+          type: moduleInfo.type,
+          dependencies: dependencies,
+          exports: dependencies.exports,
+          functions: dependencies.functions
+        });
+      }
+    }
+  }
+
+  // 分析模块信息
+  analyzeModuleInfo(file, dependencies) {
+    // 从文件路径推断模块信息
+    const pathParts = file.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    const moduleName = fileName.replace(/\.[^.]*$/, '');
+    
+    // 根据路径推断模块类型
+    let moduleType = 'unknown';
+    if (file.includes('/components/')) {
+      moduleType = 'component';
+    } else if (file.includes('/utils/') || file.includes('/common/')) {
+      moduleType = 'utility';
+    } else if (file.includes('/services/')) {
+      moduleType = 'service';
+    } else if (file.includes('/views/')) {
+      moduleType = 'view';
+    }
+    
+    return {
+      name: moduleName,
+      type: moduleType,
+      file: file
+    };
+  }
+
+  // 解析模块路径
+  resolveModulePath(modulePath, currentFile) {
+    // 简化实现，实际应该处理各种模块解析规则
+    if (modulePath.startsWith('.')) {
+      // 相对路径
+      const currentDir = path.dirname(currentFile);
+      return path.resolve(currentDir, modulePath);
+    } else if (modulePath.startsWith('@/')) {
+      // 别名路径
+      return modulePath.replace('@/', 'bklog/web/src/');
+    } else {
+      // 绝对路径或包名
+      return modulePath;
+    }
+  }
+
+  // 分析变更的影响范围
+  async analyzeChangeImpact(changedFiles) {
+    console.log('🔍 分析变更影响范围...');
+    
+    const impact = {
+      directImpact: [],
+      indirectImpact: [],
+      affectedComponents: [],
+      affectedModules: [],
+      affectedFunctions: [],
+      callChain: [],
+      riskLevel: 'low'
+    };
+    
+    for (const file of changedFiles) {
+      const fileImpact = await this.analyzeFileImpact(file);
+      impact.directImpact.push(fileImpact);
+      
+      // 分析间接影响
+      const indirectImpact = await this.analyzeIndirectImpact(file);
+      impact.indirectImpact.push(...indirectImpact);
+      
+      // 分析函数级影响
+      const functionImpact = await this.analyzeFunctionImpact(file);
+      impact.affectedFunctions.push(...functionImpact);
+      
+      // 分析调用链
+      const callChain = await this.analyzeCallChain(file);
+      impact.callChain.push(...callChain);
+    }
+    
+    // 汇总受影响的组件和模块
+    impact.affectedComponents = this.getAffectedComponents(impact);
+    impact.affectedModules = this.getAffectedModules(impact);
+    
+    // 计算风险等级
+    impact.riskLevel = this.calculateRiskLevel(impact);
+    
+    return impact;
+  }
+
+  // 分析文件影响
+  async analyzeFileImpact(filePath) {
+    const fileType = this.getFileType(filePath);
+    const impact = {
+      filePath,
+      type: fileType,
+      changes: [],
+      affectedComponents: [],
+      affectedFunctions: [],
+      severity: 'low',
+    };
+
+    // 根据文件类型分析影响
+    switch (fileType) {
+      case 'utility':
+        impact.affectedFunctions = await this.analyzeUtilityImpact(filePath);
+        impact.affectedComponents = await this.findComponentsUsingFunctions(impact.affectedFunctions);
+        break;
+      case 'component':
+        impact.affectedComponents = await this.analyzeComponentImpact(filePath);
+        break;
+      case 'service':
+        impact.affectedComponents = await this.analyzeServiceImpact(filePath);
+        break;
+    }
+
+    return impact;
+  }
+
+  // 分析工具函数影响
+  async analyzeUtilityImpact(filePath) {
+    const affectedFunctions = [];
+    
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const functions = this.extractFunctions(content);
+      
+      // 查找所有使用这些函数的文件
+      for (const func of functions) {
+        const callers = await this.findFunctionCallers(func.name);
+        affectedFunctions.push({
+          function: func.name,
+          file: filePath,
+          callers: callers,
+          impact: this.assessFunctionImpact(callers.length)
+        });
+      }
+    } catch (error) {
+      console.warn(`分析工具函数影响失败 ${filePath}:`, error.message);
+    }
+    
+    return affectedFunctions;
+  }
+
+  // 查找函数调用者
+  async findFunctionCallers(functionName) {
+    const callers = [];
+    
+    for (const [file, dependencies] of this.dependencyGraph) {
+      try {
+        const content = await fs.readFile(file, 'utf8');
+        const calls = this.findFunctionCalls(content, functionName);
+        
+        if (calls.length > 0) {
+          callers.push({
+            file: file,
+            calls: calls.length,
+            positions: calls.map(call => call.position)
+          });
+        }
+      } catch (error) {
+        // 忽略读取错误
+      }
+    }
+    
+    return callers;
+  }
+
+  // 查找使用特定函数的组件
+  async findComponentsUsingFunctions(affectedFunctions) {
+    const affectedComponents = [];
+    
+    for (const funcImpact of affectedFunctions) {
+      for (const caller of funcImpact.callers) {
+        if (this.getFileType(caller.file) === 'component') {
+          affectedComponents.push({
+            component: caller.file,
+            function: funcImpact.function,
+            impact: 'function_dependency'
+          });
+        }
+      }
+    }
+    
+    return affectedComponents;
+  }
+
+  // 评估函数影响程度
+  assessFunctionImpact(callersCount) {
+    if (callersCount > 10) return 'high';
+    if (callersCount > 5) return 'medium';
+    return 'low';
+  }
+
+  // 分析间接影响
+  async analyzeIndirectImpact(file) {
+    const indirectImpact = [];
+    
+    // 查找导入此文件的所有文件
+    const importers = this.findFileImporters(file);
+    
+    for (const importer of importers) {
+      indirectImpact.push({
+        type: 'import_dependency',
+        file: importer,
+        source: file,
+        impact: 'indirect'
+      });
+    }
+    
+    return indirectImpact;
+  }
+
+  // 查找文件导入者
+  findFileImporters(file) {
+    const importers = [];
+    
+    for (const [importerFile, dependencies] of this.dependencyGraph) {
+      const imports = dependencies.imports;
+      for (const importItem of imports) {
+        const importedModule = this.resolveModulePath(importItem.module, importerFile);
+        if (importedModule === file) {
+          importers.push(importerFile);
+        }
+      }
+    }
+    
+    return importers;
+  }
+
+  // 分析函数级影响
+  async analyzeFunctionImpact(file) {
+    const functionImpact = [];
+    
+    try {
+      const content = await fs.readFile(file, 'utf8');
+      const functions = this.extractFunctions(content);
+      
+      for (const func of functions) {
+        const callers = await this.findFunctionCallers(func.name);
+        functionImpact.push({
+          function: func.name,
+          file: file,
+          callers: callers,
+          impact: this.assessFunctionImpact(callers.length)
+        });
+      }
+    } catch (error) {
+      console.warn(`分析函数影响失败 ${file}:`, error.message);
+    }
+    
+    return functionImpact;
+  }
+
+  // 分析调用链
+  async analyzeCallChain(file) {
+    const callChain = [];
+    
+    // 查找此文件调用的函数
+    try {
+      const content = await fs.readFile(file, 'utf8');
+      const functions = this.extractFunctions(content);
+      
+      for (const func of functions) {
+        const calls = this.findFunctionCalls(content, func.name);
+        
+        for (const call of calls) {
+          // 查找被调用函数的定义
+          const calleeDefinition = this.findFunctionDefinition(call.function);
+          if (calleeDefinition) {
+            callChain.push({
+              caller: file,
+              callee: calleeDefinition,
+              function: call.function,
+              chain: [file, calleeDefinition]
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`分析调用链失败 ${file}:`, error.message);
+    }
+    
+    return callChain;
+  }
+
+  // 查找函数定义
+  findFunctionDefinition(functionName) {
+    for (const [file, dependencies] of this.dependencyGraph) {
+      const functions = dependencies.functions;
+      for (const func of functions) {
+        if (func.name === functionName) {
+          return file;
+        }
+      }
+    }
+    return null;
+  }
+
+  // 获取受影响的组件
+  getAffectedComponents(impact) {
+    const components = new Set();
+    
+    // 从直接影响中收集组件
+    impact.directImpact.forEach(fileImpact => {
+      fileImpact.affectedComponents.forEach(comp => {
+        components.add(comp.component || comp);
+      });
+    });
+    
+    // 从间接影响中收集组件
+    impact.indirectImpact.forEach(indirect => {
+      if (this.getFileType(indirect.file) === 'component') {
+        components.add(indirect.file);
+      }
+    });
+    
+    return Array.from(components);
+  }
+
+  // 获取受影响的模块
+  getAffectedModules(impact) {
+    const modules = new Set();
+    
+    // 从所有影响中收集模块
+    [...impact.directImpact, ...impact.indirectImpact].forEach(item => {
+      const moduleInfo = this.analyzeModuleInfo(item.file || item.component, {});
+      if (moduleInfo) {
+        modules.add(moduleInfo.name);
+      }
+    });
+    
+    return Array.from(modules);
+  }
+
+  // 计算风险等级
+  calculateRiskLevel(impact) {
+    let riskScore = 0;
+    
+    // 根据影响范围计算风险
+    riskScore += impact.affectedComponents.length * 10;
+    riskScore += impact.affectedModules.length * 5;
+    riskScore += impact.affectedFunctions.length * 3;
+    riskScore += impact.callChain.length * 2;
+    
+    // 根据函数调用者数量调整风险
+    impact.affectedFunctions.forEach(func => {
+      if (func.impact === 'high') riskScore += 20;
+      if (func.impact === 'medium') riskScore += 10;
+    });
+    
+    if (riskScore > 50) return 'high';
+    if (riskScore > 20) return 'medium';
+    return 'low';
+  }
+
+  // 获取变更文件（保持原有功能）
   async getChangedFiles(commitHash = 'WORKING') {
     const { execSync } = require('child_process');
     
@@ -1246,33 +1877,18 @@ class CodeImpactAnalyzer {
     }
   }
 
+  // 更新后的 analyzeCommitImpact 方法
   async analyzeCommitImpact(commitHash = 'WORKING') {
     // 获取变更文件
     const changedFiles = await this.getChangedFiles(commitHash);
 
-    const impact = {
-      directImpact: [],
-      indirectImpact: [],
-      affectedComponents: [],
-      affectedPages: [],
-      riskLevel: 'low',
-      analysisType: this.getAnalysisType(commitHash),
-      timestamp: new Date().toISOString()
-    };
+    // 使用新的影响分析功能
+    const impact = await this.analyzeChangeImpact(changedFiles);
 
-    for (const file of changedFiles) {
-      const fileImpact = await this.analyzeFileImpact(file);
-      impact.directImpact.push(fileImpact);
-
-      // 分析间接影响
-      const indirectImpact = await this.analyzeIndirectImpact(file);
-      impact.indirectImpact.push(...indirectImpact);
-    }
-
-    // 汇总受影响的组件
-    impact.affectedComponents = this.getAffectedComponents(impact);
+    // 添加分析类型和时间戳
+    impact.analysisType = this.getAnalysisType(commitHash);
+    impact.timestamp = new Date().toISOString();
     impact.affectedPages = this.getAffectedPages(impact.affectedComponents);
-    impact.riskLevel = this.calculateRiskLevel(impact);
 
     return impact;
   }
@@ -1301,6 +1917,7 @@ class CodeImpactAnalyzer {
     }
   }
 
+  // 获取文件类型
   getFileType(filePath) {
     const ext = path.extname(filePath);
     const basename = path.basename(filePath);
@@ -1314,40 +1931,16 @@ class CodeImpactAnalyzer {
     if (filePath.includes('router/') || basename.includes('route')) {
       return 'route';
     }
-    if (filePath.includes('utils/') || filePath.includes('lib/')) {
+    if (filePath.includes('utils/') || filePath.includes('lib/') || filePath.includes('common/')) {
       return 'utility';
+    }
+    if (filePath.includes('services/')) {
+      return 'service';
     }
     return 'other';
   }
 
-  async analyzeFileImpact(filePath) {
-    const fileType = this.getFileType(filePath);
-    const impact = {
-      filePath,
-      type: fileType,
-      changes: [],
-      affectedComponents: [],
-      severity: 'low',
-    };
-
-    switch (fileType) {
-      case 'component':
-        impact.affectedComponents = await this.analyzeComponentImpact(filePath);
-        break;
-      case 'utility':
-        impact.affectedComponents = await this.analyzeUtilityImpact(filePath);
-        break;
-      case 'style':
-        impact.affectedComponents = await this.analyzeStyleImpact(filePath);
-        break;
-      case 'route':
-        impact.affectedComponents = await this.analyzeRouteImpact(filePath);
-        break;
-    }
-
-    return impact;
-  }
-
+  // 分析组件影响
   async analyzeComponentImpact(componentPath) {
     const component = await this.parseComponent(componentPath);
     const impact = [];
@@ -1385,35 +1978,43 @@ class CodeImpactAnalyzer {
     return impact;
   }
 
-  buildDependencyGraph() {
-    // 构建全局依赖关系图
-    const graph = new Map();
+  // 分析服务影响
+  async analyzeServiceImpact(filePath) {
+    // 查找使用此服务的组件
+    const serviceUsers = [];
+    
+    for (const [file, dependencies] of this.dependencyGraph) {
+      const imports = dependencies.imports;
+      for (const importItem of imports) {
+        const importedModule = this.resolveModulePath(importItem.module, file);
+        if (importedModule === filePath && this.getFileType(file) === 'component') {
+          serviceUsers.push({
+            component: file,
+            service: filePath,
+            impact: 'service_dependency'
+          });
+        }
+      }
+    }
+    
+    return serviceUsers;
+  }
 
-    // 扫描所有组件文件
-    const componentFiles = this.findAllComponents();
-
-    componentFiles.forEach(file => {
-      const dependencies = this.extractDependencies(file);
-      graph.set(file, dependencies);
+  // 获取受影响的页面
+  getAffectedPages(components) {
+    const pages = new Set();
+    
+    components.forEach(component => {
+      const componentPath = typeof component === 'string' ? component : component.component;
+      if (componentPath && componentPath.includes('/views/')) {
+        pages.add(componentPath);
+      }
     });
-
-    this.dependencyGraph = graph;
-    return graph;
+    
+    return Array.from(pages);
   }
 
-  // ====== 补全的方法 ======
-  async analyzeUtilityImpact(filePath) { 
-    return []; 
-  }
-  
-  async analyzeStyleImpact(filePath) { 
-    return []; 
-  }
-  
-  async analyzeRouteImpact(filePath) { 
-    return []; 
-  }
-  
+  // 补全的方法
   async parseComponent(componentPath) { 
     return { path: componentPath }; 
   }
@@ -1431,30 +2032,6 @@ class CodeImpactAnalyzer {
   }
   
   async analyzeSlotsChanges(component) { 
-    return []; 
-  }
-  
-  extractDependencies(file) { 
-    return []; 
-  }
-  
-  findAllComponents() { 
-    return []; 
-  }
-  
-  getAffectedComponents(impact) { 
-    return []; 
-  }
-  
-  getAffectedPages(components) { 
-    return []; 
-  }
-  
-  calculateRiskLevel(impact) { 
-    return 'low'; 
-  }
-  
-  async analyzeIndirectImpact(file) { 
     return []; 
   }
 }
