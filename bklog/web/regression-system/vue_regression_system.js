@@ -224,6 +224,439 @@ class APIMockDataGenerator {
 
     return app;
   }
+
+  // 发现应用中的所有路由
+  async discoverRoutes(projectUrl) {
+    console.log('开始发现路由...');
+    
+    // 1. 从路由配置文件中提取路由
+    const staticRoutes = ['']; //await this.extractStaticRoutes();
+    
+    // // 2. 从站点地图中发现路由
+    // const sitemapRoutes = await this.extractSitemapRoutes(projectUrl);
+    
+    // // 3. 通过爬虫发现动态路由
+    // const crawledRoutes = await this.crawlRoutes(projectUrl);
+    
+    // // 4. 从Vue Router配置中提取路由
+    // const vueRoutes = await this.extractVueRoutes();
+    
+    // 合并所有路由
+    const allRoutes = [
+      ...staticRoutes,
+      // ...sitemapRoutes,
+      // ...crawledRoutes,
+      // ...vueRoutes
+    ];
+    
+    // 去重和过滤
+    const uniqueRoutes = [...new Set(allRoutes)].filter(route => 
+      !route.includes('javascript:') && 
+      !route.includes('mailto:') &&
+      !route.includes('#')
+    );
+    
+    console.log(`发现了 ${uniqueRoutes.length} 个路由`);
+    return uniqueRoutes;
+  }
+
+  // 1. 从静态路由配置文件中提取路由
+  async extractStaticRoutes() {
+    const routes = [];
+    const routeFiles = [
+      'src/router/index.js',
+      'src/router/routes.js',
+      'router/index.js',
+      'routes.js',
+      'src/routes.js'
+    ];
+    
+    for (const file of routeFiles) {
+      try {
+        const content = await fs.readFile(file, 'utf8');
+        const extractedRoutes = this.parseRouterConfig(content);
+        routes.push(...extractedRoutes);
+      } catch (error) {
+        // 文件不存在或无法读取，跳过
+        continue;
+      }
+    }
+    
+    return routes;
+  }
+
+  // 解析Vue Router配置
+  parseRouterConfig(content) {
+    const routes = [];
+    
+    // 正则匹配路由path
+    const pathRegex = /path:\s*['"`]([^'"`]+)['"`]/g;
+    let match;
+    
+    while ((match = pathRegex.exec(content)) !== null) {
+      const path = match[1];
+      // 处理动态路由参数
+      const cleanPath = path.replace(/:[^/]+/g, '1'); // 将 :id 替换为 1
+      routes.push(cleanPath);
+    }
+    
+    return routes;
+  }
+
+  // 2. 从站点地图中发现路由
+  async extractSitemapRoutes(projectUrl) {
+    const routes = [];
+    const sitemapUrls = [
+      '/sitemap.xml',
+      '/sitemap.txt',
+      '/robots.txt'
+    ];
+    
+    for (const sitemapUrl of sitemapUrls) {
+      try {
+        const response = await fetch(`${projectUrl}${sitemapUrl}`);
+        if (response.ok) {
+          const content = await response.text();
+          const extractedRoutes = this.parseSitemap(content, projectUrl);
+          routes.push(...extractedRoutes);
+        }
+      } catch (error) {
+        // 站点地图不存在或无法访问，跳过
+        continue;
+      }
+    }
+    
+    return routes;
+  }
+
+  // 解析站点地图
+  parseSitemap(content, baseUrl) {
+    const routes = [];
+    
+    if (content.includes('<?xml')) {
+      // XML格式的sitemap
+      const urlRegex = /<loc>(.*?)<\/loc>/g;
+      let match;
+      
+      while ((match = urlRegex.exec(content)) !== null) {
+        const url = match[1];
+        const path = url.replace(baseUrl, '');
+        routes.push(path);
+      }
+    } else {
+      // 纯文本格式的sitemap
+      const lines = content.split('\n');
+      for (const line of lines) {
+        if (line.trim().startsWith('http')) {
+          const path = line.trim().replace(baseUrl, '');
+          routes.push(path);
+        }
+      }
+    }
+    
+    return routes;
+  }
+
+  // 3. 通过爬虫发现动态路由
+  async crawlRoutes(projectUrl) {
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    const page = await browser.newPage();
+    const discoveredRoutes = new Set();
+    const visitedUrls = new Set();
+    const urlsToVisit = ['/'];
+    
+    // 设置用户代理
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    
+    // 监听网络请求，发现AJAX加载的路由
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('/api/') || url.includes('.json')) {
+        // 从API响应中发现路由
+        try {
+          const responseBody = await response.text();
+          const apiRoutes = this.extractRoutesFromApiResponse(responseBody);
+          apiRoutes.forEach(route => discoveredRoutes.add(route));
+        } catch (error) {
+          // 忽略解析错误
+        }
+      }
+    });
+    
+    while (urlsToVisit.length > 0 && visitedUrls.size < 50) { // 限制爬取数量
+      const currentPath = urlsToVisit.shift();
+      
+      if (visitedUrls.has(currentPath)) {
+        continue;
+      }
+      
+      visitedUrls.add(currentPath);
+      
+      try {
+        console.log(`正在爬取路由: ${currentPath}`);
+        await page.goto(`${projectUrl}${currentPath}`, { 
+          waitUntil: 'networkidle2',
+          timeout: 30000 
+        });
+        
+        // 等待Vue应用加载
+        await page.waitForTimeout(2000);
+        
+        // 提取页面中的链接
+        const links = await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll('a[href]'));
+          return links.map(link => link.getAttribute('href'));
+        });
+        
+        // 提取Vue Router链接
+        const vueLinks = await page.evaluate(() => {
+          const vueLinks = Array.from(document.querySelectorAll('[to], [href]'));
+          return vueLinks.map(link => 
+            link.getAttribute('to') || link.getAttribute('href')
+          );
+        });
+        
+        // 处理发现的链接
+        [...links, ...vueLinks].forEach(link => {
+          if (link && link.startsWith('/') && !link.startsWith('//')) {
+            const cleanLink = link.split('?')[0].split('#')[0]; // 移除查询参数和锚点
+            if (!visitedUrls.has(cleanLink) && cleanLink !== currentPath) {
+              urlsToVisit.push(cleanLink);
+              discoveredRoutes.add(cleanLink);
+            }
+          }
+        });
+        
+        // 尝试触发导航事件以发现更多路由
+        await this.triggerNavigationEvents(page);
+        
+      } catch (error) {
+        console.warn(`爬取路由 ${currentPath} 失败:`, error.message);
+      }
+    }
+    
+    await browser.close();
+    return Array.from(discoveredRoutes);
+  }
+
+  // 4. 从Vue Router配置中提取路由
+  async extractVueRoutes() {
+    const routes = [];
+    
+    try {
+      // 查找Vue项目中的路由配置
+      const vueConfigFiles = await this.findVueConfigFiles();
+      
+      for (const file of vueConfigFiles) {
+        const content = await fs.readFile(file, 'utf8');
+        const extractedRoutes = await this.parseVueRouterConfig(content);
+        routes.push(...extractedRoutes);
+      }
+    } catch (error) {
+      console.warn('提取Vue路由失败:', error.message);
+    }
+    
+    return routes;
+  }
+
+  // 查找Vue配置文件
+  async findVueConfigFiles() {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const glob = require('glob');
+    
+    const patterns = [
+      'src/router/**/*.js',
+      'src/router/**/*.ts',
+      'src/routes/**/*.js',
+      'src/routes/**/*.ts'
+    ];
+    
+    const files = [];
+    
+    for (const pattern of patterns) {
+      try {
+        const matchedFiles = glob.sync(pattern);
+        files.push(...matchedFiles);
+      } catch (error) {
+        // 忽略glob错误
+      }
+    }
+    
+    return files;
+  }
+
+  // 解析Vue Router配置
+  async parseVueRouterConfig(content) {
+    const routes = [];
+    
+    // 使用AST解析获得更准确的结果
+    try {
+      const babel = require('@babel/parser');
+      const traverse = require('@babel/traverse').default;
+      
+      const ast = babel.parse(content, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript']
+      });
+      
+      traverse(ast, {
+        ObjectExpression(path) {
+          const node = path.node;
+          const pathProperty = node.properties.find(prop => 
+            prop.key && prop.key.name === 'path'
+          );
+          
+          if (pathProperty && pathProperty.value) {
+            const routePath = pathProperty.value.value;
+            if (routePath && typeof routePath === 'string') {
+              // 处理动态路由参数
+              const cleanPath = routePath.replace(/:[^/]+/g, '1');
+              routes.push(cleanPath);
+            }
+          }
+        }
+      });
+    } catch (error) {
+      // 如果AST解析失败，使用正则表达式
+      const pathRegex = /path:\s*['"`]([^'"`]+)['"`]/g;
+      let match;
+      
+      while ((match = pathRegex.exec(content)) !== null) {
+        const path = match[1];
+        const cleanPath = path.replace(/:[^/]+/g, '1');
+        routes.push(cleanPath);
+      }
+    }
+    
+    return routes;
+  }
+
+  // 从API响应中提取路由
+  extractRoutesFromApiResponse(responseBody) {
+    const routes = [];
+    
+    try {
+      const data = JSON.parse(responseBody);
+      
+      // 递归搜索可能的路由信息
+      const searchForRoutes = (obj) => {
+        if (typeof obj === 'object' && obj !== null) {
+          for (const key in obj) {
+            if (typeof obj[key] === 'string') {
+              // 查找可能的路由路径
+              if (key.toLowerCase().includes('path') || 
+                  key.toLowerCase().includes('route') || 
+                  key.toLowerCase().includes('url')) {
+                const value = obj[key];
+                if (value.startsWith('/') && !value.startsWith('//')) {
+                  routes.push(value);
+                }
+              }
+            } else if (typeof obj[key] === 'object') {
+              searchForRoutes(obj[key]);
+            }
+          }
+        }
+      };
+      
+      searchForRoutes(data);
+    } catch (error) {
+      // 不是有效的JSON，忽略
+    }
+    
+    return routes;
+  }
+
+  // 触发导航事件以发现更多路由
+  async triggerNavigationEvents(page) {
+    try {
+      // 模拟用户交互以触发路由变化
+      await page.evaluate(() => {
+        // 触发所有按钮点击
+        const buttons = document.querySelectorAll('button, .btn, [role="button"]');
+        buttons.forEach((button, index) => {
+          if (index < 5) { // 限制点击数量
+            try {
+              button.click();
+            } catch (error) {
+              // 忽略点击错误
+            }
+          }
+        });
+        
+        // 触发菜单项点击
+        const menuItems = document.querySelectorAll('.menu-item, .nav-item, [role="menuitem"]');
+        menuItems.forEach((item, index) => {
+          if (index < 5) {
+            try {
+              item.click();
+            } catch (error) {
+              // 忽略点击错误
+            }
+          }
+        });
+      });
+      
+      // 等待可能的路由变化
+      await page.waitForTimeout(1000);
+    } catch (error) {
+      // 忽略触发事件的错误
+    }
+  }
+
+  // 模拟用户交互以捕获更多API调用
+  async simulateUserInteractions(page) {
+    try {
+      // 滚动页面
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight / 2);
+      });
+      await page.waitForTimeout(500);
+      
+      // 点击可交互元素
+      const interactiveElements = await page.$$('button, input, select, [role="button"], .btn');
+      
+      for (let i = 0; i < Math.min(interactiveElements.length, 10); i++) {
+        try {
+          await interactiveElements[i].click();
+          await page.waitForTimeout(300);
+        } catch (error) {
+          // 忽略点击错误
+        }
+      }
+      
+      // 尝试触发hover事件
+      const hoverElements = await page.$$('[data-hover], .dropdown, .menu');
+      for (let i = 0; i < Math.min(hoverElements.length, 5); i++) {
+        try {
+          await hoverElements[i].hover();
+          await page.waitForTimeout(300);
+        } catch (error) {
+          // 忽略hover错误
+        }
+      }
+      
+      // 填写表单
+      const formInputs = await page.$$('input[type="text"], input[type="email"], textarea');
+      for (let i = 0; i < Math.min(formInputs.length, 5); i++) {
+        try {
+          await formInputs[i].type('test');
+          await page.waitForTimeout(200);
+        } catch (error) {
+          // 忽略输入错误
+        }
+      }
+      
+    } catch (error) {
+      console.warn('模拟用户交互失败:', error.message);
+    }
+  }
 }
 
 // ====================
