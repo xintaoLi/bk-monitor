@@ -91,3 +91,4 @@ src/views/playground/*
 /monitor-trace-retrieve/*
 regression-system/*
 regression.config.js
+regression-data/**
