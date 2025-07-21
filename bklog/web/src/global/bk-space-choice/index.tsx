@@ -144,7 +144,7 @@ export default defineComponent({
     });
 
     const lowerCaseKeyword = computed(() => keyword.value.trim().toLocaleLowerCase());
-    
+
     const authorizedList = computed(() =>
       mySpaceList.value.filter(item => {
         let show = false;
