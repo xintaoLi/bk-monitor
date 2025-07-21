@@ -1,0 +1,19 @@
+{
+  "name": "regression-system",
+  "version": "1.0.0",
+  "description": "regression-system",
+  "author": "",
+  "dependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "@babel/types": "^7.28.1",
+    "@vue/test-utils": "^2.4.6",
+    "chokidar": "^4.0.3",
+    "express": "^5.1.0",
+    "jest": "^30.0.4",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.54.1",
+    "puppeteer": "^24.13.0",
+    "vue-template-compiler": "^2.7.16"
+  }
+}
