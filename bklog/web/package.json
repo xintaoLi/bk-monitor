@@ -18,10 +18,6 @@
     "analyze": "npm run clean && bkmonitor-cli build -a",
     "lint": "eslint \"**/*.{js,ts,tsx}\" --fix",
     "stylelint": "stylelint \"./src/**/*.(vue|scss|css)\" --fix",
-    "regression:init": "node scripts/regression-init.js",
-    "regression:record": "node scripts/regression-record.js",
-    "regression:analyze": "node scripts/regression-analyze.js",
-    "test:regression": "npm run regression:record && npm run regression:analyze",
     "biome:check": "biome check .",
     "biome:format": "biome format . --write"
   },
