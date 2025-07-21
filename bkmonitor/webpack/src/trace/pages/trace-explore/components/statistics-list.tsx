@@ -28,7 +28,7 @@ import { defineComponent, reactive, shallowRef, watch, computed, type PropType }
 import { useI18n } from 'vue-i18n';
 
 import { $bkPopover, Progress, Sideslider } from 'bkui-vue';
-import { CancelToken } from 'monitor-api/index';
+import { CancelToken } from 'monitor-api/cancel';
 import {
   traceDownloadTopK,
   traceFieldStatisticsGraph,
@@ -42,7 +42,7 @@ import { storeToRefs } from 'pinia';
 import EmptyStatus from '../../../components/empty-status/empty-status';
 import { NULL_VALUE_NAME } from '../../../components/retrieval-filter/utils';
 import { handleTransformTime, handleTransformToTimestamp } from '../../../components/time-range/utils';
-import { formatDurationWithUnit } from '../../../components/trace-view/utils/date';
+import { formatDurationWithUnit, formatDuration } from '../../../components/trace-view/utils/date';
 import { transformTableDataToCsvStr } from '../../../plugins/utls/menu';
 import { useAppStore } from '../../../store/modules/app';
 import { useTraceExploreStore } from '../../../store/modules/explore';
@@ -139,9 +139,9 @@ export default defineComponent({
             popoverLoading.value = false;
             const { min, max, avg, median } = statisticsInfo.value.value_analysis || {};
             statisticsInfo.value.value_analysis = {
-              min: formatDurationWithUnit(Number(min) || 0),
-              max: formatDurationWithUnit(Number(max) || 0),
-              avg: formatDurationWithUnit(Number(avg) || 0),
+              min: formatDuration(Number(min) || 0, '', 3).replace(/ /g, ''),
+              max: formatDuration(Number(max) || 0, '', 3).replace(/ /g, ''),
+              avg: formatDuration(Number(avg) || 0, '', 3).replace(/ /g, ''),
               median: median,
             };
             getDurationTopkList();
@@ -154,6 +154,13 @@ export default defineComponent({
           statisticsList.distinct_count = 0;
           statisticsList.field = '';
           statisticsList.list = [];
+          statisticsInfo.value = {
+            field: '',
+            total_count: 0,
+            field_count: 0,
+            distinct_count: 0,
+            field_percent: 0,
+          };
           chartData.value = [];
         }
       }
