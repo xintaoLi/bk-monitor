@@ -25,12 +25,14 @@
  */
 
 import { computed, defineComponent, ref, set } from 'vue';
-import './index-set-list.scss';
+
+import useLocale from '@/hooks/use-locale';
 
 import * as authorityMap from '../../../../common/authority-map';
 import BklogPopover from '../../../../components/bklog-popover';
-import useLocale from '@/hooks/use-locale';
 import useIndexSetList from './use-index-set-list';
+
+import './index-set-list.scss';
 
 export default defineComponent({
   props: {
@@ -57,7 +59,7 @@ export default defineComponent({
   },
   emits: ['value-change', 'favorite-change', 'auth-request'],
   setup(props, { emit }) {
-    const { indexSetTagList, clearAllValue, handleIndexSetItemCheck } = useIndexSetList(props, { emit });
+    const { indexSetTagList, clearAllValue } = useIndexSetList(props, { emit });
 
     const { $t } = useLocale();
 
@@ -96,7 +98,7 @@ export default defineComponent({
       // 检查节点是否应该显示
       const checkNodeShouldShow = (node: any, defaultIsShown = true) => {
         // 如果当前节点在选中列表中，直接返回 true
-        if (propValueStrList.value.includes(`${node.index_set_id}`)) {
+        if (propValueStrList.value.includes(`${node.__unique_id__}`)) {
           return true;
         }
 
@@ -111,7 +113,7 @@ export default defineComponent({
         if (is_shown_node) {
           // 如果启用隐藏空数据
           if (hiddenEmptyItem.value) {
-            if (!props.value.includes(`${node.index_set_id}`)) {
+            if (!props.value.includes(`${node.__unique_id__}`)) {
               is_shown_node = !node.tags.some(tag => tag.tag_id === 4);
             }
           }
@@ -133,6 +135,7 @@ export default defineComponent({
         const processedChildren = children.map(child => ({
           ...child,
           is_shown_node: checkNodeShouldShow(child, listNodeOpenManager.value[parentNode.index_set_id] === 'opened'),
+          __unique_id__: `${parentNode.index_set_id}-${child.index_set_id}`,
         }));
 
         // 对子节点进行排序
@@ -169,7 +172,9 @@ export default defineComponent({
 
         const isOpenNode = item.children?.some(child => child.is_shown_node);
         // 检查是否有子节点被选中
-        const hasSelectedChild = item.children?.some(child => propValueStrList.value.includes(`${child.index_set_id}`));
+        const hasSelectedChild = item.children?.some(child =>
+          propValueStrList.value.includes(`${child.__unique_id__}`),
+        );
 
         return {
           ...item,
@@ -177,6 +182,7 @@ export default defineComponent({
           is_children_open: isOpenNode,
           has_selected_child: hasSelectedChild,
           has_no_data_child: item.children?.some(child => child.tags?.some(tag => tag.tag_id === 4)),
+          __unique_id__: `root-${item.index_set_id}`,
         };
       });
 
@@ -224,6 +230,44 @@ export default defineComponent({
     );
 
     /**
+     * 多选：选中操作
+     * @param item
+     * @param value
+     * @param storeList: 如果是选中状态，storeList中的值会被忽略，不会作为选中结果抛出，如果是非选中，storeList 中的值会被作为选中结果抛出
+     *
+     */
+    const handleIndexSetItemCheck = (item, isChecked, storeList = []) => {
+      const targetValue = []; // 选中结果, 二维数组，结构 [[index_set_id, parent_index_set_id], [index_set_id, parent_index_set_id]]
+
+      // 如果是选中
+      if (isChecked) {
+        props.value.forEach((v: any) => {
+          if (!storeList.includes(v)) {
+            targetValue.push(v);
+          }
+        });
+        targetValue.push(item.__unique_id__);
+        emit('value-change', targetValue);
+        return;
+      }
+
+      // 如果是取消选中
+      props.value.forEach((v: any) => {
+        if (v !== item.__unique_id__) {
+          targetValue.push(v);
+        }
+      });
+
+      storeList?.forEach(v => {
+        if (!targetValue.includes(v)) {
+          targetValue.push(v);
+        }
+      });
+
+      emit('value-change', targetValue);
+    };
+
+    /**
      * 索引集选中操作
      * @param e
      * @param item
@@ -234,7 +278,7 @@ export default defineComponent({
       }
 
       if (props.type === 'single') {
-        emit('value-change', [item.index_set_id]);
+        emit('value-change', [item.__unique_id__]);
         return;
       }
 
@@ -243,22 +287,21 @@ export default defineComponent({
           return;
         }
 
-        const indexSetId = `${item.index_set_id}`;
+        const indexSetId = `${item.__unique_id__}`;
         const isChecked = !(propValueStrList.value.includes(indexSetId) || disableList.value.includes(indexSetId));
         const list = [];
 
         (item.children ?? []).forEach(child => {
           if (child.is_shown_node) {
-            const childId = `${child.index_set_id}`;
+            const childId = child.__unique_id__;
             if (propValueStrList.value.includes(childId) || disableList.value.includes(childId)) {
-              const id = `${child.index_set_id}`;
-              list.push(id);
+              list.push(childId);
               // 如果当前为选中操作，检查所有子节点是否有选中态，选中节点会被放置到 disableList
               if (isChecked) {
-                disableList.value.push(id);
+                disableList.value.push(childId);
               } else {
                 // 如果是非选中，从 disableList 中移除
-                const index = disableList.value.findIndex(v => (v === id));
+                const index = disableList.value.findIndex(v => v === childId);
                 if (index >= 0) {
                   disableList.value.splice(index, 1);
                 }
@@ -323,9 +366,9 @@ export default defineComponent({
 
     const handleNodeOpenClick = (e: MouseEvent, node) => {
       e.stopPropagation();
-      let nextStatus = listNodeOpenManager.value[node.index_set_id] === 'opened' ? 'closed' : 'opened';
+      let nextStatus = listNodeOpenManager.value[node.__unique_id__] === 'opened' ? 'closed' : 'opened';
 
-      if (searchText.value?.length > 0 && listNodeOpenManager.value[node.index_set_id] !== 'forceClosed') {
+      if (searchText.value?.length > 0 && listNodeOpenManager.value[node.__unique_id__] !== 'forceClosed') {
         nextStatus = 'forceClosed';
       }
 
@@ -333,11 +376,11 @@ export default defineComponent({
         nextStatus = 'forceClosed';
       }
 
-      if (listNodeOpenManager.value[node.index_set_id] === 'forceClosed') {
+      if (listNodeOpenManager.value[node.__unique_id__] === 'forceClosed') {
         nextStatus = 'opened';
       }
 
-      set(listNodeOpenManager.value, node.index_set_id, nextStatus);
+      set(listNodeOpenManager.value, node.__unique_id__, nextStatus);
     };
 
     const handleAuthBtnClick = (e: MouseEvent, item: any) => {
@@ -345,6 +388,12 @@ export default defineComponent({
       emit('auth-request', item);
     };
 
+    /**
+     * 获取checkbox渲染
+     * @param item
+     * @param is_root_checked 根节点是否选中
+     * @returns
+     */
     const getCheckBoxRender = (item, is_root_checked = false) => {
       if (props.type === 'single') {
         return null;
@@ -353,14 +402,16 @@ export default defineComponent({
       return (
         <bk-checkbox
           style='margin-right: 4px'
-          checked={propValueStrList.value.includes(item.index_set_id) || disableList.value.includes(item.index_set_id)}
+          checked={
+            propValueStrList.value.includes(item.__unique_id__) || disableList.value.includes(item.__unique_id__)
+          }
           disabled={is_root_checked}
         ></bk-checkbox>
       );
     };
 
     const isClosedNode = (item: any) => {
-      if (listNodeOpenManager.value[item.index_set_id] === 'forceClosed') {
+      if (listNodeOpenManager.value[item.__unique_id__] === 'forceClosed') {
         return true;
       }
 
@@ -372,7 +423,7 @@ export default defineComponent({
         return false;
       }
 
-      return !['opened'].includes(listNodeOpenManager.value[item.index_set_id]);
+      return !['opened'].includes(listNodeOpenManager.value[item.__unique_id__]);
     };
 
     /**
@@ -404,7 +455,7 @@ export default defineComponent({
               'has-child': has_child,
               'is-empty': isEmptyNode,
               'has-no-data-child': has_no_data_child,
-              active: propValueStrList.value.includes(item.index_set_id),
+              active: propValueStrList.value.includes(item.__unique_id__),
             },
           ]}
           onClick={e => handleIndexSetItemClick(e, item, is_root_checked)}
@@ -462,8 +513,8 @@ export default defineComponent({
           <div class='bklog-v3-index-set-list'>
             <bk-exception
               style='margin-top: 50px'
-              type={type}
               scene='part'
+              type={type}
             ></bk-exception>
           </div>
         );
@@ -473,11 +524,11 @@ export default defineComponent({
         <div class='bklog-v3-index-set-list'>
           {filterList.value.map((item: any) => {
             const result = [];
-            const is_root_checked = propValueStrList.value.includes(item.index_set_id);
+            const is_root_checked = propValueStrList.value.includes(item.__unique_id__);
 
             if (!isClosedNode(item)) {
               (item.children ?? []).forEach(child => {
-                if (child.is_shown_node || disableList.value.includes(child.index_set_id)) {
+                if (child.is_shown_node || disableList.value.includes(child.__unique_id__)) {
                   result.push(renderNodeItem(child, true, false, is_root_checked, item.has_no_data_child));
                 }
               });
@@ -520,56 +571,56 @@ export default defineComponent({
                   {$t('清空选择')}
                 </span>
               </div>
-              { 
-                !isMonitorComponent && <BklogPopover
-                trigger='click'
-                ref={refFavoriteGroup}
-                {...{
-                  scopedSlots: {
-                    content: () => (
-                      <bk-form
-                        label-width={200}
-                        form-type='vertical'
-                        style='padding: 16px; width: 300px;'
-                      >
-                        <bk-form-item
-                          label={$t('收藏名称')}
-                          required={true}
-                          property='name'
-                          ref={refFavoriteItemName}
+              {!isMonitorComponent && (
+                <BklogPopover
+                  ref={refFavoriteGroup}
+                  trigger='click'
+                  {...{
+                    scopedSlots: {
+                      content: () => (
+                        <bk-form
+                          style='padding: 16px; width: 300px;'
+                          form-type='vertical'
+                          label-width={200}
                         >
-                          <bk-input
-                            value={favoriteFormData.value.name}
-                            on-change={val => (favoriteFormData.value.name = val)}
-                          ></bk-input>
-                        </bk-form-item>
-                        <bk-form-item style='text-align: right;'>
-                          <bk-button
-                            style='margin-right: 3px;'
-                            theme='primary'
-                            onClick={handleFavoriteGroupClick}
+                          <bk-form-item
+                            ref={refFavoriteItemName}
+                            label={$t('收藏名称')}
+                            property='name'
+                            required={true}
                           >
-                            {$t('确定')}
-                          </bk-button>
-                          <bk-button
-                            ext-cls='mr5'
-                            theme='default'
-                          >
-                            {$t('取消')}
-                          </bk-button>
-                        </bk-form-item>
-                      </bk-form>
-                    ),
-                  },
-                }}
-              >
-                <span
-                  class='bklog-icon bklog-lc-star-shape'
-                  style='color: #DCDEE5; font-size: 14px; margin-right: 4px;'
-                ></span>
-                <span style='font-size: 12px;color: #3A84FF;'>{$t('收藏该组合')}</span>
-              </BklogPopover>
-            }
+                            <bk-input
+                              value={favoriteFormData.value.name}
+                              on-change={val => (favoriteFormData.value.name = val)}
+                            ></bk-input>
+                          </bk-form-item>
+                          <bk-form-item style='text-align: right;'>
+                            <bk-button
+                              style='margin-right: 3px;'
+                              theme='primary'
+                              onClick={handleFavoriteGroupClick}
+                            >
+                              {$t('确定')}
+                            </bk-button>
+                            <bk-button
+                              ext-cls='mr5'
+                              theme='default'
+                            >
+                              {$t('取消')}
+                            </bk-button>
+                          </bk-form-item>
+                        </bk-form>
+                      ),
+                    },
+                  }}
+                >
+                  <span
+                    style='color: #DCDEE5; font-size: 14px; margin-right: 4px;'
+                    class='bklog-icon bklog-lc-star-shape'
+                  ></span>
+                  <span style='font-size: 12px;color: #3A84FF;'>{$t('收藏该组合')}</span>
+                </BklogPopover>
+              )}
             </div>
             <div class='row-item-list'>
               {valueList.value.map((item: any) => (
@@ -624,17 +675,17 @@ export default defineComponent({
         <div class='bklog-v3-content-filter'>
           <div class='bklog-v3-search-input'>
             <bk-input
-              clearable
+              style='width: 650px; margin-right: 12px;'
               placeholder={$t('请输入 索引集、采集项 搜索')}
               right-icon="'bk-icon icon-search'"
-              style='width: 650px; margin-right: 12px;'
               value={searchText.value}
+              clearable
               on-input={handleSearchTextChange}
             ></bk-input>
             <bk-checkbox
               checked={hiddenEmptyItem.value}
-              true-value={true}
               false-value={false}
+              true-value={true}
               on-change={handleHiddenEmptyItemChange}
             >
               <span class='hidden-empty-icon'></span>
@@ -658,7 +709,7 @@ export default defineComponent({
               {indexSetTagList.value.map(item => (
                 <span
                   class={['tag-item', { 'is-active': item.tag_id === tagItem.value.tag_id }]}
-                  onClick={e => handleTagItemClick(item)}
+                  onClick={() => handleTagItemClick(item)}
                 >
                   {item.name}
                 </span>
