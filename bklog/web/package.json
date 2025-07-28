@@ -23,7 +23,12 @@
     "regression:analyze": "node scripts/regression-analyze.js",
     "test:regression": "npm run regression:record && npm run regression:analyze",
     "biome:check": "biome check .",
-    "biome:format": "biome format . --write"
+    "biome:format": "biome format . --write",
+    "regression:watch": "node bklog/web/scripts/regression-watch.js",
+    "regression:analyze:staged": "node bklog/web/scripts/regression-analyze.js --staged",
+    "regression:analyze:verbose": "node bklog/web/scripts/regression-analyze.js --verbose",
+    "regression:watch:auto": "node bklog/web/scripts/regression-watch.js --auto-analyze",
+    "regression:record:auto": "node bklog/web/scripts/regression-record.js --auto-start"
   },
   "dependencies": {
     "@babel/helper-module-imports": "7.24.7",
@@ -54,6 +59,7 @@
     "babel-loader": "9.2.1",
     "babel-plugin-import-bk-magic-vue": "2.1.11",
     "bk-magic-vue": "2.5.10-beta.1",
+    "chokidar": "^4.0.3",
     "codemirror": "6.0.1",
     "core-js": "3.38.0",
     "css-loader": "7.1.2",
@@ -61,6 +67,7 @@
     "deepmerge": "4.3.1",
     "dompurify": "^3.2.6",
     "echarts": "5.2.2",
+    "glob": "^11.0.3",
     "html-to-image": "1.11.11",
     "ifdef-loader": "^2.3.2",
     "interactjs": "1.10.27",
@@ -77,6 +84,7 @@
     "monaco-yaml": "4.0.0-alpha.3",
     "pixi.js": "8.6.6",
     "postcss-loader": "8.1.1",
+    "puppeteer": "^24.14.0",
     "qs": "6.11.2",
     "resize-detector": "0.3.0",
     "sass-loader": "14.2.1",
@@ -105,6 +113,9 @@
     "webpack-sources": "3.2.3"
   },
   "devDependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "@babel/types": "^7.28.1",
     "@biomejs/biome": "2.1.1",
     "@blueking/bkui-lint": "0.0.3",
     "@commitlint/cli": "19.2.1",

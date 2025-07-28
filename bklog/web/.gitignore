@@ -89,3 +89,11 @@ src/views/playground/*
 /monitor-retrieve/*
 /monitor-apm-retrieve/*
 /monitor-trace-retrieve/*
+
+# 回归测试数据
+regression-data/temp/
+regression-data/cache/
+regression-data/reports/
+regression-data/screenshots/
+# 但保留Mock数据
+!regression-data/mock/
