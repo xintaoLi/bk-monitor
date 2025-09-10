@@ -169,10 +169,11 @@ module.exports = (baseConfig, { app, mobile, production, fta, log, email = false
     output: {
       ...config.output,
       path: distUrl,
+      asyncChunks: true
     },
     entry: {
       ...config.entry,
-      main: './src/main.js',
+      main: './src/page-load.ts',
     },
     resolve: {
       ...config.resolve,
@@ -181,6 +182,7 @@ module.exports = (baseConfig, { app, mobile, production, fta, log, email = false
         '@': path.resolve('src'),
       },
     },
+
     plugins: baseConfig.plugins.map(plugin => {
       return plugin instanceof webpack.ProgressPlugin
         ? new WebpackBar({
