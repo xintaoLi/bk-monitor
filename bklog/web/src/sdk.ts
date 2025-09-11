@@ -25,10 +25,7 @@
  */
 import Tingyun from '@tingyun-sdk/web';
 Tingyun.init({
-  common: {
-    sendProtocol: window.location.protocol, // 自动匹配当前页面协议
-  },
-  domain: '21.236.63.139',
+  domain: 'tingyun-beacon.open.woa.com',
   token: '872c6f8d406741d28222d8fd449bfc78',
   key: 'MbVbeLGiVew',
   id: '4Nl_NnGbjwY',
