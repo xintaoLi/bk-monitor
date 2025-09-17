@@ -24,11 +24,14 @@
  * IN THE SOFTWARE.
  */
 import Tingyun from '@tingyun-sdk/web';
+import TingyunPluginRecord from '@tingyun-sdk/web-plugin-record';
+
 Tingyun.init({
   domain: 'tingyun-beacon.open.woa.com',
   token: '872c6f8d406741d28222d8fd449bfc78',
   key: 'MbVbeLGiVew',
   id: '4Nl_NnGbjwY',
+  plugins: [TingyunPluginRecord()],
   ajax: {
     bodyMaxSize: 10,
   },
