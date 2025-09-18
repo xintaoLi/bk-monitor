@@ -39,7 +39,8 @@ Tingyun.init({
     propagators: ['tingyun'],
   },
   replay: {
-    sampleRate: 0.1,
+    enabled: true,
+    sampleRate: 1.0,
   },
   webVitals: {
     ttiThreshold: 4000,
