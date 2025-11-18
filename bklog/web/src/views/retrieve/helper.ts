@@ -238,8 +238,6 @@ export const generateIframeSrcdoc = (isDev: boolean) => {
 
   // 获取当前路由信息
   const routeInfo = getRouteInfo();
-  const initialHash = routeInfo.hashPath || '/';
-  const initialQuery = routeInfo.query;
 
   // 获取基础 URL 信息
   const basePath = routeInfo.pathname.substring(0, routeInfo.pathname.lastIndexOf('/') + 1);
@@ -393,7 +391,8 @@ export const generateIframeSrcdoc = (isDev: boolean) => {
         },
         get hash() {
           try {
-            return parentLocation.hash || '';
+            const hash = parentLocation.hash || '';
+            return hash;
           } catch (e) {
             return '';
           }
@@ -401,7 +400,6 @@ export const generateIframeSrcdoc = (isDev: boolean) => {
 
         reload: function() {
           // 在 iframe 中，阻止实际刷新页面
-          console.warn('location.reload() called in iframe, ignoring to prevent infinite refresh');
           if (window.vueRouter) {
             window.vueRouter.replace(window.vueRouter.currentRoute.fullPath);
           }
@@ -424,15 +422,7 @@ export const generateIframeSrcdoc = (isDev: boolean) => {
         return;
       }
 
-      // 设置初始路由数据供 Vue Router 使用
-      window.INITIAL_ROUTE_DATA = {
-        hash: '${initialHash}',
-        fullPath: '${initialHash}',
-        query: ${JSON.stringify(initialQuery)},
-        params: {}
-      };
 
-      console.log('Location proxy initialized, using parent location:', parentLocation.href);
       isLocationProxySetup = true;
     };
 
@@ -469,10 +459,6 @@ export const generateIframeSrcdoc = (isDev: boolean) => {
             });
             // 不触发 hashchange 事件，因为 location 已经代理父级，Vue Router 会通过 location.hash 获取到正确的值
           }
-        } else {
-          // 如果 VueRouter 还没有加载，等待它加载完成后再更新
-          // 不触发 hashchange 事件，避免循环刷新
-          console.log('VueRouter not loaded yet, will update after initialization');
         }
       }, 50);
     };

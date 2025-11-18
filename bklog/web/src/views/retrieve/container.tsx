@@ -107,6 +107,42 @@ export default defineComponent({
 
         // 设置消息监听和初始化同步
         const setupIframeSync = (iframeWindow: Window) => {
+          let hashSynced = false;
+          const MAX_RETRY_COUNT = 50; // 最大重试次数（5秒）
+          const RETRY_INTERVAL = 100; // 重试间隔（100ms）
+          let retryCount = 0;
+
+          // 尝试同步 hash 到 iframe
+          const trySyncHash = () => {
+            const iframeWin = iframeWindow as any;
+            if (iframeWin.updateHashRoute) {
+              const currentHash = route.hash;
+
+              if (currentHash) {
+                syncHashToIframe(iframeWindow, currentHash);
+              }
+              hashSynced = true;
+              return true;
+            }
+            return false;
+          };
+
+          // 轮询检查 updateHashRoute 是否可用
+          const pollForUpdateHashRoute = () => {
+            if (hashSynced) {
+              return;
+            }
+
+            if (trySyncHash()) {
+              return;
+            }
+
+            retryCount += 1;
+            if (retryCount < MAX_RETRY_COUNT) {
+              setTimeout(pollForUpdateHashRoute, RETRY_INTERVAL);
+            }
+          };
+
           // 监听来自 iframe 的消息
           messageHandler = (evt: MessageEvent) => {
             // 验证消息来源是否是 iframe 窗口，且消息包含正确的 source 标识
@@ -118,6 +154,14 @@ export default defineComponent({
               if (evt.data.type === 'vue2-app-loaded') {
                 loading.value = false;
                 error.value = null;
+                // Vue2 应用已完全加载，此时 updateHashRoute 应该已经可用
+                // 立即尝试同步 hash，如果失败则启动轮询
+                if (!hashSynced) {
+                  if (!trySyncHash()) {
+                    // 如果立即同步失败，启动轮询（作为备用方案）
+                    pollForUpdateHashRoute();
+                  }
+                }
               }
 
               if (evt.data.type === 'vue2-app-error') {
@@ -145,13 +189,9 @@ export default defineComponent({
 
           window.addEventListener('message', messageHandler);
 
-          // 初始化时同步一次父级 URL 到 iframe（延迟执行，确保 iframe 已完全加载）
-          setTimeout(() => {
-            const currentHash = route.hash;
-            if (currentHash) {
-              syncHashToIframe(iframeWindow, currentHash);
-            }
-          }, 500);
+          // 启动轮询检查（作为备用方案，如果消息机制失败）
+          // 如果收到 'vue2-app-loaded' 消息，会在消息处理中同步 hash
+          pollForUpdateHashRoute();
         };
 
         // 等待 iframe 加载后设置初始同步
@@ -165,7 +205,6 @@ export default defineComponent({
       } catch (err: any) {
         loading.value = false;
         error.value = err.message || '初始化失败';
-        console.error('初始化 iframe 失败:', err);
       }
     };
 
@@ -247,6 +286,14 @@ export default defineComponent({
             border: 'none',
             display: loading.value || error.value ? 'none' : 'block',
           }}
+          // 安全警告：同时使用 allow-scripts 和 allow-same-origin 会绕过沙箱保护
+          // 当前实现需要这两个权限的原因：
+          // 1. allow-scripts: 必需，用于运行 Vue2 应用
+          // 2. allow-same-origin: 必需，用于访问 window.parent.location 实现 location 代理
+          // 安全缓解措施：
+          // - iframe 内容通过 srcdoc 注入，完全由父页面控制
+          // - iframe 和父页面来自同一 origin（同源策略）
+          // - 未来可以考虑移除 allow-same-origin，改用 postMessage 通信机制
           sandbox='allow-same-origin allow-scripts allow-forms allow-popups allow-modals'
         />
       </div>
