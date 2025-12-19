@@ -1,0 +1,86 @@
+{
+  "$schema": "../schemas/runtime-task.schema.json",
+  "id": "test-demo-click",
+  "intent": "测试体验DEMO按钮点击",
+  "context": {
+    "component": "SpaceChoice",
+    "route": "/retrieve",
+    "version": "test"
+  },
+  "preconditions": [],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "{{baseUrl}}/#/retrieve",
+      "waitUntil": "networkidle2"
+    },
+    {
+      "type": "wait",
+      "selector": "body",
+      "timeout": 10000,
+      "state": "visible"
+    },
+    {
+      "type": "wait",
+      "timeout": 3000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { console.log('当前路由:', window.location.hash); return window.location.hash; }"
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='unauth-retry']",
+      "optional": true,
+      "timeout": 2000
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { console.log('点击业务选择器前的路由:', window.location.hash); return window.location.hash; }"
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='space-choice-toggle'], .menu-select-name",
+      "optional": true,
+      "timeout": 3000
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { const demo = document.querySelector('[data-testid=\"space-choice-demo\"]'); console.log('体验DEMO元素存在:', !!demo); if (demo) { console.log('体验DEMO元素可见:', demo.offsetParent !== null); console.log('体验DEMO元素位置:', demo.getBoundingClientRect()); } return !!demo; }"
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='space-choice-demo']",
+      "timeout": 5000
+    },
+    {
+      "type": "wait",
+      "timeout": 5000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { console.log('点击体验DEMO后的路由:', window.location.hash); return window.location.hash; }"
+    }
+  ],
+  "signals": [
+    {
+      "type": "dom-visible",
+      "selector": "body",
+      "timeout": 15000
+    }
+  ],
+  "metadata": {
+    "priority": "high",
+    "tags": ["test", "demo", "click"],
+    "estimatedDuration": 30000,
+    "retryable": true
+  }
+}

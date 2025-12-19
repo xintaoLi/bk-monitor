@@ -1,0 +1,48 @@
+{
+  "name": "@autotest/mcp-e2e",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AST-based E2E automation CLI powered by CodeBuddy + chrome-devtools-mcp",
+  "keywords": [
+    "e2e",
+    "automation",
+    "mcp",
+    "chrome-devtools",
+    "codebuddy",
+    "ast",
+    "frontend-testing"
+  ],
+  "bin": {
+    "mcp-e2e": "bin/mcp-e2e.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.0.0",
+    "fs-extra": "^11.2.0",
+    "puppeteer": "^24.33.0",
+    "simple-git": "^3.20.0",
+    "ts-morph": "^20.0.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.10.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

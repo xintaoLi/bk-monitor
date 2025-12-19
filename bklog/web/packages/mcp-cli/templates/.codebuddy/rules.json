@@ -1,0 +1,31 @@
+{
+  "rules": [
+    {
+      "id": "auto-analyze-components",
+      "name": "Auto Analyze Component Changes",
+      "description": "Automatically analyze component dependencies when React/Vue files change",
+      "pattern": "src/**/*.{ts,tsx,js,jsx,vue}",
+      "action": "run_mcp_analyze",
+      "enabled": true,
+      "priority": 10
+    },
+    {
+      "id": "auto-generate-tests",
+      "name": "Auto Generate MCP Tests",
+      "description": "Automatically generate test flows when analysis completes",
+      "pattern": ".mcp/analysis.json",
+      "action": "run_mcp_generate",
+      "enabled": true,
+      "priority": 20
+    },
+    {
+      "id": "validate-test-selectors",
+      "name": "Validate Test Selectors",
+      "description": "Ensure components have proper data-testid attributes",
+      "pattern": "src/**/*.{tsx,jsx,vue}",
+      "action": "validate_selectors",
+      "enabled": true,
+      "priority": 5
+    }
+  ]
+}

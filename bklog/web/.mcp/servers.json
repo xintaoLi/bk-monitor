@@ -1,0 +1,25 @@
+{
+    "mcpServers": {
+        "chrome-devtools": {
+            "command": "npx",
+            "args": [
+                "chrome-devtools-mcp"
+            ],
+            "env": {
+                "CHROME_HEADLESS": "true",
+                "CHROME_TIMEOUT": "30000"
+            }
+        }
+    },
+    "config": {
+        "projectName": "blueking-log",
+        "baseUrl": "${MCP_BASE_URL:-http://localhost:8081}",
+        "testTimeout": 30000,
+        "screenshotOnFailure": true,
+        "headless": false,
+        "viewport": {
+            "width": 1920,
+            "height": 1080
+        }
+    }
+}

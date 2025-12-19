@@ -187,7 +187,7 @@ export default defineComponent({
       updateSearchText(newKeyword);
       // 搜索时重置选中索引
       selectedIndex.value = -1;
-      
+
       // 搜索时，如果列表滚动位置不在最顶部，则自动滚动到顶部
       if (bizListRef.value && showBizList.value) {
         await nextTick();
@@ -195,11 +195,11 @@ export default defineComponent({
         const listContainer = bizListRef.value?.$el || bizListRef.value;
         if (listContainer) {
           // 查找 RecycleScroller 的滚动容器
-          const scroller = listContainer.querySelector('.vue-recycle-scroller') 
+          const scroller = listContainer.querySelector('.vue-recycle-scroller')
             || listContainer.querySelector('.list-scroller');
 
           const scrollElement = scroller || listContainer;
-          
+
           // 检查滚动位置，如果不在顶部则滚动到顶部
           if (scrollElement.scrollTop > 0) {
             scrollElement.scrollTo({
@@ -486,6 +486,7 @@ export default defineComponent({
           >
             {/* 搜索框 */}
             <bk-input
+              data-testid='space-choice-search'
               ref={menuSearchInput}
               class='menu-select-search'
               clearable={false}
@@ -495,6 +496,7 @@ export default defineComponent({
               onChange={handleBizSearchDebounce}
               onClear={() => handleBizSearchDebounce('')}
             />
+
             {/* 空间列表 */}
             {showSpaceTypeIdList.value && (
               <ul
@@ -518,10 +520,12 @@ export default defineComponent({
             )}
             {/* 业务列表 */}
             <div
+              data-testid='space-choice-list'
               ref={bizListRef}
               style={{ width: `${bizBoxWidth.value}px` }}
               class='biz-list'
             >
+
               <List
                 canSetDefaultSpace={props.canSetDefaultSpace as boolean}
                 checked={spaceUid.value}
@@ -539,6 +543,7 @@ export default defineComponent({
             <div class='menu-select-extension'>
               {!isExternal.value && demoUid.value && (
                 <div
+                  data-testid='space-choice-demo'
                   class='menu-select-extension-item'
                   onMousedown={(e) => {
                     e.stopPropagation();
@@ -558,9 +563,11 @@ export default defineComponent({
     // 渲染主入口
     return () => (
       <div
+        data-testid='space-choice'
         ref={refRootElement}
         class={['biz-menu-select', { 'light-theme': props.theme === 'light' }]}
       >
+
         {/* 图标+业务名称 */}
         <div class='menu-select'>
           {/* 图标 */}
@@ -573,10 +580,12 @@ export default defineComponent({
           {/* 业务名称 */}
           {props.isExpand && (
             <span
+              data-testid='space-choice-toggle'
               class='menu-select-name'
               tabindex={0}
               onMousedown={handleClickBizSelect}
             >
+
               {bizName.value}
               <i
                 style={{

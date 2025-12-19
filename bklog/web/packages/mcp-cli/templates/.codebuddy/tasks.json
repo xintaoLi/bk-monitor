@@ -1,0 +1,31 @@
+{
+  "tasks": [
+    {
+      "id": "mcp-e2e-analyze",
+      "name": "MCP E2E Analysis",
+      "description": "Analyze component dependencies when files change",
+      "trigger": "on_change",
+      "files": ["src/**/*.{ts,tsx,js,jsx,vue}"],
+      "command": "npx mcp-e2e analyze",
+      "enabled": true
+    },
+    {
+      "id": "mcp-e2e-generate",
+      "name": "MCP E2E Generate Tests",
+      "description": "Generate test flows after analysis",
+      "trigger": "on_change",
+      "files": [".mcp/analysis.json"],
+      "command": "npx mcp-e2e generate",
+      "enabled": true
+    },
+    {
+      "id": "mcp-e2e-run-manual",
+      "name": "MCP E2E Run Tests (Manual)",
+      "description": "Manually run E2E tests",
+      "trigger": "manual",
+      "files": [],
+      "command": "npx mcp-e2e run",
+      "enabled": true
+    }
+  ]
+}

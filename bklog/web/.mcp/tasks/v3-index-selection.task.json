@@ -1,0 +1,103 @@
+{
+  "$schema": "../schemas/runtime-task.schema.json",
+  "id": "v3-index-selection",
+  "intent": "验证 V3 版本索引列表选择交互（含异常场景自愈）",
+  "context": {
+    "component": "IndexList",
+    "route": "/retrieve",
+    "version": "v3"
+  },
+  "preconditions": [],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "{{baseUrl}}/#/retrieve",
+      "waitUntil": "networkidle2"
+    },
+    {
+      "type": "wait",
+      "selector": "body",
+      "timeout": 10000,
+      "state": "visible"
+    },
+    {
+      "type": "wait",
+      "timeout": 5000
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='unauth-retry']",
+      "optional": true,
+      "timeout": 3000
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='space-choice-toggle']",
+      "optional": true,
+      "timeout": 3000
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { const demoBtn = document.querySelector('[data-testid=\"space-choice-demo\"]'); if (demoBtn) { console.log('找到体验DEMO按钮，点击它'); demoBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); return 'clicked-demo'; } const hash = window.location.hash || ''; const match = hash.match(/spaceUid=([^&]+)/); const currentSpaceUid = match ? match[1] : ''; console.log('当前 spaceUid:', currentSpaceUid); const items = document.querySelectorAll('.biz-list .list-item:not(.checked)'); for (const item of items) { const spaceUid = item.getAttribute('data-space-uid'); if (spaceUid && spaceUid !== currentSpaceUid) { console.log('选择业务:', spaceUid); item.click(); return 'clicked-' + spaceUid; } } console.log('没有找到可切换的业务'); return 'no-switch'; }"
+    },
+    {
+      "type": "wait",
+      "timeout": 5000
+    },
+    {
+      "type": "wait",
+      "selector": "[data-testid='index-set-choice']",
+      "timeout": 20000,
+      "state": "visible",
+      "optional": true
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='index-set-choice']",
+      "timeout": 5000,
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "click",
+      "selector": ".bk-option:nth-child(2)",
+      "timeout": 3000,
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "timeout": 3000
+    },
+    {
+      "type": "wait",
+      "selector": "[data-testid='v3-search-bar']",
+      "timeout": 15000,
+      "state": "visible",
+      "optional": true
+    }
+  ],
+  "signals": [
+    {
+      "type": "dom-visible",
+      "selector": "[data-testid='v3-search-bar']",
+      "timeout": 25000
+    }
+  ],
+  "metadata": {
+    "priority": "medium",
+    "tags": ["v3", "index-list", "interaction", "self-healing"],
+    "estimatedDuration": 35000,
+    "retryable": true
+  }
+}

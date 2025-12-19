@@ -1,0 +1,107 @@
+{
+  "$schema": "../schemas/runtime-task.schema.json",
+  "id": "main-retrieve-simple",
+  "intent": "简化版主业务流程：使用通用选择器（含异常场景自愈）",
+  "context": {
+    "component": "LogRetrieve",
+    "route": "/retrieve",
+    "version": "v3"
+  },
+  "preconditions": [],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "{{baseUrl}}/#/retrieve",
+      "waitUntil": "networkidle2"
+    },
+    {
+      "type": "wait",
+      "selector": "body",
+      "timeout": 5000,
+      "state": "visible"
+    },
+    {
+      "type": "wait",
+      "timeout": 3000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { const hash = window.location.hash || ''; const isUnauth = hash.includes('un-authorized'); console.log('当前路由:', hash, '是否在异常页:', isUnauth); return { hash, isUnauth }; }"
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='unauth-retry']",
+      "optional": true,
+      "timeout": 2000
+    },
+    {
+      "type": "wait",
+      "timeout": 1500
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='space-choice-toggle'], .menu-select-name",
+      "optional": true,
+      "timeout": 3000
+    },
+    {
+      "type": "wait",
+      "timeout": 1500
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { const demoBtn = document.querySelector('[data-testid=\"space-choice-demo\"]'); if (demoBtn) { console.log('找到体验DEMO按钮，点击它'); demoBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); return 'clicked-demo'; } const hash = window.location.hash || ''; const match = hash.match(/spaceUid=([^&]+)/); const currentSpaceUid = match ? match[1] : ''; console.log('当前 spaceUid:', currentSpaceUid); const items = document.querySelectorAll('.biz-list .list-item:not(.checked)'); for (const item of items) { const spaceUid = item.getAttribute('data-space-uid'); if (spaceUid && spaceUid !== currentSpaceUid) { console.log('选择业务:', spaceUid); item.click(); return 'clicked-' + spaceUid; } } console.log('没有找到可切换的业务'); return 'no-switch'; }"
+    },
+    {
+      "type": "wait",
+      "timeout": 3000
+    },
+    {
+      "type": "evaluate",
+      "script": "() => { console.log('页面标题:', document.title); console.log('当前 hash:', window.location.hash); return true; }"
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "click",
+      "selector": "[data-testid='v3-search-bar'] input, input[type='text']:not([readonly])",
+      "optional": true,
+      "timeout": 5000
+    },
+    {
+      "type": "type",
+      "selector": "[data-testid='v3-search-bar'] input, input[type='text']:not([readonly])",
+      "value": "error",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "timeout": 2000
+    },
+    {
+      "type": "click",
+      "selector": "button[class*='query'], button[class*='search'], .bk-button--primary",
+      "optional": true,
+      "timeout": 5000
+    },
+    {
+      "type": "wait",
+      "timeout": 5000
+    }
+  ],
+  "signals": [
+    {
+      "type": "dom-visible",
+      "selector": "[data-testid='v3-search-bar'], .v3-search-bar-root, body",
+      "timeout": 20000
+    }
+  ],
+  "metadata": {
+    "priority": "high",
+    "tags": ["main-flow", "simplified", "debug", "self-healing"],
+    "estimatedDuration": 35000,
+    "retryable": true
+  }
+}

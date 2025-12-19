@@ -393,7 +393,10 @@ export default defineComponent({
     return () => {
       if (searchMode.value === 'ai') {
         return (
-          <div class='v3-search-bar-root is-ai-mode'>
+          <div
+            data-testid='v3-search-bar-ai'
+            class='v3-search-bar-root is-ai-mode'
+          >
             <V3AiMode
               ref={aiModeRef}
               is-ai-loading={isAiLoading.value}
@@ -412,6 +415,7 @@ export default defineComponent({
 
       return (
         <V2SearchBar
+          data-testid='v3-search-bar'
           class='v3-search-bar-root'
           ref={searchBarRef}
           on-height-change={handleHeightChange}

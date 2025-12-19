@@ -239,6 +239,7 @@ export default defineComponent({
     return () => {
       return (
         <BklogPopover
+          data-testid='index-set-choice'
           ref={refRootElement}
           style={rootStyle.value}
           class={[
