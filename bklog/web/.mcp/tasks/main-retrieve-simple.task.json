@@ -100,7 +100,12 @@
   ],
   "metadata": {
     "priority": "high",
-    "tags": ["main-flow", "simplified", "debug", "self-healing"],
+    "tags": [
+      "main-flow",
+      "simplified",
+      "debug",
+      "self-healing"
+    ],
     "estimatedDuration": 35000,
     "retryable": true
   }

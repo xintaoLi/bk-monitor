@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://autotest.bklog.dev/schema/runtime-task.json",
+  "$id": "runtime-task.schema.json",
   "title": "Runtime Task",
   "description": "AI-generated executable test task for front-end autonomous QA",
   "type": "object",

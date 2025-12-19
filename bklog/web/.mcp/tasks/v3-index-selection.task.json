@@ -96,7 +96,12 @@
   ],
   "metadata": {
     "priority": "medium",
-    "tags": ["v3", "index-list", "interaction", "self-healing"],
+    "tags": [
+      "v3",
+      "index-list",
+      "interaction",
+      "self-healing"
+    ],
     "estimatedDuration": 35000,
     "retryable": true
   }
