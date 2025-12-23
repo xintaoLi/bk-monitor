@@ -1,0 +1,46 @@
+{
+  "id": "space-choice-component",
+  "intent": "测试业务切换组件 (bk-space-choice) 功能",
+  "context": {
+    "component": "BkSpaceChoice",
+    "route": "/retrieve"
+  },
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "{{baseUrl}}/#/retrieve",
+      "waitUntil": "networkidle2"
+    },
+    {
+      "type": "wait",
+      "selector": ".biz-menu-select",
+      "timeout": 10000,
+      "state": "visible"
+    },
+    {
+      "type": "click",
+      "selector": ".menu-select-name",
+      "timeout": 5000
+    },
+    {
+      "type": "wait",
+      "timeout": 500
+    },
+    {
+      "type": "wait",
+      "selector": ".menu-select-list",
+      "timeout": 5000,
+      "state": "visible"
+    },
+    {
+      "type": "type",
+      "selector": ".menu-select-search input",
+      "text": "测试",
+      "timeout": 5000
+    },
+    {
+      "type": "wait",
+      "timeout": 1000
+    }
+  ]
+}

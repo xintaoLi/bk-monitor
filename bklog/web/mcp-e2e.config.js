@@ -32,7 +32,7 @@ module.exports = {
 
     // 开发服务器配置
     devServer: {
-        url: process.env.MCP_DEV_SERVER_URL || 'http://localhost:8081',
+        url: process.env.MCP_DEV_SERVER_URL || 'http://appdev.woa.com:8001/#/retrieve/627861?addition=%5B%5D&keyword=&bizId=2005000002&spaceUid=bkcc__2005000002&pid=%5B%22%23%22%5D&search_mode=ui',
         startCommand: 'npm run dev',
         readyWhen: 'Webpack compiled', // 等待开发服务器就绪的标志
     },
@@ -55,6 +55,31 @@ module.exports = {
         'aria-label',
         'class', // 降级使用 BK UI 组件的 class
     ],
+
+    // 组件级测试配置
+    componentTests: {
+        enabled: true,
+        tests: [
+            {
+                name: 'bk-space-choice',
+                description: '业务切换组件功能测试',
+                component: 'BkSpaceChoice',
+                testFile: 'tests/mcp/flows/bk-space-choice.flow.js',
+            },
+            {
+                name: 'index-set-choice',
+                description: '索引选择组件功能测试',
+                component: 'IndexSetChoice',
+                testFile: 'tests/mcp/flows/index-set-choice.flow.js',
+            },
+            {
+                name: 'search-bar',
+                description: '检索框组件功能测试',
+                component: 'V3Searchbar',
+                testFile: 'tests/mcp/flows/search-bar.flow.js',
+            },
+        ],
+    },
 
     // 日志检索 v3 主流程定义
     mainFlows: [

@@ -3,8 +3,12 @@
  * 使用 chrome-devtools-mcp 提供的浏览器能力
  */
 
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * 获取基础 URL
@@ -23,7 +27,8 @@ function getBaseUrl() {
     try {
         const configPath = path.join(process.cwd(), 'mcp-e2e.config.js');
         if (fs.existsSync(configPath)) {
-            const config = require(configPath);
+            const configModule = await import(`file://${configPath}`);
+            const config = configModule.default || configModule;
             if (config.devServer?.url) {
                 return config.devServer.url;
             }
@@ -43,13 +48,13 @@ function getBaseUrl() {
  * @returns {Promise<{browser: object, page: object}>}
  */
 export async function openApp(ctx, url = null) {
-    const baseUrl = url || getBaseUrl();
+    const baseUrl = url || ctx.options?.baseUrl || await getBaseUrl();
     console.log(`正在打开应用: ${baseUrl}`);
 
-    // 通过 chrome-devtools-mcp 创建浏览器实例
+    // 启动浏览器
     const browser = await ctx.puppeteer.launch({
-        headless: false, // 本地测试建议可见
-        slowMo: 100,
+        headless: ctx.options?.headless !== undefined ? ctx.options.headless : false,
+        slowMo: ctx.options?.slowMo || 100,
         defaultViewport: {
             width: 1920,
             height: 1080,
@@ -58,7 +63,7 @@ export async function openApp(ctx, url = null) {
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-web-security', // 开发环境跨域
+            '--disable-web-security',
         ],
     });
 
