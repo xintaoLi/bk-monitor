@@ -1,8 +1,8 @@
 {
   "name": "@autotest/mcp-e2e",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "AST-based E2E automation CLI powered by CodeBuddy + chrome-devtools-mcp",
+  "description": "MCP 自动化测试 CLI - 基于 Chrome DevTools MCP + 大模型能力",
   "keywords": [
     "e2e",
     "automation",
@@ -10,7 +10,7 @@
     "chrome-devtools",
     "codebuddy",
     "ast",
-    "frontend-testing"
+    "ai-testing"
   ],
   "bin": {
     "mcp-e2e": "bin/mcp-e2e.js"
@@ -31,7 +31,6 @@
     "chalk": "^5.3.0",
     "commander": "^11.0.0",
     "fs-extra": "^11.2.0",
-    "puppeteer": "^24.33.0",
     "simple-git": "^3.20.0",
     "ts-morph": "^20.0.0"
   },

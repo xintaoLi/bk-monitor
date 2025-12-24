@@ -1,0 +1,461 @@
+{
+  "$schema": "https://mcp.devtools.io/rule-schema.json",
+  "id": "bklog-retrieve-e2e-test",
+  "name": "日志检索页面 E2E 测试",
+  "version": "1.0.0",
+  "description": "基于路由 /retrieve/:indexId? 的日志检索页面端到端测试用例",
+  "route": {
+    "path": "/retrieve/:indexId?",
+    "name": "retrieve",
+    "component": "RetrieveHub → RetrieveV3",
+    "meta": {
+      "title": "检索",
+      "navId": "retrieve"
+    }
+  },
+  "projectContext": {
+    "framework": "vue",
+    "componentHierarchy": [
+      "RetrieveHub (路由入口，版本切换)",
+      "RetrieveV3 (主容器)",
+      "├── V3Collection (收藏夹侧边栏)",
+      "├── V3Toolbar (工具栏：索引集选择、时间选择、查询历史)",
+      "├── V3Searchbar (搜索栏：UI模式/SQL模式/AI模式)",
+      "└── V3SearchResult (结果展示：原始日志/日志聚类/图表分析/Grep模式)"
+    ],
+    "testIdMapping": [
+      {
+        "testId": "v3-search-bar",
+        "description": "搜索栏组件（普通模式）",
+        "component": "V3Searchbar",
+        "interactions": ["输入查询语句", "切换搜索模式", "执行搜索"]
+      },
+      {
+        "testId": "v3-search-bar-ai",
+        "description": "搜索栏组件（AI模式）",
+        "component": "V3Searchbar",
+        "interactions": ["AI自然语言查询", "Tab键切换模式"]
+      },
+      {
+        "testId": "index-set-choice",
+        "description": "索引集选择器",
+        "component": "IndexSetChoice",
+        "interactions": ["选择索引集", "切换单索引/联合索引"]
+      },
+      {
+        "testId": "time-setting",
+        "description": "时间范围选择器",
+        "component": "TimeSetting",
+        "interactions": ["选择时间范围", "自定义时间"]
+      },
+      {
+        "testId": "search-result-tab",
+        "description": "结果Tab切换",
+        "component": "SearchResultTab",
+        "interactions": ["切换原始日志", "切换日志聚类", "切换图表分析", "切换Grep模式"]
+      },
+      {
+        "testId": "collection-box",
+        "description": "收藏夹开关按钮",
+        "component": "V3Toolbar",
+        "interactions": ["展开/收起收藏夹"]
+      },
+      {
+        "testId": "query-history",
+        "description": "查询历史",
+        "component": "QueryHistory",
+        "interactions": ["查看历史记录", "应用历史查询"]
+      },
+      {
+        "testId": "search-btn",
+        "description": "搜索按钮",
+        "component": "V2SearchBar",
+        "interactions": ["执行搜索", "停止搜索"]
+      },
+      {
+        "testId": "clear-btn",
+        "description": "清空按钮",
+        "component": "V2SearchBar",
+        "interactions": ["清空查询条件"]
+      },
+      {
+        "testId": "mode-switch",
+        "description": "UI/SQL模式切换",
+        "component": "V2SearchBar",
+        "interactions": ["切换UI模式", "切换SQL模式"]
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "smoke-page-load",
+      "name": "页面加载冒烟测试",
+      "type": "smoke",
+      "priority": "critical",
+      "prompt": "作为测试工程师，请执行日志检索页面的冒烟测试：\n\n1. 打开检索页面 {{baseUrl}}/retrieve\n2. 等待页面加载完成（检查 .v3-bklog-root 元素存在）\n3. 验证以下核心组件已渲染：\n   - 工具栏区域（索引集选择器、时间选择器）\n   - 搜索栏区域\n   - 结果展示区域\n4. 验证页面无 JavaScript 错误\n5. 截图保存当前页面状态\n\n**预期结果**：页面正常加载，所有核心组件可见，无控制台错误",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-root",
+          "timeout": 10000,
+          "description": "等待主容器加载"
+        },
+        {
+          "action": "assert",
+          "target": ".v3-bklog-toolbar",
+          "assertion": "visible",
+          "description": "验证工具栏可见"
+        },
+        {
+          "action": "assert",
+          "target": ".v3-search-bar-root",
+          "assertion": "visible",
+          "description": "验证搜索栏可见"
+        },
+        {
+          "action": "assert",
+          "target": ".v3-bklog-body",
+          "assertion": "visible",
+          "description": "验证结果区域可见"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-page-loaded.png",
+          "description": "截图保存"
+        }
+      ],
+      "expectedOutcome": "页面正常加载，核心组件均可见"
+    },
+    {
+      "id": "e2e-basic-search",
+      "name": "基础日志检索流程",
+      "type": "e2e",
+      "priority": "critical",
+      "prompt": "作为测试工程师，请执行完整的日志检索流程测试：\n\n1. 打开检索页面\n2. 等待索引集列表加载完成\n3. 如果有索引集选择器，选择第一个可用的索引集\n4. 在搜索栏中输入查询语句：*\n5. 点击搜索按钮或按 Enter 键执行搜索\n6. 等待搜索结果返回\n7. 验证结果列表区域显示日志数据\n8. 验证趋势图区域正常渲染\n\n**可用 test-id**：\n- v3-search-bar: 搜索栏\n- search-btn: 搜索按钮\n- index-set-choice: 索引集选择器\n\n**预期结果**：成功执行搜索并显示日志结果",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-root",
+          "timeout": 10000,
+          "description": "等待页面加载"
+        },
+        {
+          "action": "wait",
+          "target": ".index-set-choice",
+          "timeout": 5000,
+          "description": "等待索引集选择器加载"
+        },
+        {
+          "action": "fill",
+          "target": ".search-bar-container input, .search-bar-container textarea",
+          "value": "*",
+          "description": "输入查询语句"
+        },
+        {
+          "action": "click",
+          "target": ".search-btn, [data-testid='search-btn']",
+          "description": "点击搜索按钮"
+        },
+        {
+          "action": "wait",
+          "target": ".result-table, .log-item",
+          "timeout": 15000,
+          "description": "等待搜索结果"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-search-result.png",
+          "description": "截图保存搜索结果"
+        }
+      ],
+      "expectedOutcome": "搜索成功执行，结果列表显示日志数据"
+    },
+    {
+      "id": "e2e-search-mode-switch",
+      "name": "搜索模式切换测试",
+      "type": "e2e",
+      "priority": "high",
+      "prompt": "作为测试工程师，请测试搜索模式切换功能：\n\n1. 打开检索页面并等待加载完成\n2. 确认当前处于 UI 模式（默认）\n3. 点击模式切换按钮，切换到 SQL 模式\n4. 验证搜索栏变为 SQL 输入模式\n5. 输入 SQL 查询语句：log: error\n6. 执行搜索\n7. 再次点击模式切换，切回 UI 模式\n8. 验证搜索栏恢复为 UI 模式\n\n**可用 test-id**：\n- mode-switch: 模式切换按钮\n- v3-search-bar: 搜索栏\n\n**预期结果**：UI/SQL 模式切换正常，搜索功能在两种模式下均可用",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-search-bar-root",
+          "timeout": 10000,
+          "description": "等待搜索栏加载"
+        },
+        {
+          "action": "click",
+          "target": ".mode-icon, .query-type-btn",
+          "description": "点击模式切换按钮"
+        },
+        {
+          "action": "wait",
+          "duration": 500,
+          "description": "等待模式切换动画"
+        },
+        {
+          "action": "fill",
+          "target": ".sql-query-input, .search-bar-container textarea",
+          "value": "log: error",
+          "description": "输入 SQL 查询语句"
+        },
+        {
+          "action": "click",
+          "target": ".search-btn",
+          "description": "执行搜索"
+        },
+        {
+          "action": "wait",
+          "target": ".result-table, .log-item",
+          "timeout": 15000,
+          "description": "等待搜索结果"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-sql-mode.png",
+          "description": "截图 SQL 模式搜索结果"
+        }
+      ],
+      "expectedOutcome": "模式切换正常，SQL 模式搜索成功"
+    },
+    {
+      "id": "e2e-result-tab-switch",
+      "name": "结果Tab切换测试",
+      "type": "e2e",
+      "priority": "high",
+      "prompt": "作为测试工程师，请测试结果展示区域的 Tab 切换功能：\n\n1. 打开检索页面并执行一次搜索\n2. 确认当前处于「原始日志」Tab\n3. 点击「日志聚类」Tab（如果可用）\n4. 验证日志聚类视图正常显示\n5. 点击「图表分析」Tab（如果可用）\n6. 验证图表分析视图正常显示\n7. 点击「Grep模式」Tab（如果可用）\n8. 验证 Grep 模式视图正常显示\n9. 点击「原始日志」Tab 返回\n\n**可用 test-id**：\n- search-result-tab: 结果 Tab 组件\n\n**预期结果**：所有可用的 Tab 切换正常，对应视图正确渲染",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-body",
+          "timeout": 10000,
+          "description": "等待结果区域加载"
+        },
+        {
+          "action": "click",
+          "target": ".search-btn",
+          "description": "执行搜索"
+        },
+        {
+          "action": "wait",
+          "duration": 2000,
+          "description": "等待搜索完成"
+        },
+        {
+          "action": "click",
+          "target": ".tab-item:contains('日志聚类'), [data-tab='clustering']",
+          "optional": true,
+          "description": "切换到日志聚类"
+        },
+        {
+          "action": "wait",
+          "duration": 1000,
+          "description": "等待视图切换"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-clustering-tab.png",
+          "description": "截图日志聚类视图"
+        },
+        {
+          "action": "click",
+          "target": ".tab-item:contains('原始日志'), [data-tab='origin']",
+          "description": "切回原始日志"
+        }
+      ],
+      "expectedOutcome": "Tab 切换正常，各视图正确渲染"
+    },
+    {
+      "id": "e2e-favorite-sidebar",
+      "name": "收藏夹侧边栏测试",
+      "type": "e2e",
+      "priority": "medium",
+      "prompt": "作为测试工程师，请测试收藏夹侧边栏功能：\n\n1. 打开检索页面\n2. 找到收藏夹开关按钮（收藏夹图标）\n3. 点击按钮展开收藏夹侧边栏\n4. 验证侧边栏正常显示\n5. 查看收藏夹列表是否有收藏项\n6. 再次点击按钮收起侧边栏\n7. 验证侧边栏已收起\n\n**可用 test-id**：\n- collection-box: 收藏夹开关按钮\n\n**预期结果**：收藏夹侧边栏展开/收起功能正常",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-toolbar",
+          "timeout": 10000,
+          "description": "等待工具栏加载"
+        },
+        {
+          "action": "click",
+          "target": ".collection-box, .bklog-shoucangjia",
+          "description": "点击收藏夹按钮"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-collection",
+          "timeout": 2000,
+          "description": "等待侧边栏展开"
+        },
+        {
+          "action": "assert",
+          "target": ".v3-bklog-collection",
+          "assertion": "visible",
+          "description": "验证侧边栏可见"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-favorite-open.png",
+          "description": "截图收藏夹展开状态"
+        },
+        {
+          "action": "click",
+          "target": ".collection-box, .bklog-shoucangjia",
+          "description": "再次点击收起"
+        },
+        {
+          "action": "wait",
+          "duration": 500,
+          "description": "等待动画完成"
+        }
+      ],
+      "expectedOutcome": "收藏夹侧边栏展开/收起正常"
+    },
+    {
+      "id": "e2e-time-range-select",
+      "name": "时间范围选择测试",
+      "type": "e2e",
+      "priority": "high",
+      "prompt": "作为测试工程师，请测试时间范围选择功能：\n\n1. 打开检索页面\n2. 找到时间范围选择器\n3. 点击打开时间选择下拉框\n4. 选择「近 1 小时」选项\n5. 验证时间范围已更新\n6. 执行搜索\n7. 验证搜索结果按新时间范围过滤\n\n**可用 test-id**：\n- time-setting: 时间选择器\n\n**预期结果**：时间范围选择正常，搜索结果按时间过滤",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve",
+          "description": "打开检索页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-toolbar",
+          "timeout": 10000,
+          "description": "等待工具栏加载"
+        },
+        {
+          "action": "click",
+          "target": ".time-setting, .bk-date-picker",
+          "description": "点击时间选择器"
+        },
+        {
+          "action": "wait",
+          "target": ".bk-picker-panel, .time-range-dropdown",
+          "timeout": 2000,
+          "description": "等待下拉框显示"
+        },
+        {
+          "action": "click",
+          "target": ".shortcut-item:contains('近 1 小时'), [data-value='1h']",
+          "description": "选择近 1 小时"
+        },
+        {
+          "action": "click",
+          "target": ".search-btn",
+          "description": "执行搜索"
+        },
+        {
+          "action": "wait",
+          "target": ".result-table, .log-item",
+          "timeout": 15000,
+          "description": "等待搜索结果"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-time-range.png",
+          "description": "截图时间范围选择结果"
+        }
+      ],
+      "expectedOutcome": "时间范围选择正常，结果按时间过滤"
+    },
+    {
+      "id": "e2e-index-set-with-param",
+      "name": "带索引集参数访问测试",
+      "type": "e2e",
+      "priority": "high",
+      "prompt": "作为测试工程师，请测试带索引集 ID 参数的页面访问：\n\n1. 打开检索页面并带上索引集 ID 参数：{{baseUrl}}/retrieve/{{indexId}}\n2. 等待页面加载完成\n3. 验证索引集选择器显示了对应的索引集\n4. 验证页面正常渲染，无错误\n5. 执行一次搜索验证功能正常\n\n**预期结果**：带参数访问时自动选中对应索引集，页面功能正常",
+      "steps": [
+        {
+          "action": "navigate",
+          "target": "{{baseUrl}}/retrieve/{{indexId}}",
+          "description": "带索引集 ID 访问页面"
+        },
+        {
+          "action": "wait",
+          "target": ".v3-bklog-root",
+          "timeout": 10000,
+          "description": "等待页面加载"
+        },
+        {
+          "action": "assert",
+          "target": ".index-set-choice",
+          "assertion": "visible",
+          "description": "验证索引集选择器可见"
+        },
+        {
+          "action": "click",
+          "target": ".search-btn",
+          "description": "执行搜索"
+        },
+        {
+          "action": "wait",
+          "target": ".result-table, .log-item",
+          "timeout": 15000,
+          "description": "等待搜索结果"
+        },
+        {
+          "action": "screenshot",
+          "filename": "retrieve-with-indexid.png",
+          "description": "截图带参数访问结果"
+        }
+      ],
+      "expectedOutcome": "带索引集参数访问正常，自动选中对应索引集"
+    }
+  ],
+  "variables": {
+    "baseUrl": {
+      "description": "测试服务器地址",
+      "default": "http://localhost:8080"
+    },
+    "indexId": {
+      "description": "测试用索引集 ID",
+      "default": "1"
+    }
+  },
+  "mcpConfig": {
+    "server": "chrome-devtools",
+    "options": {
+      "viewport": "1920x1080",
+      "timeout": 30000,
+      "screenshotOnFailure": true
+    }
+  },
+  "metadata": {
+    "createdAt": "2025-12-24",
+    "author": "MCP CLI",
+    "tags": ["e2e", "retrieve", "bklog", "日志检索"]
+  }
+}

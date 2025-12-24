@@ -1,0 +1,321 @@
+{
+  "route": "/retrieve/:indexId?",
+  "routeName": "retrieve",
+  "generatedAt": "2025-12-24",
+  "components": [
+    {
+      "name": "RetrieveHub",
+      "file": "src/views/retrieve-hub.tsx",
+      "isRouteEntry": true,
+      "testIds": []
+    },
+    {
+      "name": "RetrieveV3",
+      "file": "src/views/retrieve-v3/index.tsx",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-retrieve-v3-root",
+          "selector": ".v3-bklog-root",
+          "description": "检索页面根容器"
+        }
+      ]
+    },
+    {
+      "name": "V3Searchbar",
+      "file": "src/views/retrieve-v3/search-bar/index.tsx",
+      "testIds": [
+        {
+          "testId": "v3-search-bar",
+          "line": 418,
+          "element": "V2SearchBar",
+          "description": "搜索栏组件（普通模式）"
+        },
+        {
+          "testId": "v3-search-bar-ai",
+          "line": 397,
+          "element": "div",
+          "description": "搜索栏组件（AI模式）"
+        }
+      ],
+      "interactions": [
+        {
+          "type": "input",
+          "description": "输入查询语句",
+          "selector": ".search-bar-container input, .search-bar-container textarea"
+        },
+        {
+          "type": "click",
+          "description": "执行搜索",
+          "selector": ".search-btn"
+        },
+        {
+          "type": "click",
+          "description": "切换搜索模式",
+          "selector": ".mode-icon, .query-type-btn"
+        },
+        {
+          "type": "click",
+          "description": "AI编辑",
+          "selector": ".bklog-ai-edit-btn"
+        }
+      ]
+    },
+    {
+      "name": "V3Toolbar",
+      "file": "src/views/retrieve-v3/toolbar/index.tsx",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-toolbar-collection-box",
+          "selector": ".collection-box",
+          "description": "收藏夹开关按钮"
+        }
+      ],
+      "interactions": [
+        {
+          "type": "click",
+          "description": "展开/收起收藏夹",
+          "selector": ".collection-box"
+        }
+      ]
+    },
+    {
+      "name": "V3Collection",
+      "file": "src/views/retrieve-v3/favorite/index.tsx",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-favorite-sidebar",
+          "selector": ".v3-bklog-collection",
+          "description": "收藏夹侧边栏"
+        }
+      ]
+    },
+    {
+      "name": "V3SearchResult",
+      "file": "src/views/retrieve-v3/search-result/index.tsx",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-search-result-body",
+          "selector": ".v3-bklog-body",
+          "description": "搜索结果区域"
+        }
+      ],
+      "interactions": [
+        {
+          "type": "click",
+          "description": "切换到原始日志",
+          "selector": "[data-tab='origin']"
+        },
+        {
+          "type": "click",
+          "description": "切换到日志聚类",
+          "selector": "[data-tab='clustering']"
+        },
+        {
+          "type": "click",
+          "description": "切换到图表分析",
+          "selector": "[data-tab='graph_analysis']"
+        },
+        {
+          "type": "click",
+          "description": "切换到Grep模式",
+          "selector": "[data-tab='grep']"
+        }
+      ]
+    },
+    {
+      "name": "SubBar",
+      "file": "src/views/retrieve-v2/sub-bar/index.vue",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-subbar-index-set",
+          "selector": ".index-set-choice",
+          "description": "索引集选择器"
+        },
+        {
+          "testId": "test-subbar-time-setting",
+          "selector": ".time-setting",
+          "description": "时间范围选择器"
+        },
+        {
+          "testId": "test-subbar-query-history",
+          "selector": ".query-history",
+          "description": "查询历史"
+        }
+      ],
+      "interactions": [
+        {
+          "type": "click",
+          "description": "选择索引集",
+          "selector": ".index-set-choice"
+        },
+        {
+          "type": "click",
+          "description": "选择时间范围",
+          "selector": ".time-setting"
+        },
+        {
+          "type": "click",
+          "description": "查看查询历史",
+          "selector": ".query-history"
+        }
+      ]
+    },
+    {
+      "name": "V2SearchBar",
+      "file": "src/views/retrieve-v2/search-bar/index.vue",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-searchbar-input",
+          "selector": ".search-bar-container",
+          "description": "搜索输入区域"
+        },
+        {
+          "testId": "test-searchbar-search-btn",
+          "selector": ".search-btn",
+          "description": "搜索按钮"
+        },
+        {
+          "testId": "test-searchbar-clear-btn",
+          "selector": ".clear-btn",
+          "description": "清空按钮"
+        },
+        {
+          "testId": "test-searchbar-mode-switch",
+          "selector": ".query-type-btn",
+          "description": "模式切换按钮"
+        }
+      ],
+      "interactions": [
+        {
+          "type": "input",
+          "description": "输入查询条件",
+          "selector": ".search-bar-container input"
+        },
+        {
+          "type": "click",
+          "description": "执行搜索",
+          "selector": ".search-btn"
+        },
+        {
+          "type": "click",
+          "description": "清空查询",
+          "selector": ".clear-btn"
+        },
+        {
+          "type": "click",
+          "description": "切换模式",
+          "selector": ".query-type-btn"
+        }
+      ]
+    },
+    {
+      "name": "SearchResultTab",
+      "file": "src/views/retrieve-v2/search-result-tab/index.vue",
+      "testIds": [],
+      "suggestedTestIds": [
+        {
+          "testId": "test-result-tab-container",
+          "selector": ".search-result-tab",
+          "description": "结果Tab容器"
+        }
+      ],
+      "tabOptions": [
+        {
+          "name": "origin",
+          "label": "原始日志",
+          "alwaysEnabled": true
+        },
+        {
+          "name": "clustering",
+          "label": "日志聚类",
+          "condition": "isAiopsToggle"
+        },
+        {
+          "name": "graph_analysis",
+          "label": "图表分析",
+          "condition": "isChartEnable"
+        },
+        {
+          "name": "grep",
+          "label": "Grep模式",
+          "condition": "isGrepEnable"
+        }
+      ]
+    }
+  ],
+  "cssSelectors": {
+    "containers": {
+      "root": ".v3-bklog-root",
+      "toolbar": ".v3-bklog-toolbar",
+      "searchBar": ".v3-search-bar-root",
+      "content": ".v3-bklog-content",
+      "body": ".v3-bklog-body",
+      "collection": ".v3-bklog-collection"
+    },
+    "inputs": {
+      "searchInput": ".search-bar-container input, .search-bar-container textarea",
+      "sqlInput": ".sql-query-input",
+      "aiInput": ".ai-mode-input textarea"
+    },
+    "buttons": {
+      "search": ".search-btn",
+      "clear": ".clear-btn",
+      "modeSwitch": ".query-type-btn, .mode-icon",
+      "favorite": ".collection-box",
+      "aiEdit": ".bklog-ai-edit-btn"
+    },
+    "tabs": {
+      "origin": "[data-tab='origin']",
+      "clustering": "[data-tab='clustering']",
+      "graphAnalysis": "[data-tab='graph_analysis']",
+      "grep": "[data-tab='grep']"
+    },
+    "results": {
+      "table": ".result-table",
+      "logItem": ".log-item",
+      "trendChart": ".trend-chart",
+      "pagination": ".bk-pagination"
+    }
+  },
+  "injectionSuggestions": [
+    {
+      "file": "src/views/retrieve-v3/index.tsx",
+      "line": 109,
+      "element": "div.v3-bklog-root",
+      "suggestedTestId": "test-retrieve-root",
+      "priority": "high"
+    },
+    {
+      "file": "src/views/retrieve-v3/toolbar/index.tsx",
+      "line": 52,
+      "element": "div.v3-bklog-toolbar",
+      "suggestedTestId": "test-retrieve-toolbar",
+      "priority": "high"
+    },
+    {
+      "file": "src/views/retrieve-v3/search-result/index.tsx",
+      "line": 117,
+      "element": "div.v3-bklog-body",
+      "suggestedTestId": "test-retrieve-result-body",
+      "priority": "high"
+    },
+    {
+      "file": "src/views/retrieve-v2/search-bar/index.vue",
+      "element": ".search-btn",
+      "suggestedTestId": "test-search-btn",
+      "priority": "critical"
+    },
+    {
+      "file": "src/views/retrieve-v2/sub-bar/index.vue",
+      "element": ".index-set-choice",
+      "suggestedTestId": "test-index-set-choice",
+      "priority": "high"
+    }
+  ]
+}

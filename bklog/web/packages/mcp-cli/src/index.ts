@@ -1,134 +1,17 @@
 #!/usr/bin/env node
 import { program } from 'commander';
 
+// 全局选项：工作目录
 program
   .name('mcp-e2e')
-  .description('AI + MCP + CodeBuddy 自动化测试 CLI')
-  .version('0.1.0');
-
-// ============ 基础命令 ============
-
-program
-  .command('init')
-  .description('Initialize MCP E2E testing environment')
-  .action(async () => {
-    const { default: init } = await import('./commands/init.js');
-    await init();
-  });
-
-program
-  .command('analyze')
-  .description('Analyze component dependencies using AST')
-  .action(async () => {
-    const { default: analyze } = await import('./commands/analyze.js');
-    await analyze();
-  });
-
-program
-  .command('generate')
-  .description('Generate MCP test flows based on changes')
-  .action(async () => {
-    const { default: generate } = await import('./commands/generate.js');
-    await generate();
-  });
-
-program
-  .command('run')
-  .description('Execute automated tests')
-  .action(async () => {
-    const { default: run } = await import('./commands/run.js');
-    await run();
-  });
-
-program
-  .command('promote')
-  .description('Promote generated tests to permanent test assets')
-  .action(async () => {
-    const { default: promote } = await import('./commands/promote.js');
-    await promote();
-  });
-
-// ============ CodeBuddy Rule 命令 ============
-
-program
-  .command('rule:analyze')
-  .description('分析项目结构并生成 CodeBuddy Test Rule')
-  .action(async () => {
-    const { analyzeProjectAndGenerateRule } = await import('./codebuddy/project-analyzer-rule.js');
-    await analyzeProjectAndGenerateRule();
-  });
-
-program
-  .command('rule:impact')
-  .description('分析代码变更影响并生成测试 Rule')
-  .option('-b, --base <branch>', '基准分支', 'HEAD~1')
-  .action(async (options) => {
-    const { analyzeChangeImpact } = await import('./codebuddy/change-impact-analyzer.js');
-    await analyzeChangeImpact(process.cwd(), options.base);
-  });
-
-program
-  .command('rule:execute')
-  .description('执行 CodeBuddy Rule')
-  .argument('<ruleId>', 'Rule ID 或文件路径')
-  .option('--headless', '无头模式运行', false)
-  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8081')
-  .action(async (ruleId, options) => {
-    const { executeRule } = await import('./runtime/rule-executor.js');
-    await executeRule(ruleId, process.cwd(), {
-      headless: options.headless,
-      baseUrl: options.baseUrl,
-    });
-  });
-
-// ============ Test-ID 命令 ============
-
-program
-  .command('testid:analyze')
-  .description('分析组件并预览 test-id 注入')
-  .option('-f, --files <files...>', '指定目标文件')
-  .action(async (options) => {
-    const { injectTestIds } = await import('./codebuddy/testid-injector.js');
-    await injectTestIds(process.cwd(), {
-      dryRun: true,
-      targetFiles: options.files,
-    });
-  });
-
-program
-  .command('testid:inject')
-  .description('为组件注入 test-id')
-  .option('-f, --files <files...>', '指定目标文件')
-  .option('--prefix <prefix>', 'test-id 前缀', 'test')
-  .action(async (options) => {
-    const { injectTestIds } = await import('./codebuddy/testid-injector.js');
-    await injectTestIds(process.cwd(), {
-      dryRun: false,
-      targetFiles: options.files,
-      config: {
-        prefix: options.prefix,
-      },
-    });
-  });
-
-program
-  .command('testid:mapping')
-  .description('查看 test-id 映射表')
-  .action(async () => {
-    const { getTestIdMapping } = await import('./codebuddy/testid-injector.js');
-    const mappings = await getTestIdMapping();
-    
-    if (mappings.length === 0) {
-      console.log('未找到 test-id 映射。请先运行 testid:analyze 或 testid:inject');
-      return;
+  .description('AI + MCP + CodeBuddy 自动化测试 CLI（基于 Chrome DevTools MCP）')
+  .version('0.1.0')
+  .option('--cwd <path>', '指定工作目录')
+  .hook('preAction', (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.cwd) {
+      process.chdir(opts.cwd);
     }
-    
-    console.table(mappings.map(m => ({
-      'Test ID': m.testId,
-      '组件': m.componentName,
-      '类型': m.elementType,
-      '选择器': m.selector,
-    })));
   });
 
 // ============ Chrome DevTools MCP 命令 ============
@@ -174,10 +57,14 @@ program
       Logger.warn('chrome-devtools-mcp: ⚠️ 首次运行需要下载');
     }
 
-    // 5. 检查 MCP 配置文件
-    const configPath = `${process.cwd()}/.mcp/servers.json`;
-    if (existsSync(configPath)) {
-      Logger.info(`MCP 配置: ✅ ${configPath}`);
+    // 5. 检查 MCP 配置文件（优先检查 .codebuddy/mcp.json）
+    const codebuddyMcpPath = `${process.cwd()}/.codebuddy/mcp.json`;
+    const legacyMcpPath = `${process.cwd()}/.mcp/servers.json`;
+
+    if (existsSync(codebuddyMcpPath)) {
+      Logger.info(`MCP 配置: ✅ ${codebuddyMcpPath} (CodeBuddy 可识别)`);
+    } else if (existsSync(legacyMcpPath)) {
+      Logger.warn(`MCP 配置: ⚠️ ${legacyMcpPath} (旧路径，建议重新运行 mcp:init)`);
     } else {
       Logger.warn('MCP 配置: ⚠️ 未找到，运行 mcp-e2e mcp:init 创建');
     }
@@ -188,20 +75,17 @@ program
 
 program
   .command('mcp:init')
-  .description('初始化 Chrome DevTools MCP 配置')
+  .description('初始化 Chrome DevTools MCP 配置（自动配置 CodeBuddy 可识别的 MCP 服务）')
   .option('--headless', '默认使用无头模式', false)
   .option('--isolated', '默认使用隔离模式', false)
   .option('--viewport <size>', '默认视口大小', '1920x1080')
   .action(async (options) => {
     const { Logger } = await import('./utils/log.js');
     const { getDefaultChromePath } = await import('./mcp/chrome-devtools-mcp.js');
-    const fs = await import('fs-extra');
+    const fsExtra = (await import('fs-extra')).default;
     const path = await import('path');
 
     Logger.header('初始化 Chrome DevTools MCP 配置');
-
-    const configDir = path.join(process.cwd(), '.mcp');
-    await fs.ensureDir(configDir);
 
     const chromePath = getDefaultChromePath();
     const args = ['chrome-devtools-mcp@latest'];
@@ -220,22 +104,42 @@ program
 
     args.push('--viewport', options.viewport);
 
-    const config = {
-      mcpServers: {
-        'chrome-devtools': {
-          command: 'npx',
-          args,
-          env: {},
-        },
-      },
+    const mcpServerConfig = {
+      command: 'npx',
+      args,
+      env: {},
     };
 
-    const configPath = path.join(configDir, 'servers.json');
-    await fs.writeJson(configPath, config, { spaces: 2 });
+    // 1. 写入 .codebuddy/mcp.json（CodeBuddy 识别的配置文件）
+    const codebuddyDir = path.join(process.cwd(), '.codebuddy');
+    await fsExtra.ensureDir(codebuddyDir);
 
-    Logger.success(`✅ 配置已保存: ${configPath}`);
-    Logger.info('\n配置内容:');
-    console.log(JSON.stringify(config, null, 2));
+    const codebuddyMcpPath = path.join(codebuddyDir, 'mcp.json');
+    const codebuddyConfig = {
+      mcpServers: {
+        'chrome-devtools': mcpServerConfig,
+      },
+    };
+    await fsExtra.writeJson(codebuddyMcpPath, codebuddyConfig, { spaces: 2 });
+    Logger.success(`✅ CodeBuddy MCP 配置: ${path.relative(process.cwd(), codebuddyMcpPath)}`);
+
+    // 2. 同时写入 .mcp/servers.json（备用）
+    const mcpDir = path.join(process.cwd(), '.mcp');
+    await fsExtra.ensureDir(mcpDir);
+    const mcpConfigPath = path.join(mcpDir, 'servers.json');
+    await fsExtra.writeJson(mcpConfigPath, codebuddyConfig, { spaces: 2 });
+    Logger.info(`   备用配置: ${path.relative(process.cwd(), mcpConfigPath)}`);
+
+    Logger.divider();
+    Logger.info('配置内容:');
+    console.log(JSON.stringify(codebuddyConfig, null, 2));
+
+    Logger.divider();
+    Logger.success('🎉 MCP 配置初始化完成！');
+    Logger.info('\n下一步操作:');
+    Logger.info('  1. 重启 CodeBuddy（或重新打开项目）');
+    Logger.info('  2. CodeBuddy 将自动识别 chrome-devtools MCP 服务');
+    Logger.info('  3. 运行 mcp-e2e router:generate 生成测试 Rule');
   });
 
 program
@@ -276,153 +180,604 @@ program
     }
   });
 
-// ============ 自然语言测试命令 ============
+// ============ Router 分析与 MCP Rule 生成命令 ============
 
 program
-  .command('nl:run')
-  .description('执行自然语言测试指令')
-  .argument('<instruction>', '自然语言测试指令')
-  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8081')
-  .option('--headless', '无头模式', false)
-  .action(async (instruction, options) => {
+  .command('router:analyze')
+  .description('分析 Router 配置，提取页面组件和交互元素')
+  .action(async () => {
     const { Logger } = await import('./utils/log.js');
-    const { executeNLTest } = await import('./runtime/natural-language-executor.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
 
-    Logger.header('自然语言测试执行');
-    Logger.info(`指令: ${instruction}`);
-
-    const result = await executeNLTest(instruction, {
-      baseUrl: options.baseUrl,
-      headless: options.headless,
-    });
+    const result = await analyzeRouter(process.cwd());
 
     Logger.divider();
-    Logger.info(`状态: ${result.success ? '✅ 通过' : '❌ 失败'}`);
-    Logger.info(`耗时: ${result.duration}ms`);
-    Logger.info(`步骤: ${result.steps.length}`);
+    Logger.header('Router 分析结果');
+    Logger.info(`框架: ${result.framework}`);
+    Logger.info(`路由文件: ${result.routerFilePath}`);
+    Logger.info(`路由数量: ${result.flatRoutes.length}`);
+    Logger.info(`页面组件: ${result.pageComponents.length}`);
+    Logger.info(`Layout 组件: ${result.layoutComponents.length}`);
+    Logger.info(`路由守卫: ${result.guards.length}`);
 
-    if (result.error) {
-      Logger.error(`错误: ${result.error}`);
+    if (result.flatRoutes.length > 0) {
+      Logger.divider();
+      Logger.info('路由列表:');
+      result.flatRoutes.slice(0, 10).forEach(route => {
+        Logger.info(`  ${route.fullPath} → ${route.component}`);
+      });
+      if (result.flatRoutes.length > 10) {
+        Logger.info(`  ... 还有 ${result.flatRoutes.length - 10} 个路由`);
+      }
     }
   });
 
 program
-  .command('nl:parse')
-  .description('解析自然语言测试指令（预览模式）')
-  .argument('<instruction>', '自然语言测试指令')
-  .action(async (instruction) => {
+  .command('router:generate')
+  .description('基于 Router 生成 Chrome DevTools MCP 测试 Rule')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--smoke', '只生成冒烟测试', false)
+  .option('--e2e', '只生成 E2E 测试', false)
+  .option('--output <dir>', '输出目录（默认 .codebuddy/rules）')
+  .action(async (options) => {
     const { Logger } = await import('./utils/log.js');
-    const { createNLParser } = await import('./runtime/natural-language-executor.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
+    const { generateDevToolsMCPRule } = await import('./generator/devtools-mcp-rule.js');
+    const path = await import('path');
 
-    Logger.header('自然语言解析');
-    Logger.info(`指令: ${instruction}`);
+    Logger.header('生成 Chrome DevTools MCP 测试 Rule');
 
-    const parser = createNLParser();
-    const steps = parser.parse(instruction);
+    // 1. 分析 Router
+    Logger.info('\n📊 Step 1: 分析 Router 配置...');
+    const routerAnalysis = await analyzeRouter(process.cwd());
+
+    if (routerAnalysis.flatRoutes.length === 0) {
+      Logger.error('未找到有效的路由配置');
+      return;
+    }
+
+    // 2. 生成 MCP Rule（输出到 .codebuddy/rules）
+    Logger.info('\n📝 Step 2: 生成 MCP Rule...');
+    const outputDir = options.output || '.codebuddy/rules';
+    const rule = await generateDevToolsMCPRule(
+      routerAnalysis,
+      process.cwd(),
+      options.baseUrl,
+      { outputDir }
+    );
+
+    const ruleFileName = `${rule.id}.json`;
+    const promptsFileName = `${rule.id}-prompts.md`;
+    const promptsFilePath = path.join(process.cwd(), outputDir, promptsFileName);
 
     Logger.divider();
-    Logger.info(`解析出 ${steps.length} 个步骤:`);
+    Logger.success('✅ MCP Rule 生成完成！');
+    Logger.info(`Rule ID: ${rule.id}`);
+    Logger.info(`测试场景: ${rule.scenarios.length}`);
+    Logger.info(`Test-ID 映射: ${rule.projectContext.testIdMapping.length}`);
 
-    steps.forEach((step, i) => {
-      Logger.info(`\n[${i + 1}] ${step.action.toUpperCase()}`);
-      Logger.info(`    描述: ${step.description}`);
-      if (step.target) Logger.info(`    目标: ${step.target}`);
-      if (step.value) Logger.info(`    值: ${step.value}`);
+    Logger.divider();
+    Logger.header('📁 生成的文件');
+    Logger.info(`  - ${outputDir}/${ruleFileName} (完整 Rule)`);
+    Logger.info(`  - ${outputDir}/${promptsFileName} (全量测试 Prompts)`);
+    Logger.info(`  - ${outputDir}/routes/ (单路由测试文件)`);
+    Logger.info(`  - ${outputDir}/route-index.json (路由索引)`);
+    Logger.info(`  - ${outputDir}/testid-mapping.json (Test-ID 映射)`);
+
+    Logger.divider();
+    Logger.header('🚀 快速使用');
+    Logger.info('\n【单路由测试】');
+    Logger.info(`  1. 查看 ${outputDir}/routes/ 目录下的文件`);
+    Logger.info('  2. 选择需要测试的路由对应的 .md 文件');
+    Logger.info('  3. 在 CodeBuddy 中引用: @.codebuddy/rules/routes/<route>.md');
+
+    Logger.info('\n【全量测试】');
+    Logger.info(`  在 CodeBuddy 对话中输入: @${outputDir}/${promptsFileName}`);
+    Logger.info('  然后告诉 AI 执行其中的测试场景');
+
+    Logger.info('\n【命令行执行】');
+    Logger.info(`  mcp-e2e rule:run ${rule.id} --base-url ${options.baseUrl}`);
+  });
+
+program
+  .command('router:inject')
+  .description('基于 Router 分析为页面组件注入 test-id')
+  .option('--dry-run', '预览模式，不实际修改文件', false)
+  .option('--only-pages', '只处理页面组件', false)
+  .option('--routes <routes...>', '指定路由路径')
+  .option('--prefix <prefix>', 'test-id 前缀', 'test')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
+    const { injectTestIdsFromRouter } = await import('./codebuddy/router-testid-injector.js');
+
+    Logger.header('基于 Router 注入 Test-ID');
+
+    // 1. 分析 Router
+    Logger.info('\n📊 Step 1: 分析 Router 配置...');
+    const routerAnalysis = await analyzeRouter(process.cwd());
+
+    if (routerAnalysis.pageComponents.length === 0) {
+      Logger.error('未找到页面组件');
+      return;
+    }
+
+    // 2. 注入 test-id
+    Logger.info('\n🏷️  Step 2: 注入 test-id...');
+    await injectTestIdsFromRouter(routerAnalysis, process.cwd(), {
+      dryRun: options.dryRun !== false, // 默认 dry-run
+      onlyPages: options.onlyPages,
+      routes: options.routes,
+      config: {
+        prefix: options.prefix,
+      },
     });
   });
 
-// ============ 工作流命令 ============
+program
+  .command('router:full')
+  .description('完整流程：分析 Router → 注入 test-id → 生成 MCP Rule')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--inject', '实际注入 test-id（默认预览）', false)
+  .option('--prefix <prefix>', 'test-id 前缀', 'test')
+  .option('--output <dir>', '输出目录（默认 .codebuddy/rules）')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
+    const { injectTestIdsFromRouter } = await import('./codebuddy/router-testid-injector.js');
+    const { generateDevToolsMCPRule } = await import('./generator/devtools-mcp-rule.js');
+    const path = await import('path');
+
+    Logger.header('🚀 Router 完整测试工作流');
+
+    // Step 1: 分析 Router
+    Logger.info('\n📊 Step 1: 分析 Router 配置...');
+    const routerAnalysis = await analyzeRouter(process.cwd());
+
+    if (routerAnalysis.flatRoutes.length === 0) {
+      Logger.error('未找到有效的路由配置');
+      return;
+    }
+
+    Logger.info(`  - 框架: ${routerAnalysis.framework}`);
+    Logger.info(`  - 路由: ${routerAnalysis.flatRoutes.length}`);
+    Logger.info(`  - 组件: ${routerAnalysis.pageComponents.length}`);
+
+    // Step 2: 注入 test-id
+    Logger.info('\n🏷️  Step 2: 分析/注入 test-id...');
+    const injectionReport = await injectTestIdsFromRouter(routerAnalysis, process.cwd(), {
+      dryRun: !options.inject,
+      config: {
+        prefix: options.prefix,
+      },
+    });
+
+    // Step 3: 生成 MCP Rule
+    Logger.info('\n📝 Step 3: 生成 MCP Rule...');
+    const outputDir = options.output || '.codebuddy/rules';
+    const rule = await generateDevToolsMCPRule(
+      routerAnalysis,
+      process.cwd(),
+      options.baseUrl,
+      { outputDir }
+    );
+
+    const promptsFilePath = path.join(process.cwd(), outputDir, `${rule.id}-prompts.md`);
+
+    // 总结
+    Logger.divider();
+    Logger.header('工作流完成');
+    Logger.info(`路由分析: ${routerAnalysis.flatRoutes.length} 个路由`);
+    Logger.info(`Test-ID: ${injectionReport.testIdMapping.length} 个映射`);
+    Logger.info(`测试场景: ${rule.scenarios.length} 个`);
+
+    Logger.divider();
+    Logger.header('📁 生成的文件');
+    Logger.info(`  - ${outputDir}/${rule.id}.json (完整 Rule)`);
+    Logger.info(`  - ${outputDir}/${rule.id}-prompts.md (全量测试 Prompts)`);
+    Logger.info(`  - ${outputDir}/routes/ (单路由测试文件)`);
+    Logger.info(`  - ${outputDir}/route-index.json (路由索引)`);
+    Logger.info(`  - ${outputDir}/testid-mapping.json (Test-ID 映射)`);
+
+    if (!options.inject) {
+      Logger.info(`\n💡 提示: 添加 --inject 参数实际注入 test-id`);
+    }
+
+    Logger.divider();
+    Logger.header('🚀 快速使用');
+    Logger.info('\n【单路由测试】查看 routes/ 目录，选择对应的 .md 文件');
+    Logger.info(`【全量测试】@${outputDir}/${rule.id}-prompts.md`);
+    Logger.info(`【查看索引】${outputDir}/route-index.json`);
+
+    Logger.success('\n✅ 完成！现在可以使用 MCP Rule 执行测试');
+  });
+
+// ============ Rule 执行命令 ============
 
 program
-  .command('workflow:full')
-  .description('执行完整测试工作流：分析 → 生成 Rule → 注入 test-id → 执行测试')
+  .command('rule:run')
+  .description('执行 MCP Rule JSON 文件（Chrome DevTools MCP 格式）')
+  .argument('<ruleId>', 'Rule ID 或 JSON 文件路径')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--scenario <id>', '只执行指定场景')
+  .option('--dry-run', '预览模式，生成执行文件但不实际执行', false)
+  .option('--save-prompts', '保存 Prompts 到文件', true)
+  .action(async (ruleId, options) => {
+    const { Logger } = await import('./utils/log.js');
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    Logger.header('执行 MCP Rule');
+
+    // 辅助函数：检查文件是否存在
+    const pathExists = async (p: string) => {
+      try {
+        await fs.access(p);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // 查找 Rule 文件（优先从 .codebuddy/rules 查找）
+    let rulePath = ruleId;
+    if (!rulePath.endsWith('.json')) {
+      const possiblePaths = [
+        // 优先 .codebuddy/rules（CodeBuddy 识别的路径）
+        path.join(process.cwd(), '.codebuddy', 'rules', `${ruleId}.json`),
+        path.join(process.cwd(), '.codebuddy', 'rules', ruleId, 'rule.json'),
+        // 兼容旧路径 .mcp/rules
+        path.join(process.cwd(), '.mcp', 'rules', `${ruleId}.json`),
+        path.join(process.cwd(), '.mcp', 'rules', ruleId, 'rule.json'),
+        // 直接路径
+        path.join(process.cwd(), ruleId),
+      ];
+      for (const p of possiblePaths) {
+        if (await pathExists(p)) {
+          rulePath = p;
+          break;
+        }
+      }
+    }
+
+    if (!await pathExists(rulePath)) {
+      Logger.error(`Rule 文件不存在: ${rulePath}`);
+      Logger.info('请检查以下目录:');
+      Logger.info('  - .codebuddy/rules/');
+      Logger.info('  - .mcp/rules/');
+      return;
+    }
+
+    Logger.info(`Rule 文件: ${rulePath}`);
+
+    // 使用 DevTools MCP 执行器
+    const { createDevToolsMCPExecutor } = await import('./runtime/devtools-mcp-executor.js');
+
+    const ruleContent = await fs.readFile(rulePath, 'utf-8');
+    const rule = JSON.parse(ruleContent);
+
+    const baseUrl = options.baseUrl || rule.variables?.baseUrl?.default || 'http://localhost:8080';
+
+    const executor = createDevToolsMCPExecutor({
+      baseUrl,
+      outputDir: path.join(path.dirname(rulePath), '..', 'execution'),
+      variables: {
+        indexId: rule.variables?.indexId?.default || '1',
+      },
+    });
+
+    // 执行规则
+    await executor.executeRule(rule, {
+      dryRun: options.dryRun,
+      scenarioId: options.scenario,
+    });
+  });
+
+// ============ Test-ID 命令 ============
+
+program
+  .command('testid:analyze')
+  .description('分析组件并预览 test-id 注入')
+  .option('-f, --files <files...>', '指定目标文件')
+  .action(async (options) => {
+    const { injectTestIds } = await import('./codebuddy/testid-injector.js');
+    await injectTestIds(process.cwd(), {
+      dryRun: true,
+      targetFiles: options.files,
+    });
+  });
+
+program
+  .command('testid:inject')
+  .description('为组件注入 test-id')
+  .option('-f, --files <files...>', '指定目标文件')
+  .option('--prefix <prefix>', 'test-id 前缀', 'test')
+  .action(async (options) => {
+    const { injectTestIds } = await import('./codebuddy/testid-injector.js');
+    await injectTestIds(process.cwd(), {
+      dryRun: false,
+      targetFiles: options.files,
+      config: {
+        prefix: options.prefix,
+      },
+    });
+  });
+
+program
+  .command('testid:mapping')
+  .description('查看 test-id 映射表')
+  .action(async () => {
+    const { getTestIdMapping } = await import('./codebuddy/testid-injector.js');
+    const mappings = await getTestIdMapping();
+
+    if (mappings.length === 0) {
+      console.log('未找到 test-id 映射。请先运行 testid:analyze 或 testid:inject');
+      return;
+    }
+
+    console.table(mappings.map(m => ({
+      'Test ID': m.testId,
+      '组件': m.componentName,
+      '类型': m.elementType,
+      '选择器': m.selector,
+    })));
+  });
+
+// ============ 测试 Prompt 生成命令 ============
+
+program
+  .command('test:list')
+  .description('列出所有可测试的路由')
+  .option('--rule <path>', 'Rule 文件路径')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { loadTestConfig, findRulePath } = await import('./runtime/cli-test-executor.js');
+
+    const rulePath = await findRulePath(options.rule);
+    if (!rulePath) {
+      Logger.error('未找到 Rule 文件，请先运行 router:generate 生成 Rule');
+      return;
+    }
+
+    const config = await loadTestConfig(rulePath);
+
+    Logger.header('可测试的路由列表');
+    Logger.info(`项目: ${config.projectName}`);
+    Logger.info(`基础 URL: ${config.baseUrl}`);
+    Logger.info(`共 ${config.routes.length} 个路由\n`);
+
+    config.routes.forEach((route, index) => {
+      const scenarioCount = route.scenarios.length;
+      const types = [...new Set(route.scenarios.map(s => s.type))].join(', ');
+      Logger.info(`${String(index + 1).padStart(3)}. ${route.route} - ${route.name} (${scenarioCount} 个场景: ${types})`);
+    });
+
+    Logger.divider();
+    Logger.info('\n生成测试 Prompt:');
+    Logger.info('  mcp-e2e test:gen --route /retrieve      单路由测试 Prompt');
+    Logger.info('  mcp-e2e test:gen --type smoke           冒烟测试 Prompt');
+    Logger.info('  mcp-e2e test:gen --all                  全量测试 Prompt');
+    Logger.info('\n在 CodeBuddy 中执行:');
+    Logger.info('  引用生成的 Prompt 文件: @.codebuddy/prompts/xxx.md');
+  });
+
+program
+  .command('test:gen')
+  .description('生成测试 Prompt 文件（供 CodeBuddy 执行）')
+  .option('--rule <path>', 'Rule 文件路径')
+  .option('--base-url <url>', '测试服务器地址')
+  .option('--route <route>', '指定要测试的路由')
+  .option('--type <type>', '指定测试类型 (smoke/functional/e2e)')
+  .option('--priority <priority>', '指定优先级 (critical/high/medium/low)')
+  .option('--all', '生成全量测试 Prompt', false)
+  .option('--output <dir>', '输出目录', '.codebuddy/prompts')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { generateTestPromptFiles, findRulePath } = await import('./runtime/cli-test-executor.js');
+
+    const rulePath = await findRulePath(options.rule);
+    if (!rulePath) {
+      Logger.error('未找到 Rule 文件，请先运行 router:generate 生成 Rule');
+      return;
+    }
+
+    await generateTestPromptFiles(rulePath, {
+      baseUrl: options.baseUrl,
+      route: options.route,
+      type: options.type,
+      priority: options.priority,
+      all: options.all,
+      outputDir: options.output,
+    });
+  });
+
+program
+  .command('test:smoke')
+  .description('生成冒烟测试 Prompt（快捷命令）')
+  .option('--rule <path>', 'Rule 文件路径')
+  .option('--base-url <url>', '测试服务器地址')
+  .option('--output <dir>', '输出目录', '.codebuddy/prompts')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { generateTestPromptFiles, findRulePath } = await import('./runtime/cli-test-executor.js');
+
+    const rulePath = await findRulePath(options.rule);
+    if (!rulePath) {
+      Logger.error('未找到 Rule 文件，请先运行 router:generate 生成 Rule');
+      return;
+    }
+
+    await generateTestPromptFiles(rulePath, {
+      baseUrl: options.baseUrl,
+      type: 'smoke',
+      all: true,
+      outputDir: options.output,
+    });
+  });
+
+program
+  .command('test:critical')
+  .description('生成关键测试 Prompt（快捷命令）')
+  .option('--rule <path>', 'Rule 文件路径')
+  .option('--base-url <url>', '测试服务器地址')
+  .option('--output <dir>', '输出目录', '.codebuddy/prompts')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { generateTestPromptFiles, findRulePath } = await import('./runtime/cli-test-executor.js');
+
+    const rulePath = await findRulePath(options.rule);
+    if (!rulePath) {
+      Logger.error('未找到 Rule 文件，请先运行 router:generate 生成 Rule');
+      return;
+    }
+
+    await generateTestPromptFiles(rulePath, {
+      baseUrl: options.baseUrl,
+      priority: 'critical',
+      all: true,
+      outputDir: options.output,
+    });
+  });
+
+// ============ 自动执行 MCP 测试命令 ============
+
+program
+  .command('test:run')
+  .description('自动执行 MCP 测试（直接调用 Chrome DevTools MCP）')
+  .option('--rule <path>', 'Rule 文件路径')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--route <route>', '指定要测试的路由')
+  .option('--type <type>', '指定测试类型 (smoke/functional/e2e)')
+  .option('--priority <priority>', '指定优先级 (critical/high/medium/low)')
+  .option('--scenario <id>', '指定场景 ID')
   .option('--headless', '无头模式运行', false)
-  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8081')
-  .option('--skip-inject', '跳过 test-id 注入', false)
+  .option('--continue-on-error', '遇到错误继续执行', true)
+  .option('--delay <ms>', '步骤间延迟（毫秒）', '500')
   .action(async (options) => {
     const { Logger } = await import('./utils/log.js');
+    const { findRulePath } = await import('./runtime/cli-test-executor.js');
+    const { autoExecuteTests } = await import('./runtime/mcp-auto-executor.js');
 
-    Logger.header('🚀 完整测试工作流');
-
-    // Step 1: 分析代码变更
-    Logger.info('\n📊 Step 1: 分析代码变更影响...');
-    const { analyzeChangeImpact } = await import('./codebuddy/change-impact-analyzer.js');
-    const impactRule = await analyzeChangeImpact();
-
-    // Step 2: 生成项目 Rule
-    Logger.info('\n📝 Step 2: 生成项目测试 Rule...');
-    const { analyzeProjectAndGenerateRule } = await import('./codebuddy/project-analyzer-rule.js');
-    const projectRule = await analyzeProjectAndGenerateRule();
-
-    // Step 3: 注入 test-id（可选）
-    if (!options.skipInject) {
-      Logger.info('\n🏷️  Step 3: 分析 test-id...');
-      const { injectTestIds } = await import('./codebuddy/testid-injector.js');
-      await injectTestIds(process.cwd(), { dryRun: true });
+    const rulePath = await findRulePath(options.rule);
+    if (!rulePath) {
+      Logger.error('未找到 Rule 文件，请先运行 router:generate 生成 Rule');
+      return;
     }
 
-    // Step 4: 执行测试
-    Logger.info('\n🧪 Step 4: 执行测试...');
-    const { executeRule } = await import('./runtime/rule-executor.js');
+    Logger.header('MCP 自动测试执行器');
+    Logger.info(`Rule 文件: ${rulePath}`);
+    Logger.info(`基础 URL: ${options.baseUrl}`);
+    Logger.info(`无头模式: ${options.headless ? '是' : '否'}`);
 
-    // 优先执行变更影响测试
-    if (impactRule.tests && impactRule.tests.length > 0) {
-      Logger.info('执行变更影响测试...');
-      await executeRule(impactRule.id, process.cwd(), {
-        headless: options.headless,
+    if (options.route) Logger.info(`路由筛选: ${options.route}`);
+    if (options.type) Logger.info(`类型筛选: ${options.type}`);
+    if (options.priority) Logger.info(`优先级筛选: ${options.priority}`);
+    if (options.scenario) Logger.info(`场景筛选: ${options.scenario}`);
+
+    Logger.divider();
+
+    try {
+      const results = await autoExecuteTests(rulePath, {
         baseUrl: options.baseUrl,
-      });
-    }
-
-    // 执行项目测试
-    if (projectRule.flows && projectRule.flows.length > 0) {
-      Logger.info('执行项目测试...');
-      await executeRule(projectRule.id, process.cwd(), {
         headless: options.headless,
-        baseUrl: options.baseUrl,
+        route: options.route,
+        type: options.type,
+        priority: options.priority,
+        scenarioId: options.scenario,
       });
-    }
 
-    Logger.success('\n✅ 工作流执行完成！');
+      // 根据测试结果设置退出码
+      const failed = results.filter(r => !r.success).length;
+      if (failed > 0) {
+        process.exitCode = 1;
+      }
+
+    } catch (error: any) {
+      Logger.error(`测试执行失败: ${error.message}`);
+      process.exitCode = 1;
+    }
   });
 
 program
-  .command('workflow:ecommerce')
-  .description('电商支付流程测试（参考文章案例）')
-  .option('--base-url <url>', '测试服务器地址', 'http://localhost:3000')
-  .option('--headless', '无头模式', false)
-  .action(async (options) => {
+  .command('test:run-prompt')
+  .description('从 Prompt 文件自动执行 MCP 测试')
+  .argument('<promptFile>', 'Prompt 文件路径')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--headless', '无头模式运行', false)
+  .action(async (promptFile, options) => {
     const { Logger } = await import('./utils/log.js');
-    const { executeNLTest } = await import('./runtime/natural-language-executor.js');
+    const { createMCPAutoExecutor, parsePromptToSteps } = await import('./runtime/mcp-auto-executor.js');
+    const fs = await import('fs/promises');
+    const path = await import('path');
 
-    Logger.header('🛒 电商支付流程测试');
+    // 读取 Prompt 文件
+    const promptPath = path.resolve(process.cwd(), promptFile);
+    let promptContent: string;
 
-    const instruction = `
-      1. 打开首页
-      2. 找到商品列表，点击第一个商品的"加入购物车"按钮
-      3. 点击购物车图标打开购物车
-      4. 验证购物车中有商品
-      5. 点击"去结算"按钮
-      6. 在支付表单中输入测试卡号 4242424242424242
-      7. 输入有效期 12/25
-      8. 输入 CVV 123
-      9. 点击"确认支付"按钮
-      10. 验证出现"支付成功"提示
-    `;
+    try {
+      promptContent = await fs.readFile(promptPath, 'utf-8');
+    } catch {
+      Logger.error(`无法读取 Prompt 文件: ${promptPath}`);
+      return;
+    }
 
-    const result = await executeNLTest(instruction, {
+    Logger.header('从 Prompt 文件执行 MCP 测试');
+    Logger.info(`Prompt 文件: ${promptFile}`);
+    Logger.info(`基础 URL: ${options.baseUrl}`);
+
+    // 解析步骤
+    const steps = parsePromptToSteps(promptContent, options.baseUrl);
+
+    if (steps.length === 0) {
+      Logger.warn('Prompt 文件中没有可执行的步骤');
+      Logger.info('\n支持的指令格式:');
+      Logger.info('  - 导航到 {{baseUrl}}/path');
+      Logger.info('  - 点击 [data-test-id="xxx"]');
+      Logger.info('  - 输入 "value" 到 [data-test-id="xxx"]');
+      Logger.info('  - 等待 [data-test-id="xxx"]');
+      Logger.info('  - 截图');
+      Logger.info('  - 验证 页面包含 "text"');
+      return;
+    }
+
+    Logger.info(`解析到 ${steps.length} 个步骤:`);
+    steps.forEach((step, i) => {
+      Logger.info(`  ${i + 1}. ${step.action}: ${step.target || step.value || ''}`);
+    });
+
+    Logger.divider();
+
+    const executor = createMCPAutoExecutor({
       baseUrl: options.baseUrl,
       headless: options.headless,
     });
 
-    Logger.divider();
-    Logger.header('测试报告');
-    Logger.info(`状态: ${result.success ? '✅ 通过' : '❌ 失败'}`);
-    Logger.info(`耗时: ${result.duration}ms`);
-    Logger.info(`通过步骤: ${result.steps.filter(s => s.success).length}/${result.steps.length}`);
+    try {
+      await executor.connect();
 
-    if (result.error) {
-      Logger.error(`\n错误: ${result.error}`);
+      const result = await executor.executeScenario({
+        id: 'prompt-test',
+        name: path.basename(promptFile, '.md'),
+        type: 'manual',
+        priority: 'medium',
+        route: '/',
+        steps,
+      });
+
+      Logger.divider();
+
+      if (result.success) {
+        Logger.success(`\n✅ 测试通过 (${result.duration}ms)`);
+      } else {
+        Logger.error(`\n❌ 测试失败: ${result.error}`);
+        process.exitCode = 1;
+      }
+
+    } catch (error: any) {
+      Logger.error(`测试执行失败: ${error.message}`);
+      process.exitCode = 1;
+    } finally {
+      await executor.disconnect();
     }
   });
 

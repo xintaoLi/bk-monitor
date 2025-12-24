@@ -32,7 +32,9 @@
     "test:visual": "node scripts/visual-test.js",
     "test:quick": "node scripts/quick-visual-test.js",
     "test:component": "node scripts/component-test.js",
-    "test:now": "node scripts/run-test-direct.js"
+    "test:now": "node scripts/run-test-direct.js",
+    "mcp-e2e": "node ./packages/mcp-cli/bin/mcp-e2e.js",
+    "mcp:build": "cd packages/mcp-cli && npm run build"
   },
   "dependencies": {
     "@babel/helper-module-imports": "7.24.7",
