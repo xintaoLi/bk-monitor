@@ -902,17 +902,19 @@ program
 
 program
   .command('change:test')
-  .description('分析变更并生成针对性测试文件')
+  .description('分析变更并生成针对性测试文件（包含详细变更描述）')
   .option('--base <ref>', 'Git 基准引用（默认自动检测）')
   .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
   .option('--threshold <n>', '路由阈值，超过视为大范围变更', '5')
   .option('--force', '强制生成，即使是大范围变更', false)
   .option('--output <dir>', '输出目录', '.codebuddy/rules/changes')
+  .option('--detailed', '输出详细的代码变更分析（函数名、行号等）', true)
   .action(async (options) => {
     const { Logger } = await import('./utils/log.js');
     const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
     const { analyzeChanges } = await import('./analyzer/change-analyzer.js');
-    const { generateChangeTest } = await import('./generator/change-test-generator.js');
+    const { ChangeTestGenerator } = await import('./generator/change-test-generator.js');
+    const { analyzeChangeDetails } = await import('./analyzer/change-detail-analyzer.js');
 
     Logger.header('变更影响测试生成');
 
@@ -947,8 +949,23 @@ program
     Logger.info(`  - 影响路由: ${impactResult.affectedRoutes.length}`);
     Logger.info(`  - 风险等级: ${impactResult.riskLevel}`);
 
-    // 3. 生成测试文件
-    Logger.info('\n📝 Step 3: 生成测试文件...');
+    // 3. 详细变更分析（获取行号、函数名等）
+    let detailedAnalysis = null;
+    if (options.detailed !== false) {
+      Logger.info('\n🔬 Step 3: 详细变更分析...');
+      try {
+        detailedAnalysis = await analyzeChangeDetails(process.cwd(), options.base);
+        Logger.info(`  - 分析完成: ${detailedAnalysis.changes.length} 个文件`);
+        Logger.info(`  - 受影响函数: ${detailedAnalysis.summary.affectedFunctions}`);
+        Logger.info(`  - 受影响组件: ${detailedAnalysis.summary.affectedComponents}`);
+      } catch (error: any) {
+        Logger.warn(`  详细分析失败: ${error.message}`);
+        Logger.info('  将使用基础变更信息生成');
+      }
+    }
+
+    // 4. 生成测试文件
+    Logger.info('\n📝 Step 4: 生成测试文件...');
 
     // 如果是大范围变更且没有 --force，只输出建议
     if (impactResult.impactScope === 'large' && !options.force) {
@@ -965,13 +982,18 @@ program
       return;
     }
 
-    const result = await generateChangeTest(
-      impactResult,
-      routerAnalysis,
+    // 创建生成器并设置详细分析结果
+    const generator = new ChangeTestGenerator(
       process.cwd(),
       options.baseUrl,
-      { outputDir: options.output }
+      options.output
     );
+
+    if (detailedAnalysis) {
+      generator.setDetailedAnalysis(detailedAnalysis);
+    }
+
+    const result = await generator.generate(impactResult, routerAnalysis);
 
     // 输出结果
     Logger.divider();
@@ -983,15 +1005,23 @@ program
       Logger.info(`📊 覆盖路由: ${result.affectedRouteCount}`);
       Logger.info(`🧪 测试场景: ${result.scenarios}`);
 
+      if (detailedAnalysis) {
+        Logger.info(`📝 变更详情: 包含 ${detailedAnalysis.summary.affectedFunctions} 个函数、${detailedAnalysis.summary.affectedComponents} 个组件的详细描述`);
+      }
+
       Logger.divider();
       Logger.header('🚀 使用方式');
       Logger.info('');
-      Logger.info('【在 CodeBuddy 中执行】');
-      Logger.info(`  1. 输入: @${result.filePath}`);
-      Logger.info('  2. 告诉 AI: "请执行上述测试"');
+      Logger.info('【第一步：大模型分析】');
+      Logger.info(`  在 CodeBuddy 中引用: @${result.filePath}`);
+      Logger.info('  告诉 AI: "请分析上述变更内容，理解变更的影响范围"');
       Logger.info('');
-      Logger.info('【命令行执行】');
-      Logger.info(`  mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
+      Logger.info('【第二步：设计测试计划】');
+      Logger.info('  基于分析结果，让 AI 设计针对性的测试计划');
+      Logger.info('');
+      Logger.info('【第三步：执行测试】');
+      Logger.info(`  命令行: mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
+      Logger.info('  或让 AI 使用 Chrome DevTools MCP 执行测试');
     } else {
       Logger.info(result.suggestion);
     }
