@@ -219,11 +219,14 @@ program
   .option('--smoke', '只生成冒烟测试', false)
   .option('--e2e', '只生成 E2E 测试', false)
   .option('--output <dir>', '输出目录（默认 .codebuddy/rules）')
+  .option('--inject-testid', '自动注入 test-id（跳过询问）')
+  .option('--no-inject-testid', '不注入 test-id（跳过询问）')
   .action(async (options) => {
     const { Logger } = await import('./utils/log.js');
     const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
     const { generateDevToolsMCPRule } = await import('./generator/devtools-mcp-rule.js');
-    const path = await import('path');
+    const { promptConfirm } = await import('./utils/prompt.js');
+    const { injectTestIdsFromRouter } = await import('./codebuddy/router-testid-injector.js');
 
     Logger.header('生成 Chrome DevTools MCP 测试 Rule');
 
@@ -236,19 +239,72 @@ program
       return;
     }
 
-    // 2. 生成 MCP Rule（输出到 .codebuddy/rules）
-    Logger.info('\n📝 Step 2: 生成 MCP Rule...');
+    Logger.info(`  - 框架: ${routerAnalysis.framework}`);
+    Logger.info(`  - 路由: ${routerAnalysis.flatRoutes.length}`);
+    Logger.info(`  - 组件: ${routerAnalysis.pageComponents.length}`);
+
+    // 2. 询问是否注入 test-id
+    let shouldInjectTestId = false;
+    let injectionReport: Awaited<ReturnType<typeof injectTestIdsFromRouter>> | null = null;
+
+    if (options.injectTestid === true) {
+      // 命令行指定 --inject-testid
+      shouldInjectTestId = true;
+      Logger.info('\n🏷️  Step 2: 注入 test-id（命令行参数指定）...');
+    } else if (options.injectTestid === false) {
+      // 命令行指定 --no-inject-testid
+      shouldInjectTestId = false;
+      Logger.info('\n🏷️  Step 2: 跳过 test-id 注入（命令行参数指定）');
+    } else {
+      // 交互式询问用户
+      Logger.info('');
+      Logger.divider();
+      Logger.info('💡 test-id 可以提高测试的稳定性和可维护性');
+      Logger.info('   注入后，测试将使用 data-testid 属性定位元素，减少不同模型执行结果的差异');
+      Logger.divider();
+
+      shouldInjectTestId = await promptConfirm(
+        '是否为页面组件注入 test-id 属性？',
+        false
+      );
+    }
+
+    if (shouldInjectTestId) {
+      Logger.info('\n🏷️  Step 2: 注入 test-id...');
+
+      injectionReport = await injectTestIdsFromRouter(routerAnalysis, process.cwd(), {
+        dryRun: false,
+        config: {
+          prefix: 'test',
+        },
+      });
+
+      Logger.success(`  已注入 ${injectionReport.testIdMapping.length} 个 test-id`);
+
+      // 重新分析 Router 以获取最新的 test-id 信息
+      Logger.info('  重新分析组件以获取最新 test-id...');
+      const updatedAnalysis = await analyzeRouter(process.cwd());
+      Object.assign(routerAnalysis, updatedAnalysis);
+    } else {
+      Logger.info('\n🏷️  Step 2: 跳过 test-id 注入');
+    }
+
+    // 3. 生成 MCP Rule（输出到 .codebuddy/rules）
+    Logger.info('\n📝 Step 3: 生成 MCP Rule...');
     const outputDir = options.output || '.codebuddy/rules';
     const rule = await generateDevToolsMCPRule(
       routerAnalysis,
       process.cwd(),
       options.baseUrl,
-      { outputDir }
+      {
+        outputDir,
+        injectionReport,
+        hasTestIds: shouldInjectTestId,
+      }
     );
 
     const ruleFileName = `${rule.id}.json`;
     const promptsFileName = `${rule.id}-prompts.md`;
-    const promptsFilePath = path.join(process.cwd(), outputDir, promptsFileName);
 
     Logger.divider();
     Logger.success('✅ MCP Rule 生成完成！');
@@ -778,6 +834,166 @@ program
       process.exitCode = 1;
     } finally {
       await executor.disconnect();
+    }
+  });
+
+// ============ 变更影响分析命令 ============
+
+program
+  .command('change:analyze')
+  .description('分析代码变更的影响范围')
+  .option('--base <ref>', 'Git 基准引用（默认 HEAD~1）')
+  .option('--threshold <n>', '路由阈值，超过视为大范围变更', '5')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
+    const { analyzeChanges } = await import('./analyzer/change-analyzer.js');
+
+    Logger.header('变更影响分析');
+
+    // 1. 分析 Router
+    Logger.info('\n📊 Step 1: 分析 Router 配置...');
+    const routerAnalysis = await analyzeRouter(process.cwd());
+
+    if (routerAnalysis.flatRoutes.length === 0) {
+      Logger.error('未找到有效的路由配置');
+      return;
+    }
+
+    // 2. 分析变更影响
+    Logger.info('\n🔍 Step 2: 分析变更影响...');
+    const impactResult = await analyzeChanges(routerAnalysis, process.cwd(), {
+      base: options.base,
+      threshold: parseInt(options.threshold, 10),
+    });
+
+    // 输出结果
+    Logger.divider();
+    Logger.header('分析结果');
+
+    if (impactResult.changedFiles.length === 0) {
+      Logger.warn('未检测到变更文件');
+      return;
+    }
+
+    Logger.info(`\n变更文件 (${impactResult.changedFiles.length}):`);
+    impactResult.changedFiles.forEach(f => {
+      Logger.info(`  - ${f.relativePath}`);
+    });
+
+    Logger.info(`\n影响路由 (${impactResult.affectedRoutes.length}):`);
+    impactResult.affectedRoutes.forEach(r => {
+      const badge = r.impactType === 'direct' ? '🔴' : '🟡';
+      Logger.info(`  ${badge} ${r.route} - ${r.name} (${r.reason})`);
+    });
+
+    Logger.divider();
+    Logger.info(`影响范围: ${impactResult.impactScope === 'small' ? '小范围' : '大范围'}`);
+    Logger.info(`风险等级: ${impactResult.riskLevel}`);
+
+    if (impactResult.impactScope === 'large') {
+      Logger.warn('\n⚠️  变更影响范围较大，建议执行全量测试');
+      Logger.info('运行: mcp-e2e test:smoke --base-url <url>');
+    } else {
+      Logger.info('\n💡 运行以下命令生成针对性测试:');
+      Logger.info(`   mcp-e2e change:test --base-url <url>`);
+    }
+  });
+
+program
+  .command('change:test')
+  .description('分析变更并生成针对性测试文件')
+  .option('--base <ref>', 'Git 基准引用（默认自动检测）')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--threshold <n>', '路由阈值，超过视为大范围变更', '5')
+  .option('--force', '强制生成，即使是大范围变更', false)
+  .option('--output <dir>', '输出目录', '.codebuddy/rules/changes')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
+    const { analyzeChanges } = await import('./analyzer/change-analyzer.js');
+    const { generateChangeTest } = await import('./generator/change-test-generator.js');
+
+    Logger.header('变更影响测试生成');
+
+    // 1. 分析 Router
+    Logger.info('\n📊 Step 1: 分析 Router 配置...');
+    const routerAnalysis = await analyzeRouter(process.cwd());
+
+    if (routerAnalysis.flatRoutes.length === 0) {
+      Logger.error('未找到有效的路由配置');
+      return;
+    }
+
+    Logger.info(`  - 框架: ${routerAnalysis.framework}`);
+    Logger.info(`  - 路由: ${routerAnalysis.flatRoutes.length}`);
+
+    // 2. 分析变更影响
+    Logger.info('\n🔍 Step 2: 分析变更影响...');
+    const impactResult = await analyzeChanges(routerAnalysis, process.cwd(), {
+      base: options.base,
+      threshold: parseInt(options.threshold, 10),
+    });
+
+    if (impactResult.changedFiles.length === 0) {
+      Logger.warn('未检测到变更文件');
+      Logger.info('\n提示:');
+      Logger.info('  - 确保有未提交的变更，或指定 --base 参数');
+      Logger.info('  - 示例: mcp-e2e change:test --base main');
+      return;
+    }
+
+    Logger.info(`  - 变更文件: ${impactResult.changedFiles.length}`);
+    Logger.info(`  - 影响路由: ${impactResult.affectedRoutes.length}`);
+    Logger.info(`  - 风险等级: ${impactResult.riskLevel}`);
+
+    // 3. 生成测试文件
+    Logger.info('\n📝 Step 3: 生成测试文件...');
+
+    // 如果是大范围变更且没有 --force，只输出建议
+    if (impactResult.impactScope === 'large' && !options.force) {
+      Logger.divider();
+      Logger.warn(`⚠️  本次变更影响范围较大（${impactResult.affectedRoutes.length} 个路由）`);
+      Logger.info('建议执行全量冒烟测试：');
+      Logger.info('');
+      Logger.info(`  mcp-e2e test:smoke --base-url ${options.baseUrl}`);
+      Logger.info('');
+      Logger.info('或在 CodeBuddy 中引用全量测试 Prompt：');
+      Logger.info('  @.codebuddy/rules/<rule-id>-prompts.md');
+      Logger.info('');
+      Logger.info('如需强制生成测试文件，添加 --force 参数');
+      return;
+    }
+
+    const result = await generateChangeTest(
+      impactResult,
+      routerAnalysis,
+      process.cwd(),
+      options.baseUrl,
+      { outputDir: options.output }
+    );
+
+    // 输出结果
+    Logger.divider();
+
+    if (result.type === 'small-scope') {
+      Logger.success('✅ 测试文件生成完成！');
+      Logger.info('');
+      Logger.info(`📄 文件: ${result.filePath}`);
+      Logger.info(`📊 覆盖路由: ${result.affectedRouteCount}`);
+      Logger.info(`🧪 测试场景: ${result.scenarios}`);
+
+      Logger.divider();
+      Logger.header('🚀 使用方式');
+      Logger.info('');
+      Logger.info('【在 CodeBuddy 中执行】');
+      Logger.info(`  1. 输入: @${result.filePath}`);
+      Logger.info('  2. 告诉 AI: "请执行上述测试"');
+      Logger.info('');
+      Logger.info('【命令行执行】');
+      Logger.info(`  mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
+    } else {
+      Logger.info(result.suggestion);
     }
   });
 

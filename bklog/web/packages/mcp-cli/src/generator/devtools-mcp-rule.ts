@@ -7,14 +7,15 @@ import {
   FlatRoute,
   InteractiveElementInfo,
 } from '../analyzer/router-analyzer.js';
+import { RouterInjectionReport, TestIdMappingEntry } from '../codebuddy/router-testid-injector.js';
 
 /**
  * Chrome DevTools MCP Rule 生成器
  *
  * 输出格式：
- * 1. 自然语言 Prompt 风格的测试描述
- * 2. Chrome DevTools MCP 可直接执行的结构化指令
- * 3. test-id 映射表，便于模型理解页面结构
+ * 1. 精确的 MCP 工具调用指令（减少模型差异）
+ * 2. test-id 选择器优先的元素定位
+ * 3. 结构化的测试步骤
  */
 
 /**
@@ -140,7 +141,7 @@ export interface TestScenario {
 }
 
 /**
- * 结构化步骤 - 辅助信息
+ * 结构化步骤 - 精确的 MCP 工具调用
  */
 export interface StructuredStep {
   order: number;
@@ -149,6 +150,16 @@ export interface StructuredStep {
   selector?: string;
   value?: string;
   description: string;
+  /** MCP 工具调用指令 */
+  mcpCommand?: MCPCommand;
+}
+
+/**
+ * MCP 工具调用指令
+ */
+export interface MCPCommand {
+  tool: string;
+  args: Record<string, any>;
 }
 
 /**
@@ -158,12 +169,32 @@ export class DevToolsMCPRuleGenerator {
   private projectRoot: string;
   private baseUrl: string;
   private outputDir: string;
+  private injectionReport: RouterInjectionReport | null = null;
+  private hasTestIds: boolean = false;
+  private testIdMap: Map<string, TestIdMappingEntry> = new Map();
 
-  constructor(projectRoot: string, baseUrl = 'http://localhost:8080', outputDir?: string) {
+  constructor(
+    projectRoot: string,
+    baseUrl = 'http://localhost:8080',
+    outputDir?: string,
+    options?: {
+      injectionReport?: RouterInjectionReport | null;
+      hasTestIds?: boolean;
+    }
+  ) {
     this.projectRoot = projectRoot;
     this.baseUrl = baseUrl;
     // 默认输出到 .codebuddy/rules（CodeBuddy 可识别）
     this.outputDir = outputDir || '.codebuddy/rules';
+    this.injectionReport = options?.injectionReport || null;
+    this.hasTestIds = options?.hasTestIds || false;
+
+    // 构建 test-id 映射表
+    if (this.injectionReport) {
+      for (const entry of this.injectionReport.testIdMapping) {
+        this.testIdMap.set(`${entry.route}:${entry.elementType}`, entry);
+      }
+    }
   }
 
   /**
@@ -343,58 +374,149 @@ export class DevToolsMCPRuleGenerator {
    */
   private generateSmokePrompt(route: FlatRoute, component?: PageComponent): string {
     const testIds = component?.existingTestIds || [];
-    const testIdHint = testIds.length > 0
-      ? `\n\n可用的 test-id: ${testIds.slice(0, 5).join(', ')}${testIds.length > 5 ? ' 等' : ''}`
-      : '';
+    const fullUrl = `${this.baseUrl}${route.fullPath}`;
 
-    return `作为测试工程师，请对 ${route.component} 页面执行冒烟测试：
+    // 如果有 test-id，生成精确的 MCP 指令
+    if (this.hasTestIds && testIds.length > 0) {
+      const testIdSelectors = testIds.slice(0, 5).map(id => `[data-testid="${id}"]`);
 
-1. 打开页面 ${route.fullPath}
-2. 等待页面完全加载（网络请求完成）
-3. 检查页面是否有 JavaScript 错误
-4. 验证页面主要内容区域是否正确渲染
-5. 检查关键交互元素是否可见
-6. 截图保存测试结果
+      return `作为测试工程师，请对 ${route.component} 页面执行冒烟测试。
 
-测试通过标准：
+## 测试步骤（请严格按顺序执行以下 MCP 工具调用）
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 等待页面加载完成
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+验证页面快照中包含预期元素。
+
+### 3. 检查控制台错误
+\`\`\`
+工具: list_console_messages
+参数: { "types": ["error"] }
+\`\`\`
+验证返回结果中无 error 类型消息。
+
+### 4. 验证关键元素可见
+使用 take_snapshot 获取的页面快照，检查以下元素是否存在：
+${testIdSelectors.map((sel, i) => `- 元素 ${i + 1}: ${sel}`).join('\n')}
+
+### 5. 截图保存
+\`\`\`
+工具: take_screenshot
+参数: { "filePath": ".codebuddy/screenshots/smoke-${this.toKebabCase(route.component)}.png" }
+\`\`\`
+
+## 测试通过标准
 - 页面在 10 秒内加载完成
 - 无 JavaScript 控制台错误
-- 主要内容区域正确显示${testIdHint}`;
+- 上述关键元素在页面快照中可见
+
+## 可用的 test-id 选择器
+${testIds.map(id => `- \`[data-testid="${id}"]\``).join('\n')}`;
+    }
+
+    // 没有 test-id 时的通用 Prompt
+    return `作为测试工程师，请对 ${route.component} 页面执行冒烟测试。
+
+## 测试步骤（请严格按顺序执行以下 MCP 工具调用）
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 等待页面加载完成
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+验证页面快照中包含预期元素。
+
+### 3. 检查控制台错误
+\`\`\`
+工具: list_console_messages
+参数: { "types": ["error"] }
+\`\`\`
+验证返回结果中无 error 类型消息。
+
+### 4. 验证页面内容
+检查页面快照中是否包含：
+- 页面标题或主要标识
+- 主要内容区域
+- 导航元素
+
+### 5. 截图保存
+\`\`\`
+工具: take_screenshot
+参数: { "filePath": ".codebuddy/screenshots/smoke-${this.toKebabCase(route.component)}.png" }
+\`\`\`
+
+## 测试通过标准
+- 页面在 10 秒内加载完成
+- 无 JavaScript 控制台错误
+- 主要内容区域正确显示`;
   }
 
   /**
    * 生成冒烟测试步骤
    */
   private generateSmokeSteps(route: FlatRoute, component?: PageComponent): StructuredStep[] {
+    const fullUrl = `${this.baseUrl}${route.fullPath}`;
     const steps: StructuredStep[] = [
       {
         order: 1,
         action: 'navigate',
         target: route.fullPath,
         description: `导航到 ${route.component} 页面`,
+        mcpCommand: {
+          tool: 'navigate_page',
+          args: { type: 'url', url: fullUrl },
+        },
       },
       {
         order: 2,
-        action: 'wait',
-        target: 'networkidle',
-        description: '等待网络请求完成',
+        action: 'snapshot',
+        target: 'page',
+        description: '获取页面快照，等待加载完成',
+        mcpCommand: {
+          tool: 'take_snapshot',
+          args: {},
+        },
       },
       {
         order: 3,
         action: 'assert',
         target: 'no-console-error',
         description: '检查无控制台错误',
+        mcpCommand: {
+          tool: 'list_console_messages',
+          args: { types: ['error'] },
+        },
       },
     ];
 
     // 添加元素可见性检查
     if (component && component.existingTestIds.length > 0) {
+      const testId = component.existingTestIds[0];
       steps.push({
         order: 4,
         action: 'assert',
-        target: component.existingTestIds[0],
-        selector: `[data-testid="${component.existingTestIds[0]}"]`,
-        description: '验证关键元素可见',
+        target: testId,
+        selector: `[data-testid="${testId}"]`,
+        description: '验证关键元素可见（通过快照检查）',
+        mcpCommand: {
+          tool: 'take_snapshot',
+          args: {},
+        },
       });
     }
 
@@ -403,6 +525,12 @@ export class DevToolsMCPRuleGenerator {
       action: 'screenshot',
       target: `smoke-${this.toKebabCase(route.component)}`,
       description: '截图保存',
+      mcpCommand: {
+        tool: 'take_screenshot',
+        args: {
+          filePath: `.codebuddy/screenshots/smoke-${this.toKebabCase(route.component)}.png`,
+        },
+      },
     });
 
     return steps;
@@ -447,25 +575,98 @@ export class DevToolsMCPRuleGenerator {
       .filter(b => b.existingTestId)
       .map(b => b.existingTestId!);
 
-    const buttonDescriptions = buttons
-      .slice(0, 5)
-      .map(b => b.context || b.existingTestId || `第${buttons.indexOf(b) + 1}个按钮`)
-      .join('、');
+    const fullUrl = `${this.baseUrl}${component.route}`;
 
-    const prompt = `作为测试工程师，请测试 ${component.name} 页面的按钮交互功能：
+    // 生成精确的按钮点击指令
+    const buttonCommands = buttons.slice(0, 5).map((button, index) => {
+      const selector = button.existingTestId
+        ? `[data-testid="${button.existingTestId}"]`
+        : button.context
+          ? `text="${button.context}"`
+          : `button >> nth=${index}`;
 
-1. 打开页面 ${component.route}
-2. 等待页面加载完成
-3. 依次测试以下按钮的点击响应：${buttonDescriptions}
-4. 验证每个按钮点击后的响应（弹窗、跳转、状态变化等）
-5. 检查是否有异常错误
+      return {
+        name: button.context || button.existingTestId || `按钮${index + 1}`,
+        selector,
+        testId: button.existingTestId,
+      };
+    });
 
-注意事项：
+    const prompt = this.hasTestIds && testIds.length > 0
+      ? `作为测试工程师，请测试 ${component.name} 页面的按钮交互功能。
+
+## 测试步骤（请严格按顺序执行以下 MCP 工具调用）
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 等待页面加载
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+
+### 3. 测试按钮点击
+${buttonCommands.map((btn, i) => `
+#### 3.${i + 1} 点击「${btn.name}」
+\`\`\`
+工具: click
+参数: { "uid": "<从快照中找到 ${btn.selector} 对应的 uid>" }
+\`\`\`
+或使用选择器：
+\`\`\`
+工具: click
+参数: { "selector": "${btn.selector}" }
+\`\`\`
+等待响应后获取新快照验证结果。
+`).join('')}
+
+### 4. 截图保存
+\`\`\`
+工具: take_screenshot
+参数: { "filePath": ".codebuddy/screenshots/buttons-${this.toKebabCase(component.name)}.png" }
+\`\`\`
+
+## 可用的 test-id 选择器
+${testIds.map(id => `- \`[data-testid="${id}"]\``).join('\n')}
+
+## 注意事项
 - 某些按钮可能需要先填写表单才能点击
 - 注意观察按钮的 loading 状态
-- 记录每个按钮的实际响应行为
+- 记录每个按钮的实际响应行为`
+      : `作为测试工程师，请测试 ${component.name} 页面的按钮交互功能。
 
-可用的 test-id: ${testIds.join(', ') || '暂无，请使用文本或其他方式定位'}`;
+## 测试步骤
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 获取页面快照
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+从快照中找到按钮元素的 uid。
+
+### 3. 依次测试按钮点击
+使用 click 工具点击各个按钮，观察响应。
+
+### 4. 截图保存
+\`\`\`
+工具: take_screenshot
+参数: {}
+\`\`\`
+
+## 注意事项
+- 从快照中获取元素 uid 进行点击
+- 某些按钮可能需要先填写表单
+- 记录每个按钮的响应行为`;
 
     return {
       id: `functional-buttons-${this.toKebabCase(component.name)}-${Date.now()}`,
@@ -489,18 +690,27 @@ export class DevToolsMCPRuleGenerator {
     component: PageComponent,
     buttons: InteractiveElementInfo[]
   ): StructuredStep[] {
+    const fullUrl = `${this.baseUrl}${component.route}`;
     const steps: StructuredStep[] = [
       {
         order: 1,
         action: 'navigate',
         target: component.route,
         description: `导航到 ${component.name} 页面`,
+        mcpCommand: {
+          tool: 'navigate_page',
+          args: { type: 'url', url: fullUrl },
+        },
       },
       {
         order: 2,
-        action: 'wait',
-        target: 'networkidle',
-        description: '等待页面加载',
+        action: 'snapshot',
+        target: 'page',
+        description: '获取页面快照',
+        mcpCommand: {
+          tool: 'take_snapshot',
+          args: {},
+        },
       },
     ];
 
@@ -509,8 +719,8 @@ export class DevToolsMCPRuleGenerator {
       const selector = button.existingTestId
         ? `[data-testid="${button.existingTestId}"]`
         : button.context
-          ? `button:contains("${button.context}")`
-          : `button:nth-of-type(${buttons.indexOf(button) + 1})`;
+          ? `text="${button.context}"`
+          : `button >> nth=${buttons.indexOf(button)}`;
 
       steps.push({
         order: order++,
@@ -518,13 +728,21 @@ export class DevToolsMCPRuleGenerator {
         target: button.context || button.existingTestId || 'button',
         selector,
         description: `点击 ${button.context || '按钮'}`,
+        mcpCommand: {
+          tool: 'click',
+          args: { selector },
+        },
       });
 
       steps.push({
         order: order++,
-        action: 'wait',
-        target: '500ms',
-        description: '等待响应',
+        action: 'snapshot',
+        target: 'page',
+        description: '等待响应，获取新快照',
+        mcpCommand: {
+          tool: 'take_snapshot',
+          args: {},
+        },
       });
     }
 
@@ -544,28 +762,100 @@ export class DevToolsMCPRuleGenerator {
       ...forms.filter(f => f.existingTestId).map(f => f.existingTestId!),
     ];
 
-    const inputDescriptions = inputs
-      .slice(0, 5)
-      .map(i => i.context || i.existingTestId || '输入框')
-      .join('、');
+    const fullUrl = `${this.baseUrl}${component.route}`;
 
-    const prompt = `作为测试工程师，请测试 ${component.name} 页面的表单功能：
+    // 生成精确的输入框填写指令
+    const inputCommands = inputs.slice(0, 5).map((input, index) => {
+      const selector = input.existingTestId
+        ? `[data-testid="${input.existingTestId}"]`
+        : input.context
+          ? `[placeholder*="${input.context}"]`
+          : `input >> nth=${index}`;
 
-1. 打开页面 ${component.route}
-2. 等待页面加载完成
-3. 定位表单区域
-4. 依次填写以下输入框：${inputDescriptions}
-5. 测试表单验证（尝试提交空表单、无效数据）
-6. 填写有效数据并提交
-7. 验证提交结果
+      return {
+        name: input.context || input.existingTestId || `输入框${index + 1}`,
+        selector,
+        testId: input.existingTestId,
+        testValue: this.generateTestValue(input),
+      };
+    });
 
-测试数据建议：
-- 文本输入：使用 "test_value_" + 时间戳
-- 数字输入：使用合理范围内的数字
-- 邮箱输入：使用 test@example.com
-- 密码输入：使用 Test123456!
+    const prompt = this.hasTestIds && testIds.length > 0
+      ? `作为测试工程师，请测试 ${component.name} 页面的表单功能。
 
-可用的 test-id: ${testIds.join(', ') || '暂无'}`;
+## 测试步骤（请严格按顺序执行以下 MCP 工具调用）
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 等待页面加载
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+
+### 3. 填写表单
+${inputCommands.map((input, i) => `
+#### 3.${i + 1} 填写「${input.name}」
+\`\`\`
+工具: fill
+参数: { "uid": "<从快照中找到 ${input.selector} 对应的 uid>", "value": "${input.testValue}" }
+\`\`\`
+`).join('')}
+
+### 4. 提交表单
+\`\`\`
+工具: click
+参数: { "uid": "<从快照中找到提交按钮的 uid>" }
+\`\`\`
+提交按钮选择器参考：\`[data-testid*="submit"]\` 或 \`button[type="submit"]\`
+
+### 5. 验证结果
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+检查是否有成功提示或错误信息。
+
+### 6. 截图保存
+\`\`\`
+工具: take_screenshot
+参数: { "filePath": ".codebuddy/screenshots/form-${this.toKebabCase(component.name)}.png" }
+\`\`\`
+
+## 可用的 test-id 选择器
+${testIds.map(id => `- \`[data-testid="${id}"]\``).join('\n')}
+
+## 测试数据
+${inputCommands.map(input => `- ${input.name}: \`${input.testValue}\``).join('\n')}`
+      : `作为测试工程师，请测试 ${component.name} 页面的表单功能。
+
+## 测试步骤
+
+### 1. 导航到页面
+\`\`\`
+工具: navigate_page
+参数: { "type": "url", "url": "${fullUrl}" }
+\`\`\`
+
+### 2. 获取页面快照
+\`\`\`
+工具: take_snapshot
+参数: {}
+\`\`\`
+从快照中找到输入框和按钮的 uid。
+
+### 3. 填写表单
+使用 fill 工具填写各个输入框。
+
+### 4. 提交表单
+使用 click 工具点击提交按钮。
+
+### 5. 验证结果
+获取新快照，检查提交结果。`;
 
     return {
       id: `functional-form-${this.toKebabCase(component.name)}-${Date.now()}`,
@@ -583,24 +873,61 @@ export class DevToolsMCPRuleGenerator {
   }
 
   /**
+   * 生成测试数据
+   */
+  private generateTestValue(input: InteractiveElementInfo): string {
+    const context = (input.context || '').toLowerCase();
+
+    if (context.includes('email') || context.includes('邮箱')) {
+      return 'test@example.com';
+    }
+    if (context.includes('password') || context.includes('密码')) {
+      return 'Test123456!';
+    }
+    if (context.includes('phone') || context.includes('手机') || context.includes('电话')) {
+      return '13800138000';
+    }
+    if (context.includes('name') || context.includes('姓名') || context.includes('名称')) {
+      return 'TestUser';
+    }
+    if (context.includes('url') || context.includes('链接')) {
+      return 'https://example.com';
+    }
+    if (context.includes('number') || context.includes('数字') || context.includes('数量')) {
+      return '100';
+    }
+
+    return `test_value_${Date.now()}`;
+  }
+
+  /**
    * 生成表单测试步骤
    */
   private generateFormSteps(
     component: PageComponent,
     inputs: InteractiveElementInfo[]
   ): StructuredStep[] {
+    const fullUrl = `${this.baseUrl}${component.route}`;
     const steps: StructuredStep[] = [
       {
         order: 1,
         action: 'navigate',
         target: component.route,
         description: `导航到 ${component.name} 页面`,
+        mcpCommand: {
+          tool: 'navigate_page',
+          args: { type: 'url', url: fullUrl },
+        },
       },
       {
         order: 2,
-        action: 'wait',
-        target: 'networkidle',
-        description: '等待页面加载',
+        action: 'snapshot',
+        target: 'page',
+        description: '获取页面快照',
+        mcpCommand: {
+          tool: 'take_snapshot',
+          args: {},
+        },
       },
     ];
 
@@ -609,16 +936,22 @@ export class DevToolsMCPRuleGenerator {
       const selector = input.existingTestId
         ? `[data-testid="${input.existingTestId}"]`
         : input.context
-          ? `input[placeholder*="${input.context}"]`
-          : `input:nth-of-type(${inputs.indexOf(input) + 1})`;
+          ? `[placeholder*="${input.context}"]`
+          : `input >> nth=${inputs.indexOf(input)}`;
+
+      const testValue = this.generateTestValue(input);
 
       steps.push({
         order: order++,
-        action: 'type',
+        action: 'fill',
         target: input.context || input.existingTestId || 'input',
         selector,
-        value: `test_value_${Date.now()}`,
+        value: testValue,
         description: `填写 ${input.context || '输入框'}`,
+        mcpCommand: {
+          tool: 'fill',
+          args: { selector, value: testValue },
+        },
       });
     }
 
@@ -626,8 +959,23 @@ export class DevToolsMCPRuleGenerator {
       order: order++,
       action: 'click',
       target: 'submit',
-      selector: 'button[type="submit"], [data-testid*="submit"], .submit-btn',
+      selector: '[data-testid*="submit"], button[type="submit"], .submit-btn',
       description: '点击提交按钮',
+      mcpCommand: {
+        tool: 'click',
+        args: { selector: '[data-testid*="submit"], button[type="submit"]' },
+      },
+    });
+
+    steps.push({
+      order: order++,
+      action: 'snapshot',
+      target: 'page',
+      description: '验证提交结果',
+      mcpCommand: {
+        tool: 'take_snapshot',
+        args: {},
+      },
     });
 
     return steps;
@@ -1023,12 +1371,29 @@ export class DevToolsMCPRuleGenerator {
     scenarios: TestScenario[]
   ): string {
     const routeDesc = rule.projectContext.routes.find(r => r.path === routePath);
+    const routeTestIds = rule.projectContext.testIdMapping.filter(
+      m => scenarios.some(s => s.availableTestIds.includes(m.testId))
+    );
 
     let content = `# 路由测试: ${routePath}\n\n`;
     content += `**描述**: ${routeDesc?.description || '无描述'}\n`;
     content += `**组件**: ${routeDesc?.component || '未知'}\n`;
     content += `**基础 URL**: ${rule.projectContext.baseUrl}\n`;
     content += `**场景数量**: ${scenarios.length}\n\n`;
+
+    // 添加 test-id 速查表
+    if (routeTestIds.length > 0) {
+      content += `## Test-ID 速查表\n\n`;
+      content += `| Test-ID | 元素类型 | 选择器 | 说明 |\n`;
+      content += `|---------|----------|--------|------|\n`;
+      for (const mapping of routeTestIds.slice(0, 10)) {
+        content += `| \`${mapping.testId}\` | ${mapping.elementType} | \`${mapping.selector}\` | ${mapping.description} |\n`;
+      }
+      if (routeTestIds.length > 10) {
+        content += `\n*还有 ${routeTestIds.length - 10} 个 test-id，详见 testid-mapping.json*\n`;
+      }
+      content += `\n`;
+    }
 
     content += `---\n\n`;
 
@@ -1043,12 +1408,30 @@ export class DevToolsMCPRuleGenerator {
 
       content += `**预期结果**: ${scenario.expectedOutcome}\n\n`;
 
+      // 添加结构化步骤的 MCP 命令
+      if (scenario.steps.length > 0) {
+        content += `### MCP 执行步骤\n\n`;
+        for (const step of scenario.steps) {
+          content += `${step.order}. **${step.description}**\n`;
+          if (step.mcpCommand) {
+            content += `   \`\`\`json\n`;
+            content += `   { "tool": "${step.mcpCommand.tool}", "args": ${JSON.stringify(step.mcpCommand.args)} }\n`;
+            content += `   \`\`\`\n`;
+          }
+        }
+        content += `\n`;
+      }
+
       if (scenario.availableTestIds.length > 0) {
-        content += `**可用 test-id**: \`${scenario.availableTestIds.join('`, `')}\`\n\n`;
+        content += `### 可用 test-id\n\n`;
+        for (const testId of scenario.availableTestIds) {
+          content += `- \`[data-testid="${testId}"]\`\n`;
+        }
+        content += '\n';
       }
 
       if (scenario.preconditions && scenario.preconditions.length > 0) {
-        content += `**前置条件**:\n`;
+        content += `### 前置条件\n\n`;
         for (const pre of scenario.preconditions) {
           content += `- ${pre}\n`;
         }
@@ -1133,9 +1516,16 @@ export async function generateDevToolsMCPRule(
   analysis: RouterAnalysisResult,
   projectRoot?: string,
   baseUrl?: string,
-  options?: { outputDir?: string }
+  options?: {
+    outputDir?: string;
+    injectionReport?: RouterInjectionReport | null;
+    hasTestIds?: boolean;
+  }
 ): Promise<DevToolsMCPRule> {
   const root = projectRoot || process.cwd();
-  const generator = new DevToolsMCPRuleGenerator(root, baseUrl, options?.outputDir);
+  const generator = new DevToolsMCPRuleGenerator(root, baseUrl, options?.outputDir, {
+    injectionReport: options?.injectionReport,
+    hasTestIds: options?.hasTestIds,
+  });
   return await generator.generateFromRouterAnalysis(analysis);
 }
