@@ -1012,16 +1012,13 @@ program
       Logger.divider();
       Logger.header('🚀 使用方式');
       Logger.info('');
-      Logger.info('【第一步：大模型分析】');
-      Logger.info(`  在 CodeBuddy 中引用: @${result.filePath}`);
-      Logger.info('  告诉 AI: "请分析上述变更内容，理解变更的影响范围"');
+      Logger.info('【在 CodeBuddy 中使用】（推荐）');
+      Logger.info(`  直接引用: @${result.filePath}`);
+      Logger.info('  AI 会自动读取文档并按指引执行分析和测试');
+      Logger.info('  ✨ 无需额外说明，一键开始！');
       Logger.info('');
-      Logger.info('【第二步：设计测试计划】');
-      Logger.info('  基于分析结果，让 AI 设计针对性的测试计划');
-      Logger.info('');
-      Logger.info('【第三步：执行测试】');
-      Logger.info(`  命令行: mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
-      Logger.info('  或让 AI 使用 Chrome DevTools MCP 执行测试');
+      Logger.info('【命令行执行】');
+      Logger.info(`  mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
     } else {
       Logger.info(result.suggestion);
     }

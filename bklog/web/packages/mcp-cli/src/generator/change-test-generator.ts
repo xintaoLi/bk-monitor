@@ -108,6 +108,51 @@ export class ChangeTestGenerator {
     lines.push('> 本文档由 mcp-e2e 自动生成，用于辅助大模型理解代码变更并进行测试分析。');
     lines.push('');
 
+    // ============ AI 任务指引（放在最前面，让 AI 直接知道要做什么） ============
+    lines.push('## 📋 AI 任务指引');
+    lines.push('');
+    lines.push('**请按以下步骤执行变更测试分析：**');
+    lines.push('');
+    lines.push('### 第一步：理解变更内容');
+    lines.push('');
+    lines.push('1. 仔细阅读下方的"详细变更描述"部分');
+    lines.push('2. 重点关注：');
+    lines.push('   - 变更的文件类型（组件/工具/API/配置等）');
+    lines.push('   - 具体变更的行号范围');
+    lines.push('   - 受影响的函数名、组件名');
+    lines.push('   - 导出的符号（可能被其他模块引用）');
+    lines.push('3. 理解变更的业务影响和技术影响');
+    lines.push('');
+    lines.push('### 第二步：评估影响范围');
+    lines.push('');
+    lines.push('1. 查看"影响范围分析"部分，了解受影响的路由');
+    lines.push('2. 分析：');
+    lines.push('   - 哪些页面/功能会受到影响');
+    lines.push('   - 影响是直接的还是间接的');
+    lines.push('   - 风险等级评估是否合理');
+    lines.push('3. 如果有导出的函数/组件被修改，考虑其他可能的调用者');
+    lines.push('');
+    lines.push('### 第三步：设计测试策略');
+    lines.push('');
+    lines.push('基于变更内容和影响范围，设计针对性的测试计划：');
+    lines.push('');
+    lines.push('1. **优先级排序**：先测试直接影响的功能，再测试间接影响');
+    lines.push('2. **测试类型选择**：');
+    lines.push('   - 如果只是样式/文案修改 → 视觉回归测试');
+    lines.push('   - 如果是业务逻辑修改 → 功能测试 + 边界测试');
+    lines.push('   - 如果是 API/工具函数修改 → 单元测试 + 集成测试');
+    lines.push('3. **测试用例设计**：');
+    lines.push('   - 正常流程验证');
+    lines.push('   - 边界条件测试');
+    lines.push('   - 异常情况处理');
+    lines.push('');
+    lines.push('### 第四步：执行测试');
+    lines.push('');
+    lines.push('根据下方"测试范围"部分的指引，执行相应的测试场景。');
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
     // ============ 第一部分：变更概要（供大模型快速理解） ============
     lines.push('## 一、变更概要');
     lines.push('');
@@ -227,14 +272,34 @@ export class ChangeTestGenerator {
       testIndex++;
     }
 
-    // ============ 第五部分：AI 分析指引 ============
+    // ============ 第五部分：快速开始 ============
     lines.push('---');
     lines.push('');
-    lines.push('## 五、AI 分析指引');
+    lines.push('## 五、快速开始');
+    lines.push('');
+    lines.push('### 方式一：在 CodeBuddy 中使用（推荐）');
+    lines.push('');
+    lines.push('直接在对话框中引用本文档：');
+    lines.push('');
+    lines.push('```');
+    lines.push(`@${path.join(this.outputDir, this.generateFileName(impactResult))}`);
+    lines.push('```');
+    lines.push('');
+    lines.push('AI 会自动读取文档，按照"AI 任务指引"执行分析和测试。**无需额外说明**。');
+    lines.push('');
+    lines.push('### 方式二：命令行执行');
+    lines.push('');
+    lines.push('```bash');
+    lines.push(`mcp-e2e test:run-prompt ${path.join(this.outputDir, this.generateFileName(impactResult))} --base-url ${this.baseUrl}`);
+    lines.push('```');
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('## 六、变更分析详情');
     lines.push('');
     lines.push('### 变更入口文件');
     lines.push('');
-    lines.push('以下是本次变更的入口文件，AI 可以从这些文件开始分析：');
+    lines.push('以下是本次变更的入口文件：');
     lines.push('');
     for (const file of impactResult.changedFiles.slice(0, 5)) {
       lines.push(`- \`${file.relativePath}\``);
@@ -244,47 +309,11 @@ export class ChangeTestGenerator {
     }
     lines.push('');
 
-    // 生成 AI 理解摘要
-    lines.push('### 变更理解要点');
-    lines.push('');
-    lines.push('请 AI 在分析时关注以下要点：');
-    lines.push('');
-    lines.push('1. **变更内容理解**');
-    lines.push('   - 查看"详细变更描述"部分，了解每个文件的具体变更');
-    lines.push('   - 关注变更的函数/组件名称及其行号范围');
-    lines.push('   - 理解变更的代码实体类型（函数、组件、配置等）');
-    lines.push('');
-    lines.push('2. **影响范围评估**');
-    lines.push('   - 分析受影响的路由及其关联关系');
-    lines.push('   - 识别直接影响和间接影响的区别');
-    lines.push('   - 评估变更可能带来的风险');
-    lines.push('');
-    lines.push('3. **测试策略建议**');
-    lines.push('   - 根据变更内容确定测试优先级');
-    lines.push('   - 针对变更的函数/组件设计测试用例');
-    lines.push('   - 考虑边界条件和异常情况');
-    lines.push('');
-
     // 执行说明
     lines.push('---');
     lines.push('');
-    lines.push('## 六、执行说明');
-    lines.push('');
-    lines.push('### 在 CodeBuddy 中执行');
-    lines.push('');
-    lines.push('1. 引用此文件: `@' + path.join(this.outputDir, this.generateFileName(impactResult)) + '`');
-    lines.push('2. 告诉 AI: "请执行上述测试"');
-    lines.push('3. AI 将使用 Chrome DevTools MCP 自动执行测试');
-    lines.push('');
-    lines.push('### 命令行执行');
-    lines.push('');
-    lines.push('```bash');
-    lines.push(`mcp-e2e test:run-prompt ${path.join(this.outputDir, this.generateFileName(impactResult))} --base-url ${this.baseUrl}`);
-    lines.push('```');
-    lines.push('');
-
-    // 测试通过标准
     lines.push('## 七、测试通过标准');
+    // 测试通过标准
     lines.push('');
     lines.push('- [ ] 所有页面能够正常加载');
     lines.push('- [ ] 无 JavaScript 控制台错误');
