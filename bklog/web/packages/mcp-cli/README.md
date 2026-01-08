@@ -86,6 +86,22 @@ npx mcp-e2e rule:run <rule-id> --base-url http://localhost:8080
 | `testid:inject` | 注入 test-id |
 | `testid:mapping` | 查看映射表 |
 
+### 变更影响分析命令
+
+| 命令 | 说明 |
+|------|------|
+| `change:analyze` | 分析代码变更的影响范围 |
+| `change:test` | 生成针对性测试文件（包含详细变更描述） |
+
+### 影响预测命令（新增）
+
+| 命令 | 说明 |
+|------|------|
+| `impact:predict` | 预测变更影响范围，生成 AI 分析 Prompt |
+| `impact:analyze` | 基于 AST 深度分析变更影响 |
+| `impact:test` | 生成可执行的影响测试 Prompt |
+| `impact:full` | 完整影响分析流程（预测 + AST 分析 + 测试生成） |
+
 ## 生成文件
 
 执行 `router:generate` 后会在 `.codebuddy/rules/` 目录生成：

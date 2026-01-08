@@ -382,7 +382,6 @@ program
     const { analyzeRouter } = await import('./analyzer/router-analyzer.js');
     const { injectTestIdsFromRouter } = await import('./codebuddy/router-testid-injector.js');
     const { generateDevToolsMCPRule } = await import('./generator/devtools-mcp-rule.js');
-    const path = await import('path');
 
     Logger.header('🚀 Router 完整测试工作流');
 
@@ -417,8 +416,6 @@ program
       options.baseUrl,
       { outputDir }
     );
-
-    const promptsFilePath = path.join(process.cwd(), outputDir, `${rule.id}-prompts.md`);
 
     // 总结
     Logger.divider();
@@ -1021,6 +1018,368 @@ program
       Logger.info(`  mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
     } else {
       Logger.info(result.suggestion);
+    }
+  });
+
+// ============ 影响预测命令（新增） ============
+
+program
+  .command('impact:predict')
+  .description('预测代码变更的影响范围（模式一：生成 AI 分析 Prompt）')
+  .option('--base <ref>', 'Git 基准引用（默认 HEAD~1）')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--output <dir>', '输出目录', '.codebuddy/rules/impact')
+  .option('--max-depth <n>', '最大追踪深度', '5')
+  .option('--no-transitive', '不包含传递影响')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { predictImpact } = await import('./analyzer/impact-predictor.js');
+    const { generateImpactPrompt } = await import('./generator/impact-prompt-generator.js');
+
+    Logger.header('变更影响预测');
+
+    try {
+      // 1. 预测影响
+      const prediction = await predictImpact(process.cwd(), {
+        baseRef: options.base,
+        includeTransitive: options.transitive !== false,
+        maxDepth: parseInt(options.maxDepth, 10),
+      });
+
+      if (prediction.changedFiles.length === 0) {
+        Logger.warn('未检测到变更文件');
+        Logger.info('\n提示:');
+        Logger.info('  - 确保有未提交的变更，或指定 --base 参数');
+        Logger.info('  - 示例: mcp-e2e impact:predict --base main');
+        return;
+      }
+
+      // 2. 生成 AI 分析 Prompt
+      const result = await generateImpactPrompt(
+        prediction,
+        {
+          mode: 'ai-analysis',
+          baseUrl: options.baseUrl,
+          outputDir: options.output,
+        },
+        undefined,
+        process.cwd()
+      );
+
+      // 输出结果
+      Logger.divider();
+      Logger.success('✅ 影响预测完成！');
+      Logger.info('');
+      Logger.info(`📄 文件: ${result.filePath}`);
+      Logger.info(`📊 变更文件: ${result.stats.changedFiles}`);
+      Logger.info(`📦 受影响模块: ${result.stats.affectedModules}`);
+      Logger.info(`🧪 测试建议: ${result.stats.testSuggestions}`);
+      Logger.info('');
+      Logger.info(`🎯 影响范围: ${prediction.impactScope.level}`);
+      Logger.info(`⚠️  风险等级: ${prediction.riskAssessment.overallRisk} (${prediction.riskAssessment.riskScore}/100)`);
+
+      Logger.divider();
+      Logger.header('🚀 使用方式');
+      Logger.info('');
+      Logger.info('【在 CodeBuddy 中使用】（推荐）');
+      Logger.info(`  直接引用: @${result.filePath}`);
+      Logger.info('  AI 会自动分析变更影响并给出测试和排查建议');
+      Logger.info('');
+      Logger.info('【进一步分析】');
+      Logger.info('  使用 AST 深度分析: mcp-e2e impact:analyze --base ' + (options.base || 'HEAD~1'));
+      Logger.info('  生成可执行测试: mcp-e2e impact:test --base ' + (options.base || 'HEAD~1'));
+
+    } catch (error: any) {
+      Logger.error(`影响预测失败: ${error.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('impact:analyze')
+  .description('基于 AST 深度分析变更影响（模式二：详细代码分析）')
+  .option('--base <ref>', 'Git 基准引用（默认 HEAD~1）')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--output <dir>', '输出目录', '.codebuddy/rules/impact')
+  .option('--max-files <n>', '最大分析文件数', '20')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { predictImpact } = await import('./analyzer/impact-predictor.js');
+    const { analyzeChangeDetails } = await import('./analyzer/change-detail-analyzer.js');
+    const { analyzeASTImpact } = await import('./analyzer/ast-impact-analyzer.js');
+    const { generateImpactPrompt } = await import('./generator/impact-prompt-generator.js');
+
+    Logger.header('AST 深度影响分析');
+
+    try {
+      // 1. 预测影响
+      Logger.info('\n📊 Step 1: 预测影响范围...');
+      const prediction = await predictImpact(process.cwd(), {
+        baseRef: options.base,
+        includeTransitive: true,
+      });
+
+      if (prediction.changedFiles.length === 0) {
+        Logger.warn('未检测到变更文件');
+        return;
+      }
+
+      Logger.info(`  - 变更文件: ${prediction.changedFiles.length}`);
+      Logger.info(`  - 影响范围: ${prediction.impactScope.level}`);
+
+      // 2. 获取详细变更
+      Logger.info('\n🔬 Step 2: 获取详细变更...');
+      const detailedAnalysis = await analyzeChangeDetails(process.cwd(), options.base);
+      Logger.info(`  - 分析文件: ${detailedAnalysis.changes.length}`);
+
+      // 3. AST 深度分析
+      Logger.info('\n🌳 Step 3: AST 深度分析...');
+      const astAnalysis = await analyzeASTImpact(detailedAnalysis.changes, process.cwd());
+      Logger.info(`  - 调用链: ${astAnalysis.callChains.length}`);
+      Logger.info(`  - 组件树节点: ${astAnalysis.componentTree.totalNodes}`);
+      Logger.info(`  - 副作用: ${astAnalysis.sideEffects.length}`);
+      Logger.info(`  - 测试路径: ${astAnalysis.testPathSuggestions.length}`);
+
+      // 4. 生成详细分析文档
+      Logger.info('\n📝 Step 4: 生成分析文档...');
+      const result = await generateImpactPrompt(
+        prediction,
+        {
+          mode: 'detailed-ast',
+          baseUrl: options.baseUrl,
+          outputDir: options.output,
+          maxFiles: parseInt(options.maxFiles, 10),
+        },
+        astAnalysis,
+        process.cwd()
+      );
+
+      // 输出结果
+      Logger.divider();
+      Logger.success('✅ AST 深度分析完成！');
+      Logger.info('');
+      Logger.info(`📄 文件: ${result.filePath}`);
+      Logger.info(`📊 分析文件: ${astAnalysis.fileAnalyses.length}`);
+      Logger.info(`🔗 调用链: ${astAnalysis.callChains.length}`);
+      Logger.info(`🌳 组件树: ${astAnalysis.componentTree.totalNodes} 个节点`);
+      Logger.info(`⚡ 副作用: ${astAnalysis.sideEffects.length}`);
+      Logger.info(`🧪 测试路径: ${astAnalysis.testPathSuggestions.length}`);
+
+      Logger.divider();
+      Logger.header('🚀 使用方式');
+      Logger.info('');
+      Logger.info('【在 CodeBuddy 中使用】');
+      Logger.info(`  直接引用: @${result.filePath}`);
+      Logger.info('  包含函数调用链、组件依赖树、副作用分析等详细信息');
+      Logger.info('');
+      Logger.info('【生成可执行测试】');
+      Logger.info('  mcp-e2e impact:test --base ' + (options.base || 'HEAD~1'));
+
+    } catch (error: any) {
+      Logger.error(`AST 分析失败: ${error.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('impact:test')
+  .description('生成可执行的影响测试 Prompt（模式三：测试执行）')
+  .option('--base <ref>', 'Git 基准引用（默认 HEAD~1）')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--output <dir>', '输出目录', '.codebuddy/rules/impact')
+  .option('--ast', '包含 AST 深度分析', false)
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { predictImpact } = await import('./analyzer/impact-predictor.js');
+    const { analyzeChangeDetails } = await import('./analyzer/change-detail-analyzer.js');
+    const { analyzeASTImpact } = await import('./analyzer/ast-impact-analyzer.js');
+    const { generateImpactPrompt } = await import('./generator/impact-prompt-generator.js');
+
+    Logger.header('生成影响测试 Prompt');
+
+    try {
+      // 1. 预测影响
+      Logger.info('\n📊 Step 1: 预测影响范围...');
+      const prediction = await predictImpact(process.cwd(), {
+        baseRef: options.base,
+        includeTransitive: true,
+      });
+
+      if (prediction.changedFiles.length === 0) {
+        Logger.warn('未检测到变更文件');
+        return;
+      }
+
+      Logger.info(`  - 变更文件: ${prediction.changedFiles.length}`);
+      Logger.info(`  - 受影响组件: ${prediction.affectedComponents.length}`);
+
+      // 2. 可选的 AST 分析
+      let astAnalysis = undefined;
+      if (options.ast) {
+        Logger.info('\n🌳 Step 2: AST 深度分析...');
+        const detailedAnalysis = await analyzeChangeDetails(process.cwd(), options.base);
+        astAnalysis = await analyzeASTImpact(detailedAnalysis.changes, process.cwd());
+        Logger.info(`  - 测试路径: ${astAnalysis.testPathSuggestions.length}`);
+      }
+
+      // 3. 生成测试 Prompt
+      Logger.info('\n📝 Step 3: 生成测试 Prompt...');
+      const result = await generateImpactPrompt(
+        prediction,
+        {
+          mode: 'test-execution',
+          baseUrl: options.baseUrl,
+          outputDir: options.output,
+        },
+        astAnalysis,
+        process.cwd()
+      );
+
+      // 输出结果
+      Logger.divider();
+      Logger.success('✅ 测试 Prompt 生成完成！');
+      Logger.info('');
+      Logger.info(`📄 文件: ${result.filePath}`);
+      Logger.info(`🧪 测试建议: ${result.stats.testSuggestions}`);
+
+      Logger.divider();
+      Logger.header('🚀 使用方式');
+      Logger.info('');
+      Logger.info('【在 CodeBuddy 中执行】（推荐）');
+      Logger.info(`  直接引用: @${result.filePath}`);
+      Logger.info('  AI 会按照测试步骤执行 Chrome DevTools MCP 测试');
+      Logger.info('');
+      Logger.info('【命令行执行】');
+      Logger.info(`  mcp-e2e test:run-prompt ${result.filePath} --base-url ${options.baseUrl}`);
+
+    } catch (error: any) {
+      Logger.error(`生成测试失败: ${error.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('impact:full')
+  .description('完整影响分析流程（预测 + AST 分析 + 测试生成）')
+  .option('--base <ref>', 'Git 基准引用（默认 HEAD~1）')
+  .option('--base-url <url>', '测试服务器地址', 'http://localhost:8080')
+  .option('--output <dir>', '输出目录', '.codebuddy/rules/impact')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { predictImpact } = await import('./analyzer/impact-predictor.js');
+    const { analyzeChangeDetails } = await import('./analyzer/change-detail-analyzer.js');
+    const { analyzeASTImpact } = await import('./analyzer/ast-impact-analyzer.js');
+    const { generateImpactPrompt } = await import('./generator/impact-prompt-generator.js');
+
+    Logger.header('完整影响分析流程');
+
+    try {
+      // 1. 预测影响
+      Logger.info('\n📊 Step 1: 预测影响范围...');
+      const prediction = await predictImpact(process.cwd(), {
+        baseRef: options.base,
+        includeTransitive: true,
+      });
+
+      if (prediction.changedFiles.length === 0) {
+        Logger.warn('未检测到变更文件');
+        Logger.info('\n提示:');
+        Logger.info('  - 确保有未提交的变更，或指定 --base 参数');
+        Logger.info('  - 示例: mcp-e2e impact:full --base main');
+        return;
+      }
+
+      Logger.info(`  - 变更文件: ${prediction.changedFiles.length}`);
+      Logger.info(`  - 影响范围: ${prediction.impactScope.level}`);
+      Logger.info(`  - 风险等级: ${prediction.riskAssessment.overallRisk}`);
+
+      // 2. 详细变更分析
+      Logger.info('\n🔬 Step 2: 详细变更分析...');
+      const detailedAnalysis = await analyzeChangeDetails(process.cwd(), options.base);
+      Logger.info(`  - 分析文件: ${detailedAnalysis.changes.length}`);
+      Logger.info(`  - 受影响函数: ${detailedAnalysis.summary.affectedFunctions}`);
+
+      // 3. AST 深度分析
+      Logger.info('\n🌳 Step 3: AST 深度分析...');
+      const astAnalysis = await analyzeASTImpact(detailedAnalysis.changes, process.cwd());
+      Logger.info(`  - 调用链: ${astAnalysis.callChains.length}`);
+      Logger.info(`  - 组件树: ${astAnalysis.componentTree.totalNodes} 个节点`);
+      Logger.info(`  - 副作用: ${astAnalysis.sideEffects.length}`);
+
+      // 4. 生成所有类型的 Prompt
+      Logger.info('\n📝 Step 4: 生成分析文档...');
+
+      // 4.1 AI 分析 Prompt
+      const aiPrompt = await generateImpactPrompt(
+        prediction,
+        { mode: 'ai-analysis', baseUrl: options.baseUrl, outputDir: options.output },
+        undefined,
+        process.cwd()
+      );
+      Logger.info(`  - AI 分析: ${aiPrompt.fileName}`);
+
+      // 4.2 AST 详细分析
+      const astPrompt = await generateImpactPrompt(
+        prediction,
+        { mode: 'detailed-ast', baseUrl: options.baseUrl, outputDir: options.output },
+        astAnalysis,
+        process.cwd()
+      );
+      Logger.info(`  - AST 分析: ${astPrompt.fileName}`);
+
+      // 4.3 测试执行 Prompt
+      const testPrompt = await generateImpactPrompt(
+        prediction,
+        { mode: 'test-execution', baseUrl: options.baseUrl, outputDir: options.output },
+        astAnalysis,
+        process.cwd()
+      );
+      Logger.info(`  - 测试执行: ${testPrompt.fileName}`);
+
+      // 输出结果
+      Logger.divider();
+      Logger.success('✅ 完整影响分析完成！');
+      Logger.info('');
+      Logger.header('📁 生成的文件');
+      Logger.info('');
+      Logger.info(`  1. ${aiPrompt.filePath}`);
+      Logger.info('     → AI 分析 Prompt，用于理解变更影响');
+      Logger.info('');
+      Logger.info(`  2. ${astPrompt.filePath}`);
+      Logger.info('     → AST 详细分析，包含调用链和组件树');
+      Logger.info('');
+      Logger.info(`  3. ${testPrompt.filePath}`);
+      Logger.info('     → 可执行测试 Prompt，用于 MCP 测试');
+      Logger.info('');
+
+      Logger.divider();
+      Logger.header('📊 分析摘要');
+      Logger.info('');
+      Logger.info(`  变更文件: ${prediction.changedFiles.length}`);
+      Logger.info(`  受影响模块: ${prediction.affectedModules.length}`);
+      Logger.info(`  受影响组件: ${prediction.affectedComponents.length}`);
+      Logger.info(`  调用链: ${astAnalysis.callChains.length}`);
+      Logger.info(`  副作用: ${astAnalysis.sideEffects.length}`);
+      Logger.info(`  测试建议: ${astAnalysis.testPathSuggestions.length}`);
+      Logger.info('');
+      Logger.info(`  影响范围: ${prediction.impactScope.level} (${prediction.impactScope.totalImpact} 个文件)`);
+      Logger.info(`  风险等级: ${prediction.riskAssessment.overallRisk} (${prediction.riskAssessment.riskScore}/100)`);
+
+      Logger.divider();
+      Logger.header('🚀 推荐使用方式');
+      Logger.info('');
+      Logger.info('【快速理解变更】');
+      Logger.info(`  @${aiPrompt.filePath}`);
+      Logger.info('');
+      Logger.info('【深入分析代码】');
+      Logger.info(`  @${astPrompt.filePath}`);
+      Logger.info('');
+      Logger.info('【执行测试】');
+      Logger.info(`  @${testPrompt.filePath}`);
+
+    } catch (error: any) {
+      Logger.error(`影响分析失败: ${error.message}`);
+      process.exitCode = 1;
     }
   });
 
