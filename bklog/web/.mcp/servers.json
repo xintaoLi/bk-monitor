@@ -5,7 +5,7 @@
       "args": [
         "chrome-devtools-mcp@latest",
         "--executablePath",
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "--viewport",
         "1920x1080"
       ],

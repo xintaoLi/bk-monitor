@@ -63,6 +63,7 @@ export default defineComponent({
      * AI 助手关闭
      */
     const handleAiClose = () => {
+      console.log('AI 助手关闭');
       RetrieveHelper.fire(RetrieveEvent.AI_CLOSE);
     };
 

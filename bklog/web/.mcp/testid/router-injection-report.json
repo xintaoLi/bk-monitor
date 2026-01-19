@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-01-15T07:33:23.618Z",
+  "mode": "inject",
+  "routerFramework": "vue-router",
+  "totalRoutes": 86,
+  "totalComponents": 0,
+  "totalInjected": 0,
+  "totalSkipped": 0,
+  "totalExisting": 0,
+  "results": [],
+  "testIdMapping": []
+}
