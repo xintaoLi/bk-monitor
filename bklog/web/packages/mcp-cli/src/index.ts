@@ -1258,6 +1258,194 @@ program
     }
   });
 
+// ============ DOM 结构断言命令 ============
+
+program
+  .command('dom:snapshot')
+  .description('获取页面 DOM 结构快照（用于结构断言）')
+  .option('--url <url>', '要获取快照的页面 URL')
+  .option('--selector <selector>', '根选择器', 'body')
+  .option('--max-depth <n>', '最大遍历深度', '10')
+  .option('--headless', '无头模式', false)
+  .option('--output <path>', '输出文件路径')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { ChromeDevToolsMCP } = await import('./mcp/chrome-devtools-mcp.js');
+    const { generateDomSnapshotScript } = await import('./mcp/dom-structure-assert-mcp.js');
+    const fs = await import('fs/promises');
+
+    if (!options.url) {
+      Logger.error('请指定 --url 参数');
+      return;
+    }
+
+    Logger.header('获取 DOM 结构快照');
+    Logger.info(`URL: ${options.url}`);
+    Logger.info(`选择器: ${options.selector}`);
+    Logger.info(`最大深度: ${options.maxDepth}`);
+
+    const client = new ChromeDevToolsMCP({
+      headless: options.headless,
+    });
+
+    try {
+      await client.connect();
+      await client.navigate(options.url);
+
+      Logger.info('\n正在提取 DOM 结构...');
+
+      const script = generateDomSnapshotScript(options.selector, parseInt(options.maxDepth, 10));
+      const snapshot = await client.evaluate(script);
+
+      if (snapshot?.error) {
+        Logger.error(`快照提取失败: ${snapshot.error}`);
+        return;
+      }
+
+      if (options.output) {
+        await fs.writeFile(options.output, JSON.stringify(snapshot, null, 2));
+        Logger.success(`✅ 快照已保存到: ${options.output}`);
+      } else {
+        console.log(JSON.stringify(snapshot, null, 2));
+      }
+
+    } catch (error: any) {
+      Logger.error(`获取快照失败: ${error.message}`);
+    } finally {
+      await client.disconnect();
+    }
+  });
+
+program
+  .command('dom:assert')
+  .description('执行 DOM 结构断言（比较预期结构与实际 DOM）')
+  .option('--url <url>', '要断言的页面 URL')
+  .option('--expected <path>', '预期结构 JSON 文件路径')
+  .option('--selector <selector>', '根选择器', 'body')
+  .option('--strict-order', '严格检查子节点顺序', false)
+  .option('--ignore-extra', '忽略多余节点', false)
+  .option('--headless', '无头模式', false)
+  .option('--output <path>', '输出差异报告路径')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { ChromeDevToolsMCP } = await import('./mcp/chrome-devtools-mcp.js');
+    const {
+      generateDomSnapshotScript,
+      createDomStructureAssertMCP,
+    } = await import('./mcp/dom-structure-assert-mcp.js');
+    const fs = await import('fs/promises');
+
+    if (!options.url || !options.expected) {
+      Logger.error('请指定 --url 和 --expected 参数');
+      return;
+    }
+
+    Logger.header('DOM 结构断言');
+    Logger.info(`URL: ${options.url}`);
+    Logger.info(`预期结构: ${options.expected}`);
+
+    // 读取预期结构
+    let expectedStructure;
+    try {
+      const content = await fs.readFile(options.expected, 'utf-8');
+      expectedStructure = JSON.parse(content);
+    } catch (error: any) {
+      Logger.error(`读取预期结构失败: ${error.message}`);
+      return;
+    }
+
+    const client = new ChromeDevToolsMCP({
+      headless: options.headless,
+    });
+
+    try {
+      await client.connect();
+      await client.navigate(options.url);
+
+      Logger.info('\n正在获取 DOM 快照...');
+
+      const script = generateDomSnapshotScript(options.selector);
+      const snapshot = await client.evaluate(script);
+
+      if (snapshot?.error) {
+        Logger.error(`快照提取失败: ${snapshot.error}`);
+        return;
+      }
+
+      Logger.info('正在执行结构断言...\n');
+
+      const assertMCP = createDomStructureAssertMCP();
+      const result = await assertMCP.assertDomStructure({
+        domSnapshot: snapshot,
+        expectedStructure,
+        options: {
+          strictChildrenOrder: options.strictOrder,
+          ignoreExtraNodes: options.ignoreExtra,
+        },
+      });
+
+      // 输出结果
+      Logger.divider();
+      if (result.pass) {
+        Logger.success('✅ 结构断言通过！');
+      } else {
+        Logger.error('❌ 结构断言失败！');
+        Logger.info(`\n错误数量: ${result.stats?.errorCount}`);
+        Logger.info(`警告数量: ${result.stats?.warningCount}`);
+
+        Logger.info('\n差异详情:');
+        result.diff.slice(0, 10).forEach((d, i) => {
+          const icon = d.severity === 'error' ? '🔴' : '🟡';
+          Logger.info(`  ${i + 1}. ${icon} [${d.type}] ${d.path}`);
+          Logger.info(`     ${d.message}`);
+        });
+
+        if (result.diff.length > 10) {
+          Logger.info(`  ... 还有 ${result.diff.length - 10} 个差异`);
+        }
+      }
+
+      // 保存报告
+      if (options.output) {
+        await fs.writeFile(options.output, JSON.stringify(result, null, 2));
+        Logger.info(`\n报告已保存到: ${options.output}`);
+      }
+
+      // 设置退出码
+      if (!result.pass) {
+        process.exitCode = 1;
+      }
+
+    } catch (error: any) {
+      Logger.error(`断言执行失败: ${error.message}`);
+      process.exitCode = 1;
+    } finally {
+      await client.disconnect();
+    }
+  });
+
+program
+  .command('dom:mapping')
+  .description('查看组件到 DOM 的映射表')
+  .option('--filter <pattern>', '过滤组件名称')
+  .action(async (options) => {
+    const { Logger } = await import('./utils/log.js');
+    const { DEFAULT_COMPONENT_MAPPING } = await import('./mcp/dom-structure-assert-mcp.js');
+
+    Logger.header('组件 → DOM 映射表');
+
+    const mappings = Object.entries(DEFAULT_COMPONENT_MAPPING)
+      .filter(([name]) => !options.filter || name.includes(options.filter))
+      .map(([name, mapping]) => ({
+        '组件': name,
+        'DOM 标签': mapping.tag,
+        '必需类名': mapping.mustHaveClasses?.join(', ') || '-',
+      }));
+
+    console.table(mappings);
+    Logger.info(`\n共 ${mappings.length} 个映射`);
+  });
+
 program
   .command('impact:full')
   .description('完整影响分析流程（预测 + AST 分析 + 测试生成）')
