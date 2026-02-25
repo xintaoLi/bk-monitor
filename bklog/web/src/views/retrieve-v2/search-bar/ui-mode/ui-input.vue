@@ -2,7 +2,6 @@
 import { computed, ref, set } from 'vue';
 
 import {
-  formatDateTimeField,
   getOperatorKey,
 } from '@/common/util';
 import useFieldNameHook from '@/hooks/use-field-name';
@@ -20,6 +19,7 @@ import {
 } from '../utils/const.common';
 import useFocusInput from '../utils/use-focus-input';
 import UiInputOptions from './ui-input-option.vue';
+import RetrieveHelper from '@/views/retrieve-helper';
 
 const props = defineProps({
   value: {
@@ -63,11 +63,13 @@ const setMorePopoverRef = (el, index) => {
 };
 const inputValueLength = ref(0);
 
+const isAiAssistantActive = computed(() => store.state.features.isAiAssistantActive);
+
 // 动态设置placeHolder
 const inputPlaceholder = computed(() => {
   if (inputValueLength.value === 0) {
     // return `${t('请输入检索内容')}, / ${t('唤起')} ...`;
-    return ` / ${t('唤起')}，${t('输入检索内容')}（${t('Tab 可切换为 AI 模式')}）`;
+    return ` / ${t('唤起')}，${t('输入检索内容')}${isAiAssistantActive.value ? `（${t('Tab 可切换为 AI 模式')}）` : ''}`;
   }
 
   return '';
@@ -216,6 +218,7 @@ const {
     hideOnClick: true,
     placement: 'top',
     delay: [0, 300],
+    // appendTo: document.body,
     onHide: () => {
       refPopInstance.value?.beforeHideFn?.();
     },
@@ -514,6 +517,11 @@ const handleBatchInputChange = (isShow) => {
     instance.setProps({ hideOnClick: !isShow });
   }
 };
+
+const formatDateTimeField = (value, fieldType) => {
+  const timezone = store.state.indexItem.timezone;
+  return RetrieveHelper.formatTimeZoneValue(value, fieldType, timezone);
+}
 </script>
 
 <template>
@@ -882,7 +890,6 @@ const handleBatchInputChange = (isShow) => {
           padding: 0 4px;
           font-weight: 500;
           background-image: linear-gradient(128deg, #235DFA 0%, #E28BED 100%);
-          background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
         }

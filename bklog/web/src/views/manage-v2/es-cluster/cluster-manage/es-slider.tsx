@@ -29,7 +29,7 @@ import { defineComponent, ref, computed, watch } from 'vue';
 import { messageError } from '@/common/bkmagic';
 import useLocale from '@/hooks/use-locale';
 import useStore from '@/hooks/use-store';
-import BkUserSelector from '@blueking/user-selector';
+import ValidateUserSelector from '@/components/user-selector';
 import { Message } from 'bk-magic-vue';
 
 import { useSidebarDiff } from '../../hooks/use-sidebar-diff';
@@ -44,7 +44,7 @@ export default defineComponent({
   name: 'EsSlider',
   components: {
     EsDialog,
-    BkUserSelector,
+    ValidateUserSelector,
   },
   props: {
     // 是否显示侧滑
@@ -136,8 +136,8 @@ export default defineComponent({
       cluster_name: [
         { required: true, trigger: 'blur' },
         {
-          validator: (val: string) => new RegExp(/^[A-Za-z0-9_]+$/).test(val),
-          message: t('只支持输入字母，数字，下划线'),
+          validator: (val: string) => /^[_A-Za-z0-9][_A-Za-z0-9-]{0,49}$/.test(val),
+          message: t('支持字母、数字、下划线、连字符，不能以连字符开头'),
           trigger: 'blur',
         },
       ],
@@ -176,7 +176,6 @@ export default defineComponent({
     const maxDaysList = ref([]); // 最大过期时间列表
     const customRetentionDay = ref(''); // 默认过期时间输入框
     const customMaxDay = ref(''); // 最大过期时间输入框
-    const isAdminError = ref(false); // 集群负责人是否为空
     const bizSelectID = ref(''); // 选中的当前按照业务属性选择
     const bizInputStr = ref(''); // 按照业务属性选择输入值
     const isFirstShow = ref(true); // 是否是第一次渲染
@@ -621,16 +620,6 @@ export default defineComponent({
       }
     };
 
-    // 集群负责人为空时报错警告
-    const handleChangePrincipal = (val: any[]) => {
-      const realVal = val.filter(item => item !== undefined);
-      isAdminError.value = !realVal.length;
-      formData.value.admin = realVal;
-    };
-    const handleBlur = () => {
-      isAdminError.value = !formData.value.admin.length;
-    };
-
     // 获取业务属性（父/子）列表
     const getBizPropertyId = async () => {
       // 因搜索框如果直接搜索子级元素则返回值不带父级元素 传参需要父级元素则分开展示
@@ -884,7 +873,7 @@ export default defineComponent({
                     <bk-input
                       maxlength={50}
                       readonly={isEdit.value}
-                      placeholder={t('支持字母、数字、下划线')}
+                      placeholder={t('支持字母、数字、下划线、连字符')}
                       value={basicFormData.value.cluster_name}
                       onChange={(val: string) => (basicFormData.value.cluster_name = val)}
                     />
@@ -1398,14 +1387,10 @@ export default defineComponent({
                         required
                       >
                         <div class='principal'>
-                          <BkUserSelector
-                            class={isAdminError.value && 'is-error'}
-                            api={userApi.value}
-                            empty-text={t('无匹配人员')}
+                          <ValidateUserSelector
                             placeholder={t('请选择集群负责人')}
                             value={formData.value.admin}
-                            onBlur={handleBlur}
-                            onChange={handleChangePrincipal}
+                            onChange={(val: string[]) => (formData.value.admin = val)}
                           />
                         </div>
                       </bk-form-item>
