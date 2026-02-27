@@ -127,6 +127,11 @@ class RouteUrlResolver {
     ];
   }
 
+  /**
+   * 通用解析器
+   * 注意：Vue Router 3.x 的 route.query 已自动解码 URL 参数
+   * 因此这里不需要再次调用 decodeURIComponent
+   */
   private commonResolver(str, next?) {
     if (str !== undefined && str !== null) {
       // vue-router query 可能是 string | string[]
@@ -212,6 +217,7 @@ class RouteUrlResolver {
   /**
    * datepicker时间范围格式化为标准时间格式
    * @param timeRange [start_time, end_time]
+   * 注意：Vue Router 已自动解码，无需再次 decodeURIComponent
    */
   private dateTimeRangeResolver(timeRange: string[]) {
     const decodeValue = timeRange.map((t) => {
@@ -229,6 +235,10 @@ class RouteUrlResolver {
     return { start_time: result[0], end_time: result[1] };
   }
 
+  /**
+   * addition 条件解析器
+   * Vue Router 已自动解码，无需再次 decodeURIComponent
+   */
   private additionResolver(str) {
     return this.commonResolver(str, (value) => {
       if (value === undefined || value === null || value === '') {
@@ -258,6 +268,10 @@ class RouteUrlResolver {
     });
   }
 
+  /**
+   * addition 数组解析器
+   * Vue Router 已自动解码，无需再次 decodeURIComponent
+   */
   private additionArrayResolver(str) {
     if (!str) {
       return [];
@@ -348,12 +362,18 @@ class RetrieveUrlResolver {
     };
   }
 
+  /**
+   * 将 Store 参数解析为 URL query 参数
+   * 注意：Vue Router 3.x 的 router.push/replace({ query: {...} }) 会自动编码参数
+   * 因此这里不需要手动调用 encodeURIComponent
+   */
   resolveParamsToUrl() {
-    const getEncodeString = val => JSON.stringify(val);
+    const getJsonString = val => JSON.stringify(val);
 
     /**
      * 路由参数格式化字典函数
      * 不同的字段需要不同的格式化函数
+     * Vue Router 会自动编码，无需手动 encodeURIComponent
      */
     const routeQueryMap = {
       host_scopes: (val) => {
@@ -365,7 +385,7 @@ class RetrieveUrlResolver {
           return val[k]?.length;
         });
 
-        return isEmpty ? undefined : getEncodeString(val);
+        return isEmpty ? undefined : getJsonString(val);
       },
       // 注意：不要在这里 encodeURIComponent，vue-router 在生成 href / replace 时会自动编码
       // 这里提前编码会导致 URL 出现 %25... 的重复编码
@@ -374,7 +394,7 @@ class RetrieveUrlResolver {
       keyword: val => (/^\s*\*\s*$/.test(val) ? undefined : val),
       unionList: (val) => {
         if (this.routeQueryParams.isUnionIndex && val?.length) {
-          return getEncodeString(val);
+          return getJsonString(val);
         }
 
         return;
@@ -382,11 +402,11 @@ class RetrieveUrlResolver {
       default: (val) => {
         if (typeof val === 'object' && val !== null) {
           if (Array.isArray(val) && val.length) {
-            return getEncodeString(val);
+            return getJsonString(val);
           }
 
           if (Object.keys(val).length) {
-            return getEncodeString(val);
+            return getJsonString(val);
           }
 
           return;
