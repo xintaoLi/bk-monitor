@@ -38,14 +38,17 @@ import type { Route } from 'vue-router';
 class RouteUrlResolver {
   private route;
   private resolver: Map<string, (_str: string) => unknown>;
+  private paramSanitizers: Map<string, (val: unknown) => unknown>;
   private resolveFieldList: string[];
 
   constructor({ route, resolveFieldList }: { route: Route; resolveFieldList?: string[] }) {
     this.route = route;
     // eslint-disable-next-line
     this.resolver = new Map<string, (_str: string) => unknown>();
+    this.paramSanitizers = new Map<string, (val: unknown) => unknown>();
     this.resolveFieldList = resolveFieldList ?? this.getDefaultResolveFieldList();
     this.setDefaultResolver();
+    this.setDefaultSanitizers();
   }
 
   get query() {
@@ -73,10 +76,17 @@ class RouteUrlResolver {
       try {
         value = this.resolver.get(key)?.(this.query?.[key]) ?? this.commonResolver(this.query?.[key]);
       } catch (error) {
-        // 单个字段解析失败不影响整体，避免白屏：能解析多少展示多少
         console.warn('route url resolver convertQueryToStore error', key, error);
         value = undefined;
       }
+
+      if (value !== undefined) {
+        const sanitizer = this.paramSanitizers.get(key);
+        if (sanitizer) {
+          value = sanitizer(value);
+        }
+      }
+
       if (value !== undefined) {
         output[key] = value;
       }
@@ -343,6 +353,64 @@ class RouteUrlResolver {
         const startTime = this.commonResolver(this.query?.start_time) ?? value;
         return this.dateTimeRangeResolver([startTime, value]).end_time;
       });
+    });
+  }
+
+  private stripQuoteArtifacts(val: string): string {
+    return val.replace(/^["']+|["']+$/g, '').trim();
+  }
+
+  /**
+   * 参数清洗器：对 resolver 解析后的值做格式校验，自动修正或丢弃不合法的值。
+   * 主要用于防御外部系统构造的 URL 中混入 HTML 实体残留（如 &quot; → "）等脏数据。
+   */
+  private setDefaultSanitizers() {
+    // timezone: IANA 时区格式 Region/City 或缩写如 UTC
+    const timezonePattern = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z][A-Za-z0-9_+-]*)*$/;
+    this.paramSanitizers.set('timezone', (val) => {
+      if (typeof val !== 'string') return undefined;
+      if (timezonePattern.test(val)) return val;
+      const cleaned = this.stripQuoteArtifacts(val);
+      return timezonePattern.test(cleaned) ? cleaned : undefined;
+    });
+
+    // bizId: 数字，支持负数
+    this.paramSanitizers.set('bizId', (val) => {
+      if (typeof val !== 'string') return val;
+      if (/^-?\d+$/.test(val)) return val;
+      const cleaned = this.stripQuoteArtifacts(val);
+      return /^-?\d+$/.test(cleaned) ? cleaned : undefined;
+    });
+
+    // spaceUid: 字母、数字、下划线、连字符
+    this.paramSanitizers.set('spaceUid', (val) => {
+      if (typeof val !== 'string') return val;
+      if (/^[a-zA-Z0-9_-]+$/.test(val)) return val;
+      const cleaned = this.stripQuoteArtifacts(val);
+      return /^[a-zA-Z0-9_-]+$/.test(cleaned) ? cleaned : undefined;
+    });
+
+    // search_mode: 白名单
+    this.paramSanitizers.set('search_mode', (val) => {
+      if (typeof val !== 'string') return undefined;
+      return ['sql', 'ui'].includes(val) ? val : undefined;
+    });
+
+    // format: 日期格式仅允许合法字符集
+    const formatPattern = /^[YMDHhmsS\-/:. ]+$/;
+    this.paramSanitizers.set('format', (val) => {
+      if (typeof val !== 'string') return val;
+      if (formatPattern.test(val)) return val;
+      const cleaned = this.stripQuoteArtifacts(val);
+      return formatPattern.test(cleaned) ? cleaned : undefined;
+    });
+
+    // index_id: 纯数字或数字字符串
+    this.paramSanitizers.set('index_id', (val) => {
+      if (typeof val !== 'string') return val;
+      if (/^\d+$/.test(val)) return val;
+      const cleaned = val.replace(/[^\d]/g, '');
+      return cleaned.length ? cleaned : undefined;
     });
   }
 }
