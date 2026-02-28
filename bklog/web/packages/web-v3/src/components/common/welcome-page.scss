@@ -1,0 +1,96 @@
+.welcome-page-container {
+  display: flow-root;
+  height: 100%;
+  background: #f4f7fa;
+
+  .title {
+    height: 26px;
+    margin: 70px 0 35px;
+    font-size: 20px;
+    font-weight: normal;
+    line-height: 26px;
+    color: #313238;
+    text-align: center;
+  }
+
+  .card-container {
+    display: flex;
+    justify-content: center;
+
+    .card {
+      position: relative;
+      display: flex;
+      flex-flow: column;
+      align-items: center;
+      width: 260px;
+      height: 400px;
+      background: #fff;
+      border-radius: 2px;
+      transition: box-shadow 0.3s;
+
+      .outside-link-icon {
+        position: absolute;
+        top: 333px;
+        left: 162px;
+        width: 10px;
+        height: 10px;
+        cursor: pointer;
+        fill: #63656e;
+      }
+
+      &:not(:last-child) {
+        margin-right: 40px;
+      }
+
+      &:hover {
+        box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.1);
+        transition: box-shadow 0.3s;
+
+        .outside-link-icon {
+          fill: #fff;
+        }
+
+        .t-button.hover-state {
+          background-color: var(--td-brand-color);
+          color: #fff;
+        }
+      }
+
+      .card-img {
+        width: 220px;
+        height: 160px;
+        margin: 28px 0 20px;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 22px;
+        color: #313238;
+      }
+
+      .card-detail {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 200px;
+        height: 60px;
+        margin: 11px 0 21px;
+        font-size: 12px;
+        line-height: 20px;
+        color: #63656e;
+        text-align: center;
+      }
+
+      .king-button {
+        width: 200px;
+        font-size: 12px;
+      }
+
+      .button-container {
+        position: relative;
+        cursor: pointer;
+      }
+    }
+  }
+}
