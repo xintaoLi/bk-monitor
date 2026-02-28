@@ -1,0 +1,62 @@
+.empty-status-container {
+  padding: 20px 0;
+
+  .empty-exception {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .exception-image {
+    width: 180px;
+    height: 180px;
+    user-select: none;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  .empty-exception-empty .exception-image {
+    background-image: url('data:image/svg+xml,...'); /* 待替换为实际图片 */
+  }
+
+  .empty-exception-search-empty .exception-image {
+    background-image: url('data:image/svg+xml,...'); /* 待替换为实际图片 */
+  }
+
+  .empty-exception-500 .exception-image {
+    background-image: url('data:image/svg+xml,...'); /* 待替换为实际图片 */
+  }
+
+  .empty-exception-403 .exception-image {
+    background-image: url('data:image/svg+xml,...'); /* 待替换为实际图片 */
+  }
+
+  .empty-text-content {
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  .empty-text {
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 22px;
+    color: #63656e;
+  }
+
+  .operation-text {
+    font-size: 12px;
+    line-height: 20px;
+    color: #63656e;
+  }
+
+  .operation-btn {
+    display: inline-block;
+    color: #3a84ff;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

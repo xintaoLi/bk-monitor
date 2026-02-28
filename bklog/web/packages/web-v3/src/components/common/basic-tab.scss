@@ -1,0 +1,43 @@
+/* stylelint-disable declaration-no-important */
+.custom-tab {
+  &.t-tabs {
+    .t-tabs__nav-item {
+      color: #63656e;
+      background-color: #eaebf0;
+      border-radius: 4px 4px 0 0;
+
+      & + .t-tabs__nav-item {
+        margin-left: 8px;
+      }
+
+      &.t-is-active {
+        color: #3a84ff;
+        background-color: #fff;
+      }
+    }
+
+    .t-tabs__content {
+      height: calc(100% - 42px);
+      overflow-y: auto;
+      background-color: #fff;
+    }
+
+    .t-tabs__nav {
+      &::after {
+        display: none;
+      }
+    }
+
+    .t-tabs__nav-container,
+    .t-tabs__nav,
+    .t-tabs__nav-item {
+      height: 42px !important;
+      line-height: 42px !important;
+    }
+
+    .t-tabs__header {
+      background-color: #f4f8fb;
+      border-color: transparent;
+    }
+  }
+}
