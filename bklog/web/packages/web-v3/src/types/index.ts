@@ -1,117 +1,35 @@
-/**
- * 通用 API 响应类型
+/*
+ * Tencent is pleased to support the open source community by making
+ * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.
+ *
+ * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
+ *
+ * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
-export interface ApiResponse<T = any> {
-  result: boolean;
-  code: number;
-  message: string;
-  data: T;
-  permission?: any;
-}
 
 /**
- * 分页请求参数
+ * 类型定义统一导出
  */
-export interface PageParams {
-  page: number;
-  pageSize: number;
-}
 
-/**
- * 分页响应数据
- */
-export interface PageData<T = any> {
-  count: number;
-  results: T[];
-}
-
-/**
- * 空间信息
- */
-export interface SpaceInfo {
-  id: number;
-  space_uid: string;
-  space_id: string;
-  space_name: string;
-  space_type_id: string;
-  space_type_name: string;
-  space_code: string;
-  time_zone: string;
-  language: string;
-}
-
-/**
- * 业务信息
- */
-export interface BizInfo {
-  bk_biz_id: number;
-  bk_biz_name: string;
-}
-
-/**
- * 用户信息
- */
-export interface UserInfo {
-  username: string;
-  chinese_name: string;
-  phone: string;
-  email: string;
-}
-
-/**
- * 索引集信息
- */
-export interface IndexSetInfo {
-  index_set_id: number;
-  index_set_name: string;
-  scenario_id: string;
-  scenario_name: string;
-  storage_cluster_id: number;
-  time_field: string;
-  time_field_type: string;
-  time_field_unit: string;
-}
-
-/**
- * 字段信息
- */
-export interface FieldInfo {
-  field_name: string;
-  field_type: string;
-  field_alias: string;
-  is_display: boolean;
-  is_editable: boolean;
-  tag: string;
-  es_doc_values: boolean;
-  filterExpand?: boolean;
-}
-
-/**
- * 检索查询参数
- */
-export interface SearchParams {
-  space_uid: string;
-  bk_biz_id: number;
-  index_set_id: number;
-  keyword: string;
-  start_time: string;
-  end_time: string;
-  time_range?: string;
-  host_scopes?: any;
-  addition?: any[];
-  begin?: number;
-  size?: number;
-  aggs?: any;
-  highlight?: any;
-}
-
-/**
- * 检索结果
- */
-export interface SearchResult {
-  total: number;
-  took: number;
-  list: any[];
-  aggs?: any;
-  origin_log_list?: any[];
-}
+export * from './api'
+export * from './business'
+export * from './common'
+export * from './router'
+export * from './store'
