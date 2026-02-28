@@ -16,5 +16,8 @@ export function setupStore(app: App): void {
 // 导出所有 store
 export * from './user';
 export * from './global';
+export * from './retrieve';
+export * from './collect';
+export * from './dashboard';
 
 export default pinia;

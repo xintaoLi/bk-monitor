@@ -1,0 +1,17 @@
+.table-status-container {
+  display: flex;
+  align-items: center;
+
+  &.success .t-icon {
+    color: #2dcb56;
+  }
+
+  &.failed .t-icon {
+    color: #ea3636;
+  }
+
+  .text {
+    margin-left: 4px;
+    color: #63656e;
+  }
+}

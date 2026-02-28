@@ -30,3 +30,70 @@
 
 export * from './decode'
 export * from './performance-monitor'
+
+/**
+ * 生成随机字符串
+ * @param length 字符串长度
+ * @returns 随机字符串
+ */
+export function random(length: number = 10): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * 深拷贝对象
+ * @param obj 对象
+ * @returns 拷贝后的对象
+ */
+export function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  return structuredClone(obj);
+}
+
+/**
+ * 防抖函数
+ * @param fn 函数
+ * @param delay 延迟时间
+ * @returns 防抖后的函数
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number = 300
+): (...args: Parameters<T>) => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return function (this: any, ...args: Parameters<T>) {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    timer = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+}
+
+/**
+ * 节流函数
+ * @param fn 函数
+ * @param delay 延迟时间
+ * @returns 节流后的函数
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number = 300
+): (...args: Parameters<T>) => void {
+  let lastTime = 0;
+  return function (this: any, ...args: Parameters<T>) {
+    const now = Date.now();
+    if (now - lastTime >= delay) {
+      lastTime = now;
+      fn.apply(this, args);
+    }
+  };
+}
