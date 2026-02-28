@@ -1,0 +1,115 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: $bg-gray;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: $header-height;
+    padding: 0 $spacing-lg;
+    background-color: $bg-white;
+    border-bottom: 1px solid $border-color;
+    box-shadow: $box-shadow;
+    z-index: 100;
+
+    .header-left {
+      display: flex;
+      align-items: center;
+
+      .logo {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+
+        &-text {
+          margin-left: $spacing-sm;
+          font-size: $font-size-lg;
+          font-weight: $font-weight-bold;
+          color: $text-primary;
+        }
+      }
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: $spacing-lg;
+
+      .user-info {
+        cursor: pointer;
+        
+        &:hover {
+          color: $primary-color;
+        }
+      }
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  &__sidebar {
+    position: relative;
+    width: $sidebar-width;
+    height: 100%;
+    background-color: $bg-white;
+    border-right: 1px solid $border-color;
+    transition: width $transition-base;
+    overflow: hidden;
+
+    &.is-collapsed {
+      width: $sidebar-collapsed-width;
+
+      .sidebar-nav {
+        .t-menu-item {
+          span {
+            display: none;
+          }
+        }
+      }
+    }
+
+    .sidebar-toggle {
+      position: absolute;
+      top: $spacing-md;
+      right: -12px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: $bg-white;
+      border: 1px solid $border-color;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 10;
+      transition: all $transition-base;
+
+      &:hover {
+        background-color: $bg-hover;
+      }
+    }
+
+    .sidebar-nav {
+      height: 100%;
+      padding: $spacing-md 0;
+      overflow-y: auto;
+      @include scrollbar;
+    }
+  }
+
+  &__content {
+    flex: 1;
+    height: 100%;
+    padding: $spacing-lg;
+    overflow-y: auto;
+    @include scrollbar;
+  }
+}
