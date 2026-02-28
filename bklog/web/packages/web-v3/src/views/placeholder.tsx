@@ -8,23 +8,16 @@
  */
 
 import { defineComponent } from 'vue';
-import { Result, Button } from 'bkui-vue';
-import { useRouter } from 'vue-router';
 
 export default defineComponent({
-  name: 'Error500',
-  setup() {
-    const router = useRouter();
+  name: 'PlaceholderPage',
+  setup(_, { attrs }) {
+    const title = (attrs.title as string) || '页面';
     return () => (
-      <Result
-        type='error'
-        title='500'
-        subTitle='服务器错误'
-      >
-        <Button theme='primary' onClick={() => router.push('/')}>
-          返回首页
-        </Button>
-      </Result>
+      <div class='page-content' style={{ padding: '24px', textAlign: 'center' }}>
+        <h2>{title}</h2>
+        <p style={{ color: '#979ba5', marginTop: '16px' }}>页面开发中...</p>
+      </div>
     );
   },
 });

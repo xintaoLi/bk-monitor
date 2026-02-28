@@ -11,37 +11,29 @@ const routes: RouteRecordRaw[] = [
     redirect: '/retrieve',
   },
   {
-    path: '/retrieve',
+    path: '/retrieve/:indexId?',
     name: 'retrieve',
-    component: () => import('@/layouts/main-layout.tsx'),
+    component: () => import('@/views/retrieve/index'),
     meta: {
       title: '检索',
+      navId: 'search',
       requiresAuth: true,
     },
-    children: [
-      {
-        path: '',
-        name: 'retrieve-index',
-        component: () => import('@/views/retrieve/index.tsx'),
-        meta: {
-          title: '日志检索',
-        },
-      },
-    ],
   },
   {
     path: '/manage',
     name: 'manage',
-    component: () => import('@/layouts/main-layout.tsx'),
+    component: () => import('@/views/manage/index'),
     meta: {
       title: '管理',
+      navId: 'manage',
       requiresAuth: true,
     },
     children: [
       {
-        path: 'collection',
-        name: 'collection',
-        component: () => import('@/views/manage/collection/index.tsx'),
+        path: 'log-collection',
+        name: 'log-collection',
+        component: () => import('@/views/manage/log-collection/index'),
         meta: {
           title: '日志采集',
         },
@@ -49,9 +41,49 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'index-set',
         name: 'index-set',
-        component: () => import('@/views/manage/index-set/index.tsx'),
+        component: () => import('@/views/manage/index-set/index'),
         meta: {
-          title: '索引集',
+          title: '索引集管理',
+        },
+      },
+      {
+        path: 'clean',
+        name: 'clean',
+        component: () => import('@/views/manage/clean/index'),
+        meta: {
+          title: '清洗配置',
+        },
+      },
+      {
+        path: 'archive',
+        name: 'archive',
+        component: () => import('@/views/manage/archive/index'),
+        meta: {
+          title: '归档管理',
+        },
+      },
+      {
+        path: 'extract',
+        name: 'extract',
+        component: () => import('@/views/manage/extract/index'),
+        meta: {
+          title: '日志提取',
+        },
+      },
+      {
+        path: 'client-log',
+        name: 'client-log',
+        component: () => import('@/views/manage/client-log/index'),
+        meta: {
+          title: '客户端日志',
+        },
+      },
+      {
+        path: 'cluster',
+        name: 'cluster',
+        component: () => import('@/views/manage/cluster/index'),
+        meta: {
+          title: 'ES 集群管理',
         },
       },
     ],
@@ -59,53 +91,44 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: () => import('@/layouts/main-layout.tsx'),
+    component: () => import('@/views/dashboard/index'),
     meta: {
       title: '仪表盘',
+      navId: 'dashboard',
       requiresAuth: true,
     },
-    children: [
-      {
-        path: '',
-        name: 'dashboard-index',
-        component: () => import('@/views/dashboard/index.tsx'),
-        meta: {
-          title: '仪表盘列表',
-        },
-      },
-    ],
   },
   {
     path: '/monitor',
     name: 'monitor',
-    component: () => import('@/layouts/main-layout.tsx'),
+    component: () => import('@/views/monitor/index'),
     meta: {
       title: '监控日志',
+      navId: 'monitor',
       requiresAuth: true,
     },
-    children: [
-      {
-        path: 'apm',
-        name: 'apm',
-        component: () => import('@/views/monitor/apm/index.tsx'),
-        meta: {
-          title: 'APM日志',
-        },
-      },
-      {
-        path: 'trace',
-        name: 'trace',
-        component: () => import('@/views/monitor/trace/index.tsx'),
-        meta: {
-          title: 'Trace日志',
-        },
-      },
-    ],
+  },
+  {
+    path: '/share/:id',
+    name: 'share',
+    component: () => import('@/views/share/index'),
+    meta: {
+      title: '分享',
+    },
+  },
+  {
+    path: '/authorization',
+    name: 'authorization',
+    component: () => import('@/views/authorization/index'),
+    meta: {
+      title: '权限管理',
+      requiresAuth: true,
+    },
   },
   {
     path: '/403',
     name: '403',
-    component: () => import('@/views/error/403.tsx'),
+    component: () => import('@/views/error/403'),
     meta: {
       title: '无权限',
     },
@@ -113,7 +136,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/404',
     name: '404',
-    component: () => import('@/views/error/404.tsx'),
+    component: () => import('@/views/error/404'),
     meta: {
       title: '页面不存在',
     },
@@ -121,7 +144,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/500',
     name: '500',
-    component: () => import('@/views/error/500.tsx'),
+    component: () => import('@/views/error/500'),
     meta: {
       title: '服务器错误',
     },
