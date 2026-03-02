@@ -5,82 +5,64 @@
  * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
  *
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-import { defineComponent } from 'vue';
-import { Button, Dropdown } from 'bkui-vue';
+import { defineComponent, ref } from 'vue';
 
-/**
- * 检索工具栏
- * 
- * 功能：
- * - 字段管理
- * - 分享链接
- * - 导出日志
- * - 创建告警
- * - 更多操作
- */
+import RetrieveHelper, { RetrieveEvent } from '../../retrieve-helper';
+import SubBar from '../../retrieve-v2/sub-bar/index.vue';
+import useRetrieveEvent from '@/hooks/use-retrieve-event';
+import './index.scss';
+
 export default defineComponent({
-  name: 'Toolbar',
-
+  name: 'V3Toolbar',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setup() {
-    /**
-     * 字段管理
-     */
-    const handleFieldManage = () => {
-      console.log('Field manage clicked');
+    const isFavoriteShown = ref(RetrieveHelper.isFavoriteShown);
+    const onFavoriteShowChange = (val: boolean) => {
+      isFavoriteShown.value = val;
     };
 
-    /**
-     * 分享链接
-     */
-    const handleShare = () => {
-      console.log('Share clicked');
-    };
+    const { addEvent } = useRetrieveEvent();
+    addEvent(RetrieveEvent.FAVORITE_SHOWN_CHANGE, onFavoriteShowChange);
 
-    /**
-     * 导出日志
-     */
-    const handleExport = () => {
-      console.log('Export clicked');
+    const handleCollectionShowChange = () => {
+      isFavoriteShown.value = !isFavoriteShown.value;
+      RetrieveHelper.setFavoriteShown(isFavoriteShown.value);
     };
 
     return () => (
-      <div class='retrieve-toolbar'>
-        <div class='toolbar-left'>
-          <Button onClick={handleFieldManage}>
-            <i class='bk-icon icon-cog'></i>
-            字段管理
-          </Button>
-        </div>
+      <div class='v3-bklog-toolbar'>
+        {!window.__IS_MONITOR_COMPONENT__ && (
+          <div
+            class={`collection-box ${isFavoriteShown.value ? 'active' : ''}`}
+            onClick={handleCollectionShowChange}
+          >
+            <span
+              style={{ color: isFavoriteShown.value ? '#3A84FF' : '' }}
+              class='bklog-icon bklog-shoucangjia'
+            ></span>
+          </div>
+        )}
 
-        <div class='toolbar-right'>
-          <Button onClick={handleShare}>
-            <i class='bk-icon icon-share'></i>
-            分享
-          </Button>
-
-          <Button onClick={handleExport}>
-            <i class='bk-icon icon-download'></i>
-            导出
-          </Button>
-
-          <Dropdown>
-            {{
-              default: () => (
-                <Button>
-                  更多
-                  <i class='bk-icon icon-down-shape'></i>
-                </Button>
-              ),
-              content: () => (
-                <div class='toolbar-more-menu'>
-                  {/* TODO: 更多菜单项 */}
-                </div>
-              ),
-            }}
-          </Dropdown>
-        </div>
+        <SubBar></SubBar>
       </div>
     );
   },

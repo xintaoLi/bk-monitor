@@ -5,124 +5,72 @@
  * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
  *
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-import { defineComponent, ref, onMounted } from 'vue';
-import { Button, Table, Dialog } from 'bkui-vue';
-import { useCollectStore } from '@/stores';
+import { defineComponent, ref } from 'vue';
 
-/**
- * 日志采集管理
- * 
- * 功能：
- * - 采集项列表展示
- * - 新建采集项
- * - 编辑采集项
- * - 删除采集项
- * - 启动/停止采集
- * - 查看采集状态
- */
+import useLocale from '@/hooks/use-locale';
+
+import LeftList from './components/list-main/left-list';
+import TableList from './components/list-main/table-list';
+
+import type { IListItemData } from './type';
+
+import './index.scss';
+
 export default defineComponent({
-  name: 'LogCollection',
+  name: 'V2LogCollection',
 
   setup() {
-    const collectStore = useCollectStore();
-    const loading = ref(false);
-
-    /**
-     * 加载采集列表
-     */
-    const loadCollectorList = async () => {
-      loading.value = true;
-      try {
-        await collectStore.fetchCollectorList({});
-      } catch (error) {
-        console.error('Failed to load collector list:', error);
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    /**
-     * 新建采集
-     */
-    const handleCreate = () => {
-      console.log('Create collector');
-      // TODO: 跳转到创建页面或打开弹窗
-    };
-
-    /**
-     * 编辑采集
-     */
-    const handleEdit = (row: any) => {
-      console.log('Edit collector:', row);
-      // TODO: 跳转到编辑页面或打开弹窗
-    };
-
-    /**
-     * 删除采集
-     */
-    const handleDelete = (row: any) => {
-      Dialog.confirm({
-        title: '确认删除',
-        message: `确定删除采集项 "${row.collector_config_name}" 吗？`,
-        confirmFn: async () => {
-          try {
-            await collectStore.deleteCollector(row.collector_config_id);
-            loadCollectorList();
-          } catch (error) {
-            console.error('Failed to delete collector:', error);
-          }
-        },
-      });
-    };
-
-    /**
-     * 表格列配置
-     */
-    const columns = [
-      { label: '采集项名称', prop: 'collector_config_name' },
-      { label: '采集场景', prop: 'collector_scenario_name' },
-      { label: '业务ID', prop: 'bk_biz_id' },
-      { label: '状态', prop: 'is_active' },
-      { label: '创建人', prop: 'created_by' },
-      { label: '创建时间', prop: 'created_at' },
-      {
-        label: '操作',
-        width: 200,
-        render: ({ row }: any) => (
-          <>
-            <Button text onClick={() => handleEdit(row)}>编辑</Button>
-            <Button text onClick={() => handleDelete(row)}>删除</Button>
-          </>
-        ),
-      },
-    ];
-
-    onMounted(() => {
-      loadCollectorList();
+    const { t } = useLocale();
+    const isShowLeft = ref(true);
+    const currentIndexSet = ref<IListItemData>({
+      index_set_name: t('全部采集项'),
+      index_count: 0,
+      index_set_id: 'all',
     });
+    /** 展开/收起左侧采集项列表 */
+    const handleShowLeft = () => {
+      isShowLeft.value = !isShowLeft.value;
+    };
+    /** 选中索引集 */
+    const handleChoose = (item: IListItemData) => {
+      currentIndexSet.value = item;
+    };
 
     return () => (
-      <div class='log-collection'>
-        <div class='log-collection-header'>
-          <h2>日志采集</h2>
-          <Button theme='primary' onClick={handleCreate}>
-            新建采集
-          </Button>
-        </div>
-
-        <div class='log-collection-content'>
-          <Table
-            data={collectStore.collectorList}
-            columns={columns}
-            loading={loading.value}
-            pagination={{
-              current: 1,
-              limit: 20,
-              count: collectStore.collectorList.length,
-            }}
-          />
+      <div class='v2-log-collection-main'>
+        {isShowLeft.value && (
+          <div class='v2-log-collection-left'>
+            <LeftList on-choose={handleChoose} />
+          </div>
+        )}
+        <div class='v2-log-collection-right'>
+          <button
+            class='right-btn-box'
+            onClick={handleShowLeft}
+            type='button'
+          >
+            <i class={`bk-icon icon-angle-${isShowLeft.value ? 'left' : 'right'} right-btn`} />
+          </button>
+          <TableList indexSet={currentIndexSet.value} />
         </div>
       </div>
     );

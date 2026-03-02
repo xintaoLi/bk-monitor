@@ -1,28 +1,25 @@
-/*
- * Tencent is pleased to support the open source community by making
- * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.
- *
- * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
- *
- * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
- */
-
 /**
- * 通用基础组件
+ * 通用组件统一导出
+ * Common Components Export
  */
 
-export { LogIcon } from './log-icon'
-export { EmptyStatus } from './empty-status'
-export { StepBox } from './step-box'
-export { BasicTab } from './basic-tab'
-export { TableStatus } from './table-status'
-export { LogButton } from './log-button'
-export { WelcomePage } from './welcome-page'
+// 基础组件
+export { default as LogButton } from './LogButton';
+export type { LogButtonProps } from './LogButton';
 
-export type { LogIconProps } from './log-icon'
-export type { EmptyStatusProps, EmptyType, SceneType } from './empty-status'
-export type { StepBoxProps, PlacementType } from './step-box'
-export type { BasicTabProps } from './basic-tab'
-export type { TableStatusProps } from './table-status'
-export type { LogButtonProps, ButtonTheme } from './log-button'
-export type { WelcomePageProps, WelcomePageData } from './welcome-page'
+export { default as LogIcon } from './LogIcon';
+export type { LogIconProps } from './LogIcon';
+
+export { default as EmptyStatus } from './EmptyStatus';
+export type { EmptyStatusProps, EmptyType, SceneType } from './EmptyStatus';
+
+// 更多组件待迁移...
+// export { default as BasicTab } from './BasicTab';
+// export { default as BklogPopover } from './BklogPopover';
+// export { default as StepBox } from './StepBox';
+// export { default as EllipsisTagList } from './EllipsisTagList';
+// export { default as AuthContainerPage } from './AuthContainerPage';
+// export { default as AuthDialog } from './AuthDialog';
+// export { default as FieldsConfig } from './FieldsConfig';
+// export { default as TableStatus } from './TableStatus';
+// export { default as WelcomePage } from './WelcomePage';

@@ -5,93 +5,123 @@
  * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
  *
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-import { defineComponent, computed } from 'vue';
-import { useRetrieveStore, useGlobalStore } from '@/stores';
-import { useRetrieveInit } from '@/composables/use-retrieve-init';
-import SearchBar from './search-bar';
-import SearchResult from './search-result';
-import Toolbar from './toolbar';
-import Container from './container';
-import Favorite from './favorite';
+import { computed, defineComponent } from 'vue';
 
+import useStore from '@/hooks/use-store';
+
+import { BK_LOG_STORAGE } from '../../store/store.type';
+import V3Container from './container';
+import V3Collection from './favorite';
+import V3Searchbar from './search-bar';
+import V3SearchResult from './search-result';
+import V3Toolbar from './toolbar';
+import useAppInit from './use-app-init';
+import AiAssitant from '@/global/ai-assitant/index';
+import RetrieveHelper, { RetrieveEvent } from '@/views/retrieve-helper';
+
+import './global-en.scss';
 import './index.scss';
+import './media.scss';
+import './segment-pop.scss';
 
-/**
- * 检索主页
- * 
- * 核心功能：
- * - 索引集选择
- * - 搜索框（关键字、条件过滤）
- * - 日志列表展示
- * - 趋势图展示
- * - 字段侧栏
- * - 收藏夹管理
- * - 上下文日志
- * - 实时日志
- * - 导出功能
- */
 export default defineComponent({
-  name: 'Retrieve',
-  
+  name: 'RetrieveV3',
   setup() {
-    const retrieveStore = useRetrieveStore();
-    const globalStore = useGlobalStore();
+    const store = useStore();
+    const aiAssitantRef = RetrieveHelper.aiAssitantHelper.getAiAssitantInstance();
 
-    // 初始化检索页面
     const {
       isSearchContextStickyTop,
       isSearchResultStickyTop,
       stickyStyle,
       contentStyle,
       isPreApiLoaded,
-    } = useRetrieveInit();
+    } = useAppInit();
 
-    // 是否文本省略从开始
-    const isStartTextEllipsis = computed(() => {
-      // TODO: 从配置中读取
-      return false;
-    });
+    const isStartTextEllipsis = computed(() => store.state.storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR] === 'start');
+
+    /**
+     * AI 助手关闭
+     */
+    const handleAiClose = () => {
+      RetrieveHelper.fire(RetrieveEvent.AI_CLOSE);
+    };
+
+    /**
+     * 渲染 AI 助手
+     * @returns
+     */
+    const renderAiAssitant = () => {
+      if (!store.state.features.isAiAssistantActive) {
+        return null;
+      }
+
+      return <AiAssitant ref={aiAssitantRef} on-close={handleAiClose}></AiAssitant>;
+    };
 
     /**
      * 渲染结果内容
+     * @returns
      */
     const renderResultContent = () => {
       if (isPreApiLoaded.value) {
         return [
-          <Toolbar />,
-          <Container>
-            <SearchBar
+          <V3Toolbar></V3Toolbar>,
+          <V3Container>
+            <V3Searchbar
               class={{
                 'is-sticky-top': isSearchContextStickyTop.value,
                 'is-sticky-top-result': isSearchResultStickyTop.value,
               }}
-            />
-            <SearchResult />
-          </Container>,
+            ></V3Searchbar>
+            <V3SearchResult></V3SearchResult>
+          </V3Container>,
         ];
       }
 
       return <div style={{ minHeight: '50vh', width: '100%' }}></div>;
     };
 
+    /**
+     * 渲染根元素
+     * @returns
+     */
     return () => (
       <div
         style={stickyStyle.value}
         class={[
-          'retrieve-root',
+          'v3-bklog-root',
           { 'is-start-text-ellipsis': isStartTextEllipsis.value },
-          {
-            'is-sticky-top': isSearchContextStickyTop.value,
-            'is-sticky-top-result': isSearchResultStickyTop.value,
-          },
+          { 'is-sticky-top': isSearchContextStickyTop.value, 'is-sticky-top-result': isSearchResultStickyTop.value },
         ]}
         v-bkloading={{ isLoading: !isPreApiLoaded.value }}
       >
-        <Favorite />
-        <div style={contentStyle.value} class='retrieve-content'>
+        <V3Collection></V3Collection>
+        <div
+          style={contentStyle.value}
+          class='v3-bklog-content'
+        >
           {renderResultContent()}
+          {renderAiAssitant()}
         </div>
       </div>
     );

@@ -5,88 +5,122 @@
  * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
  *
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-import { defineComponent } from 'vue';
-import { Table, Loading } from 'bkui-vue';
-import { useRetrieveStore } from '@/stores';
+import { computed, type ComputedRef, defineComponent } from "vue";
 
-/**
- * 检索结果展示
- * 
- * 功能：
- * - 日志列表表格
- * - 趋势图展示
- * - 字段筛选
- * - 分页加载
- * - 上下文日志
- * - 实时日志
- * - 日志导出
- */
+import { debounce } from "lodash-es";
+import { useRoute, useRouter } from "vue-router/composables";
+
+// #if MONITOR_APP !== 'apm' && MONITOR_APP !== 'trace'
+import GraphAnalysis from "../../retrieve-v2/search-result-panel/graph-analysis";
+// #else
+// #code const GraphAnalysis = () => null
+// #endif
+import SearchResultPanel from "../../retrieve-v2/search-result-panel/index.vue";
+// #if MONITOR_APP !== 'apm' && MONITOR_APP !== 'trace'
+import SearchResultTab from "../../retrieve-v2/search-result-tab/index.vue";
+// #else
+// #code const SearchResultTab = () => null;
+
+// #endif
+import RetrieveHelper, { RetrieveEvent } from "../../retrieve-helper";
+import Grep from "../grep";
+import { RouteQueryTab } from "../index.type";
+import useStore from "@/hooks/use-store";
+import LogClustering from "./log-clustering";
+import useRetrieveEvent from "@/hooks/use-retrieve-event";
+
+import "./index.scss";
+
 export default defineComponent({
-  name: 'SearchResult',
-
+  name: "V3ResultContainer",
   setup() {
-    const retrieveStore = useRetrieveStore();
+    const router = useRouter();
+    const route = useRoute();
+    const store = useStore();
 
-    /**
-     * 渲染结果表格
-     */
-    const renderResultTable = () => {
-      return (
-        <Table
-          data={retrieveStore.searchResult?.list || []}
-          pagination={{
-            current: 1,
-            limit: 50,
-            count: retrieveStore.searchResult?.total || 0,
-          }}
-        >
-          {/* TODO: 定义表格列 */}
-        </Table>
+    const debounceUpdateTabValue = debounce((value) => {
+      const isClustering = value === "clustering";
+      router.replace({
+        params: { ...(route.params ?? {}) },
+        query: {
+          ...(route.query ?? {}),
+          tab: value,
+          ...(isClustering ? {} : { clusterParams: undefined }),
+        },
+      });
+    }, 60);
+    const activeTab = computed(
+      () => route.query.tab ?? "origin"
+    ) as ComputedRef<string>;
+
+    const handleTabChange = (tab: string, triggerTrend = false) => {
+      debounceUpdateTabValue(tab);
+
+      if (triggerTrend) {
+        store.dispatch("requestIndexSetQuery");
+        setTimeout(() => {
+          RetrieveHelper.fire(RetrieveEvent.TREND_GRAPH_SEARCH);
+        }, 300);
+      }
+    };
+
+    const handleFavoriteChange = (item) => {
+      debounceUpdateTabValue(
+        item.favorite_type === "chart" ? "graph_analysis" : "origin"
       );
     };
 
-    /**
-     * 渲染趋势图
-     */
-    const renderTrendChart = () => {
-      return (
-        <div class='search-result-chart'>
-          {/* TODO: 渲染趋势图 */}
-          <div style={{ height: '200px', background: '#f0f1f5' }}>
-            趋势图占位
-          </div>
-        </div>
-      );
-    };
+    const { addEvent } = useRetrieveEvent();
+    addEvent(RetrieveEvent.FAVORITE_ACTIVE_CHANGE, handleFavoriteChange);
 
-    /**
-     * 渲染空状态
-     */
-    const renderEmpty = () => {
+    const renderTabContent = () => {
+      if (activeTab.value === RouteQueryTab.GRAPH_ANALYSIS
+          || activeTab.value === RouteQueryTab.GRAPH_ANALYSIS_LEGACY) {
+        return <GraphAnalysis></GraphAnalysis>;
+      }
+
+      if (activeTab.value === RouteQueryTab.GREP) {
+        return <Grep></Grep>;
+      }
+
+      if (activeTab.value === RouteQueryTab.CLUSTERING) {
+        return <LogClustering />;
+      }
+
       return (
-        <div class='search-result-empty'>
-          <div class='empty-content'>
-            <div class='empty-icon'>📊</div>
-            <div class='empty-text'>暂无数据</div>
-            <div class='empty-desc'>请输入搜索条件后查询</div>
-          </div>
-        </div>
+        <SearchResultPanel
+          active-tab={activeTab.value}
+          onUpdate:active-tab={handleTabChange}
+        ></SearchResultPanel>
       );
     };
 
     return () => (
-      <div class='search-result'>
-        <Loading loading={retrieveStore.isTrendDataLoading}>
-          {/* 趋势图 */}
-          {renderTrendChart()}
-
-          {/* 结果表格 */}
-          <div class='search-result-table'>
-            {retrieveStore.searchResult ? renderResultTable() : renderEmpty()}
-          </div>
-        </Loading>
+      <div class="v3-bklog-body">
+        <SearchResultTab
+          value={activeTab.value}
+          on-input={handleTabChange}
+        ></SearchResultTab>
+        {renderTabContent()}
       </div>
     );
   },
