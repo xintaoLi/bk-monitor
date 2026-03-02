@@ -1,0 +1,72 @@
+/**
+ * variables.scss - CSS 变量与 SCSS 变量定义
+ * 对齐原项目颜色体系，兼容 TDesign Vue Next 主题
+ */
+
+// ==================== 主色调 ====================
+$primary-color: #3a84ff;
+$primary-hover: #699df4;
+$primary-active: #2761dd;
+
+// ==================== 功能色 ====================
+$success-color: #2dcb56;
+$warning-color: #ff9c01;
+$danger-color: #ea3636;
+$info-color: #3a84ff;
+
+// ==================== 中性色 ====================
+$text-primary: #313238;
+$text-secondary: #63656e;
+$text-disabled: #c4c6cc;
+$text-placeholder: #c4c6cc;
+$border-color: #dcdee5;
+$bg-color: #f4f7fa;
+$bg-white: #fff;
+$bg-hover: #f0f1f5;
+
+// ==================== 字体 ====================
+$font-size-xs: 10px;
+$font-size-sm: 12px;
+$font-size-md: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+
+// ==================== 间距 ====================
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+// ==================== 圆角 ====================
+$border-radius-sm: 2px;
+$border-radius-md: 4px;
+$border-radius-lg: 8px;
+
+// ==================== 阴影 ====================
+$shadow-sm: 0 1px 4px 0 rgba(0, 0, 0, 0.1);
+$shadow-md: 0 2px 8px 0 rgba(0, 0, 0, 0.15);
+$shadow-lg: 0 4px 16px 0 rgba(0, 0, 0, 0.2);
+
+// ==================== 布局 ====================
+$header-height: 52px;
+$side-nav-width: 240px;
+$side-nav-mini-width: 60px;
+
+// ==================== CSS 自定义属性（运行时可覆盖）====================
+:root {
+  --primary-color: #{$primary-color};
+  --primary-hover: #{$primary-hover};
+  --primary-active: #{$primary-active};
+  --success-color: #{$success-color};
+  --warning-color: #{$warning-color};
+  --danger-color: #{$danger-color};
+  --text-primary: #{$text-primary};
+  --text-secondary: #{$text-secondary};
+  --text-disabled: #{$text-disabled};
+  --border-color: #{$border-color};
+  --bg-color: #{$bg-color};
+  --header-height: #{$header-height};
+  --side-nav-width: #{$side-nav-width};
+  --notice-component-height: 0px;
+}

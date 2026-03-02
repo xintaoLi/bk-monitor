@@ -1,0 +1,39 @@
+/* un-authorized/index.scss */
+.un-authorized-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  background: #f4f7fa;
+}
+
+.un-authorized-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 60px 40px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+
+  .un-authorized-icon {
+    font-size: 64px;
+    color: #c4c6cc;
+  }
+
+  .un-authorized-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: #313238;
+  }
+
+  .un-authorized-desc {
+    font-size: 14px;
+    color: #63656e;
+    line-height: 1.6;
+  }
+}

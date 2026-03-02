@@ -1,0 +1,18 @@
+/**
+ * app.scss - 根组件样式
+ */
+
+.log-search-container {
+  position: relative;
+  width: 100%;
+  height: calc(100% - var(--header-height) - var(--notice-component-height));
+  overflow-y: hidden;
+
+  &.as-iframe {
+    height: 100%;
+  }
+
+  &.clear-min-height {
+    min-height: 0 !important; /* stylelint-disable-line */
+  }
+}

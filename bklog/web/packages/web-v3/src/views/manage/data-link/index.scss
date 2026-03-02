@@ -1,0 +1,51 @@
+/**
+ * index.scss - 数据链路配置样式
+ */
+
+.manage-data-link-conf-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .page-header {
+    margin-bottom: 16px;
+
+    .page-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: $text-primary;
+    }
+  }
+
+  .page-content {
+    flex: 1;
+    background: $bg-white;
+    border-radius: $border-radius-md;
+    padding: 16px;
+  }
+
+  .page-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+
+    .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #e1ecff;
+      border-top-color: $primary-color;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+  }
+
+  .page-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    color: $text-secondary;
+    font-size: 14px;
+  }
+}

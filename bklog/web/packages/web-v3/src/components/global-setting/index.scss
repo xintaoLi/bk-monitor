@@ -1,0 +1,42 @@
+/* global-setting/index.scss */
+.global-setting-dialog {
+  display: flex;
+  min-height: 400px;
+  gap: 0;
+
+  .setting-tabs {
+    width: 160px;
+    border-right: 1px solid #eaebf0;
+    padding: 8px 0;
+    flex-shrink: 0;
+
+    .tab-item {
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #63656e;
+      cursor: pointer;
+      transition: background 0.2s;
+
+      &:hover {
+        background: #f0f1f5;
+        color: #313238;
+      }
+
+      &.is-active {
+        background: #e1ecff;
+        color: #3a84ff;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .setting-content {
+    flex: 1;
+    padding: 16px 20px;
+    overflow-y: auto;
+  }
+
+  .setting-panel {
+    min-height: 200px;
+  }
+}

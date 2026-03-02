@@ -1,0 +1,151 @@
+/**
+ * base.scss - 基础公共样式
+ */
+
+// ==================== 布局 ====================
+.log-search-container {
+  position: relative;
+  width: 100%;
+  height: calc(100% - var(--header-height) - var(--notice-component-height));
+  overflow-y: hidden;
+
+  &.as-iframe {
+    height: 100%;
+  }
+
+  &.is-show-notice {
+    height: calc(100% - 90px);
+
+    .sub-nav-container {
+      top: 91px;
+    }
+  }
+}
+
+.clear-min-height {
+  min-height: 0 !important; /* stylelint-disable-line declaration-no-important */
+}
+
+// ==================== 文字 ====================
+.text-overflow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-primary {
+  color: $primary-color;
+}
+
+.text-secondary {
+  color: $text-secondary;
+}
+
+.text-danger {
+  color: $danger-color;
+}
+
+// ==================== 链接按钮 ====================
+.button-text {
+  color: $primary-color;
+  cursor: pointer;
+
+  &:hover {
+    color: $primary-hover;
+  }
+
+  &:active {
+    color: $primary-active;
+  }
+
+  &.is-disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
+// ==================== 无权限鼠标样式 ====================
+.cursor-element {
+  width: 12px;
+  height: 16px;
+  background: url('../images/cursor-lock.svg') no-repeat;
+}
+
+// ==================== 滚动条 ====================
+.scroll-y {
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c4c6cc;
+    border-radius: 2px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+// ==================== 空状态 ====================
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: $text-secondary;
+  font-size: 14px;
+}
+
+// ==================== 分隔线 ====================
+.divider {
+  height: 1px;
+  background: $border-color;
+  margin: 8px 0;
+}
+
+// ==================== 标签 ====================
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 2px;
+  background: #f0f1f5;
+  color: $text-secondary;
+
+  &.tag-primary {
+    background: #e1ecff;
+    color: $primary-color;
+  }
+
+  &.tag-success {
+    background: #e4faf0;
+    color: $success-color;
+  }
+
+  &.tag-warning {
+    background: #fff3e1;
+    color: $warning-color;
+  }
+
+  &.tag-danger {
+    background: #ffe6e6;
+    color: $danger-color;
+  }
+}
+
+// ==================== app 样式 ====================
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+}

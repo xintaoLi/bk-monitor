@@ -1,0 +1,155 @@
+/**
+ * search-result.scss - 搜索结果样式
+ */
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+
+  &__tabs {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 16px;
+    background: #fff;
+    border-bottom: 1px solid #eaebf0;
+    flex-shrink: 0;
+
+    .result-tab {
+      padding: 0 16px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      color: #63656e;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s;
+
+      &:hover {
+        color: #3a84ff;
+      }
+
+      &.is-active {
+        color: #3a84ff;
+        border-bottom-color: #3a84ff;
+      }
+    }
+
+    .result-count {
+      margin-left: auto;
+      font-size: 12px;
+      color: #979ba5;
+
+      .count-num {
+        color: #3a84ff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background: #fff;
+
+    @include scroller;
+  }
+}
+
+.result-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+  color: #63656e;
+  font-size: 13px;
+
+  .loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid #e1ecff;
+    border-top-color: #3a84ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.result-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #c4c6cc;
+  font-size: 13px;
+  gap: 8px;
+
+  i {
+    font-size: 48px;
+    opacity: 0.5;
+  }
+}
+
+.graph-analysis-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #c4c6cc;
+  font-size: 14px;
+}
+
+// 聚类样式
+.log-clustering {
+  padding: 16px;
+
+  .clustering-loading,
+  .clustering-empty {
+    text-align: center;
+    color: #c4c6cc;
+    padding: 40px 0;
+    font-size: 13px;
+  }
+
+  .clustering-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .clustering-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f5f6fa;
+    border-radius: 4px;
+    border-left: 3px solid #3a84ff;
+    gap: 16px;
+
+    .item-pattern {
+      flex: 1;
+      font-size: 12px;
+      font-family: monospace;
+      color: #313238;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-count {
+      flex-shrink: 0;
+      font-size: 12px;
+      color: #63656e;
+      background: #e1ecff;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+  }
+}

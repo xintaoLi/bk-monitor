@@ -1,0 +1,8 @@
+/**
+ * mixins/index.scss - 全局 mixin 汇总入口
+ * 统一导出所有 mixin，供 sass-loader additionalData 全局注入
+ */
+
+@import 'clearfix';
+@import 'ellipsis';
+@import 'scroller';

@@ -1,0 +1,16 @@
+// scroller mixin
+@mixin scroller($width: 4px, $color: #c4c6cc) {
+  &::-webkit-scrollbar {
+    width: $width;
+    height: $width;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $color;
+    border-radius: calc($width / 2);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

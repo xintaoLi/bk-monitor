@@ -1,0 +1,37 @@
+/* auth-dialog.scss */
+.auth-dialog-content {
+  padding: 4px 0;
+
+  .auth-dialog-desc {
+    font-size: 13px;
+    color: #63656e;
+    margin-bottom: 12px;
+  }
+
+  .auth-dialog-list {
+    padding: 0;
+    margin: 0;
+  }
+
+  .auth-dialog-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f1f5;
+    font-size: 13px;
+    gap: 8px;
+
+    &:last-child { border-bottom: none; }
+
+    .item-action {
+      color: #313238;
+      font-weight: 500;
+      min-width: 100px;
+    }
+
+    .item-resources {
+      color: #63656e;
+      font-size: 12px;
+    }
+  }
+}

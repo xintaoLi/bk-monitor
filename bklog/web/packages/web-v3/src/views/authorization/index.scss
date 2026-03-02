@@ -1,0 +1,33 @@
+/* authorization/index.scss */
+.authorization-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  background: #f4f7fa;
+}
+
+.auth-loading,
+.auth-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 60px 40px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  text-align: center;
+
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e1ecff;
+    border-top-color: #3a84ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  i { font-size: 48px; color: #3a84ff; }
+  p { font-size: 16px; color: #313238; }
+}

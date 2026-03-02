@@ -1,0 +1,24 @@
+/* empty-status.scss */
+.empty-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+
+  &__icon {
+    font-size: 48px;
+    opacity: 0.4;
+  }
+
+  &__text {
+    font-size: 13px;
+    color: #c4c6cc;
+  }
+
+  &--empty .empty-status__icon { color: #c4c6cc; }
+  &--search-empty .empty-status__icon { color: #979ba5; }
+  &--no-permission .empty-status__icon { color: #ff9c01; }
+  &--error .empty-status__icon { color: #ea3636; }
+}
