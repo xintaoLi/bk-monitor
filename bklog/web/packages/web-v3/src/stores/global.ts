@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
 import type { SpaceInfo, BizInfo } from '@/types';
+import http from '@/api';
+import type { GlobalStore } from './types';
 
 interface GlobalState {
   // 空间信息
@@ -19,10 +21,16 @@ interface GlobalState {
   isExternal: boolean; // 是否外部版
   runVer: string; // 运行版本
   featureToggle: Record<string, any>; // 功能开关
+  features: Record<string, any>; // 功能开关别名
   
   // UI 状态
   sidebarCollapsed: boolean;
   fullscreen: boolean;
+
+  // 对话框和提示（新增）
+  showAlert: boolean;
+  isShowGlobalDialog: boolean;
+  authDialogData: any;
 }
 
 /**
@@ -43,9 +51,15 @@ export const useGlobalStore = defineStore('global', {
     isExternal: window.IS_EXTERNAL || false,
     runVer: window.RUN_VER || 'open',
     featureToggle: window.FEATURE_TOGGLE || {},
+    features: window.FEATURE_TOGGLE || {}, // 别名，指向同一对象
 
     sidebarCollapsed: false,
     fullscreen: false,
+
+    // 新增字段
+    showAlert: false,
+    isShowGlobalDialog: false,
+    authDialogData: null,
   }),
 
   getters: {
@@ -158,6 +172,57 @@ export const useGlobalStore = defineStore('global', {
         console.error('Failed to fetch biz list:', error);
       }
     },
+
+    /**
+     * 设置显示提示框（新增）
+     */
+    setShowAlert(show: boolean) {
+      this.showAlert = show;
+    },
+
+    /**
+     * 设置全局对话框显示（新增）
+     */
+    setIsShowGlobalDialog(show: boolean) {
+      this.isShowGlobalDialog = show;
+    },
+
+    /**
+     * 设置权限对话框数据（新增）
+     */
+    setAuthDialogData(data: any) {
+      this.authDialogData = data;
+    },
+
+    /**
+     * 通用状态更新方法（新增）
+     * 用于兼容 Vuex 的 updateState
+     */
+    updateState(payload: Record<string, any>) {
+      Object.keys(payload).forEach(key => {
+        if (key in this.$state) {
+          (this as any)[key] = payload[key];
+        }
+      });
+    },
+
+    /**
+     * 获取权限申请数据（新增）
+     * 用于兼容 Vuex 的 getApplyData
+     */
+    async getApplyData(params: any) {
+      try {
+        const response = await http.request({
+          url: '/iam/meta/get_apply_data/',
+          method: 'post',
+          data: params,
+        });
+        return response;
+      } catch (error) {
+        console.error('Failed to get apply data:', error);
+        throw error;
+      }
+    },
   },
 
   persist: {
@@ -170,4 +235,4 @@ export const useGlobalStore = defineStore('global', {
       },
     ],
   },
-});
+}) as () => GlobalStore;

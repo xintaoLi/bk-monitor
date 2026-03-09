@@ -59,6 +59,10 @@ export interface ApiResponse<T = any> {
   message: string
   /** 请求结果 */
   result: boolean
+  /** 权限信息 */
+  permission?: Record<string, any>
+  /** 其他扩展字段 */
+  [key: string]: any
 }
 
 /**

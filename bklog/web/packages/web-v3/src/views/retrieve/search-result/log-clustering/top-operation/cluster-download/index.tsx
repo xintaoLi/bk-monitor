@@ -26,7 +26,7 @@
 
 import { defineComponent, ref, computed } from 'vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import { blobDownload, formatDate } from '@/common/util';
 
 import './index.scss';
@@ -50,7 +50,12 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const isDownloading = ref(false);
 
     // 计算下载按钮是否禁用
@@ -72,7 +77,7 @@ export default defineComponent({
 
     // 获取当前索引集信息
     const currentIndexItem = computed(() => {
-      return store.state.indexItem.items?.find((item: { index_set_id: string }) => item.index_set_id === props.indexId);
+      return retrieveStore.indexItem.items?.find((item: { index_set_id: string }) => item.index_set_id === props.indexId);
     });
 
     // 生成文件名
@@ -80,7 +85,7 @@ export default defineComponent({
       const indexSetName = currentIndexItem.value?.index_set_name || 'cluster';
 
       // 获取开始时间
-      const { start_time } = store.state.indexItem;
+      const { start_time } = retrieveStore.indexItem;
 
       // 格式化时间为文件名格式（将冒号替换为横线以避免文件名非法字符）
       const startTimeStr = formatDate(start_time).replace(/:/g, '-');

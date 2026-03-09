@@ -27,7 +27,7 @@
 import { computed, defineComponent, ref } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { useFavorite } from '../../hooks/use-favorite';
 import { IFavoriteItem, IGroupItem } from '../../types';
@@ -60,9 +60,14 @@ export default defineComponent({
     const { t } = useLocale();
     const formRef = ref(null);
     const selectRef = ref(null);
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     /** 当前空间id */
-    const spaceUid = computed(() => store.state.spaceUid);
+    const spaceUid = computed(() => globalStore.spaceUid);
     const isUnionSearch = computed(() => props.data.index_set_type === 'union');
     const groupNameMap = {
       unknown: t('未分组'),
@@ -104,7 +109,7 @@ export default defineComponent({
     const showGroupList = computed(() => {
       return favoriteData.value.visible_type === 'public' ? publicGroupList.value : groupList.value;
     });
-    const indexItem = computed(() => store.state.indexItem);
+    const indexItem = computed(() => retrieveStore.indexItem);
 
     const handleCancel = () => {
       emit('cancel', !props.isShow);

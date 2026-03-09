@@ -29,7 +29,7 @@ import { bkMessage } from "bk-magic-vue";
 import useLocale from "@/hooks/use-locale";
 import $http from "@/api";
 import dayjs from "dayjs";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import { type VariableList } from "@/services/new-report";
 import "./index.scss";
 
@@ -54,7 +54,12 @@ export default defineComponent({
   },
   setup(props, { expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const formRef = ref<any>(null);
     const variableTableData = ref<VariableList>([]);
@@ -364,8 +369,8 @@ export default defineComponent({
      * 以及从 url 中提取并赋值 展示同比 和 Pattern 。
      */
     const setFormDefaultValue = () => {
-      const spaceList = store.state.mySpaceList;
-      const bizId = store.state.bkBizId;
+      const spaceList = (globalStore as any).mySpaceList;
+      const bizId = globalStore.bkBizId;
       const bizName =
         spaceList.find((item) => item.bk_biz_id === bizId)?.space_name || "";
       const currentDate = dayjs(new Date()).format("YYYY-MM-DD HH:mm");
@@ -374,7 +379,7 @@ export default defineComponent({
       };
       const targetTitle = titleMapping[props.scenario] || "";
       formData.value.name = `${targetTitle}-${
-        store.state.userMeta?.username || ""
+        userStore.userInfo?.username || ""
       }`;
     };
 

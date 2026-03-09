@@ -26,9 +26,8 @@
 
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useUtils from '@/hooks/use-utils';
-import { BK_LOG_STORAGE } from '@/store/store.type';
 import { t } from '@/hooks/use-locale';
 import * as authorityMap from '../../../../common/authority-map';
 import { tenantManager, UserInfoLoadedEventData } from '@/views/retrieve-core/tenant-manager';
@@ -71,7 +70,12 @@ export default defineComponent({
   },
   emits: ['update-total'],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const tableData = ref({
       total: 0,
@@ -202,7 +206,7 @@ export default defineComponent({
       try {
         const response = await http.request('collect/getUsernameList', {
           query: {
-            bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+            bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
           },
         });
         // 将接口返回的数据转换为过滤器所需的格式，text 和 value 均使用接口返回的值
@@ -221,7 +225,7 @@ export default defineComponent({
     const buildQueryParams = () => {
       return {
         query: {
-          bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+          bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
           page: queryParams.value.page,
           pagesize: queryParams.value.pagesize,
           ...(queryParams.value.ordering && { ordering: queryParams.value.ordering }),
@@ -356,12 +360,12 @@ export default defineComponent({
           resources: [
             {
               type: 'space',
-              id: store.state.spaceUid,
+              id: globalStore.spaceUid,
             },
           ],
         };
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       }
     };
 

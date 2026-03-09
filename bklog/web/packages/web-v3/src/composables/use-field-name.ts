@@ -24,17 +24,17 @@
  * IN THE SOFTWARE.
  */
 
-import type { Store } from 'vuex';
-import type { BK_LOG_STORAGE, FieldInfoItem } from '../store/store.type';
+import { useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import type { FieldInfoItem } from '../store/store.type';
 
 /**
  * 根据字段信息返回别名
  * @param field - 字段信息
- * @param store - Vuex Store 实例
  * @returns 返回别名，如果没有别名则返回字段名
  */
-export const getFieldNameByField = (field: any, store: Store<any>) => {
-  if (store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
+export const getFieldNameByField = (field: any) => {
+  const storageStore = useStorageStore();
+  if (storageStore[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
     return field.query_alias || field.field_name;
   }
 
@@ -44,25 +44,27 @@ export const getFieldNameByField = (field: any, store: Store<any>) => {
 /**
  * 字段名管理 Composable
  * 用于管理字段名称和别名的转换
- * @param options - 配置项
  * @returns 字段名管理对象
  */
-export default ({ store }: { store: Store<any> }) => {
+export default () => {
+  const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
+
   /**
    * 根据字段名返回别名
    * @param name - 字段名 field_name
    * @returns 返回别名，如果没有别名则返回字段名
    */
   const getFieldName = (name: string) => {
-    if (store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
-      const field = store.state.indexFieldInfo.fields.filter((item: any) => item.field_name === name);
+    if (storageStore[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
+      const field = indexFieldStore.indexFieldInfo.fields.filter((item: any) => item.field_name === name);
       return field[0]?.query_alias || name;
     }
     return name;
   };
 
   const mGetFieldNameByField = (field: { field_name: string; query_alias: string }) => {
-    return getFieldNameByField(field, store);
+    return getFieldNameByField(field);
   };
 
   /**
@@ -71,7 +73,7 @@ export default ({ store }: { store: Store<any> }) => {
    * @returns 返回别名数组，如果没有别名则返回字段名
    */
   const getFieldNames = (fields: any[]) => {
-    if (store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
+    if (storageStore[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]) {
       return fields.map(fieldInfo => fieldInfo.query_alias || fieldInfo.field_name);
     }
     return fields.map(fieldInfo => fieldInfo.field_name);
@@ -84,7 +86,7 @@ export default ({ store }: { store: Store<any> }) => {
    */
   const getConcatenatedFieldName = (fields: any) => {
     const { field_name: id, field_alias: alias, query_alias: query } = fields;
-    if (store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS] && query) {
+    if (storageStore[BK_LOG_STORAGE.SHOW_FIELD_ALIAS] && query) {
       return { id, name: `${query}(${alias || id})` };
     }
     return { id, name: alias ? `${id}(${alias})` : id };
@@ -96,17 +98,17 @@ export default ({ store }: { store: Store<any> }) => {
    * @returns 返回别名
    */
   const getQueryAlias = (field: any) => {
-    return store.state.storage[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]
+    return storageStore[BK_LOG_STORAGE.SHOW_FIELD_ALIAS]
       ? field.query_alias || field.field_name
       : field.field_name;
   };
 
   const getFieldList = (withAliasFieldMap = false) => {
     if (withAliasFieldMap) {
-      return store.state.indexFieldInfo.fields;
+      return indexFieldStore.indexFieldInfo.fields;
     }
 
-    return store.state.indexFieldInfo.fields.filter((field: any) => !field.is_virtual_alias_field);
+    return indexFieldStore.indexFieldInfo.fields.filter((field: any) => !field.is_virtual_alias_field);
   };
 
   /**

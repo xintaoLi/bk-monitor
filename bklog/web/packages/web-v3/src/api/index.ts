@@ -30,3 +30,13 @@
 
 export * from './services'
 export * from '../types/api'
+
+/**
+ * 默认导出 http 实例（用于兼容）
+ */
+import http from '../utils/http'
+export default http
+
+// Compatibility exports
+import axios from 'axios';
+export const axiosInstance = axios.create();

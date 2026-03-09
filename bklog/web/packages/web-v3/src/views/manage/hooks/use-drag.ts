@@ -26,10 +26,15 @@
 
 import { ref } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 export function useDrag() {
-  const store = useStore();
+  const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
   const minIntroWidth = ref(300); // 最小宽度
   const maxIntroWidth = ref(480); // 默认最大宽度
@@ -63,7 +68,7 @@ export function useDrag() {
     currentScreenX.value = null;
     window.removeEventListener('mousemove', dragMoving);
     window.removeEventListener('mouseup', dragStop);
-    store.commit('updateChartSize');
+    (globalStore as any).commit('updateChartSize');
   }
 
   return {

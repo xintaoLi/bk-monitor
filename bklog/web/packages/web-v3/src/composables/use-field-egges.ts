@@ -23,146 +23,79 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { ref } from 'vue';
 
-import useStore from '@/hooks/use-store';
-import { ConditionOperator } from '@/store/condition-operator';
+import { useIndexFieldStore } from '@/stores';
+import http from '@/api';
 
 /**
- * 字段边缘值（Egges）管理 Composable
- * 用于管理字段自动补全提示的请求
- * @returns 字段边缘值管理对象
+ * 字段聚合管理 Composable
+ * 用于管理字段聚合数据的获取和缓存
+ * @param options - 配置项
+ * @returns 字段聚合管理对象
  */
-export default () => {
-  const store = useStore();
-
-  const isRequesting = ref(false);
-  const isValidateItem = ref(false);
-
-  let requestTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const taskPool: any[] = [];
+export default ({ indexSetId }: { indexSetId: string | number }) => {
+  const indexFieldStore = useIndexFieldStore();
 
   /**
-   * 设置请求状态
-   * @param val - 请求状态
+   * 获取字段聚合数据
+   * @param fieldName - 字段名
+   * @param queryString - 查询字符串
+   * @param addition - 附加参数
+   * @returns 聚合数据列表
    */
-  const setIsRequesting = (val: boolean) => {
-    isRequesting.value = val;
-  };
-
-  /**
-   * 验证字段是否支持边缘值查询
-   * @param field - 字段信息
-   * @returns 是否支持边缘值查询
-   */
-  const isValidateEgges = (field: any) => {
-    isValidateItem.value = ['keyword'].includes(field.field_type);
-    return isValidateItem.value;
-  };
-
-  /**
-   * 请求字段边缘值（自动补全提示接口）
-   * @param field - 字段信息
-   * @param value - 查询值
-   * @param callback - 成功回调
-   * @param finallyFn - 完成回调
-   */
-  const requestFieldEgges = (field: any, value?: string, callback?: (_resp: any) => void, finallyFn?: () => void) => {
-    /**
-     * 检测字段是否为 flattened 字段
-     */
-    if (field.field_type === 'flattened') {
-      setIsRequesting(false);
-      return;
-    }
-
-    if (
-      taskPool.some(task => {
-        return task.fields[0] === field && task.query_value === value && task.pending;
-      })
-    ) {
-      setIsRequesting(false);
-      return;
-    }
-
-    const getConditionValue = () => {
-      if (['keyword'].includes(field.field_type)) {
-        return [`${value}`];
+  const getFieldEgges = async (
+    fieldName: string,
+    queryString: string = '*',
+    addition: any[] = [],
+  ): Promise<any[]> => {
+    try {
+      // 检查缓存
+      const cachedData = indexFieldStore.indexFieldInfo.aggs_items[fieldName];
+      if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
+        return cachedData;
       }
-      setIsRequesting(false);
-      return [];
-    };
 
-    if (value !== undefined && value !== null && !isValidateEgges(field)) {
-      setIsRequesting(false);
-      return;
-    }
-
-    const size = value?.length > 0 ? 50 : 100;
-    requestTimer && clearTimeout(requestTimer);
-    requestTimer = setTimeout(() => {
-      setIsRequesting(true);
-
-      const addition = value
-        ? [
-            {
-              field: field.field_name,
-              operator: 'contains',
-              value: getConditionValue(),
-            },
-          ].map(val => {
-            const instance = new ConditionOperator(val);
-            return instance.getRequestParam();
-          })
-        : [];
-
-      const taskArgs = {
-        fields: [field],
+      // 请求新数据
+      const params = {
+        index_set_id: indexSetId,
+        field_name: fieldName,
+        query_string: queryString,
         addition,
-        force: true,
-        size,
-        pending: true,
-        index: taskPool.length,
-        commit: false,
-        cancelToken: true,
-        query_value: value,
       };
 
-      for (const task of taskPool) {
-        task.pending = false;
+      const resp = await http.request('retrieve/getFieldAggs', {
+        query: params,
+      });
+
+      if (resp?.data?.aggs_items) {
+        // 更新到 store
+        indexFieldStore.updateIndexFieldEggsItems(resp.data.aggs_items);
+        return resp.data.aggs_items[fieldName] || [];
       }
 
-      taskPool.push(taskArgs);
-      store
-        .dispatch('requestIndexSetValueList', taskArgs)
-        .then(resp => {
-          if (taskArgs.pending) {
-            store.commit('updateIndexFieldEggsItems', resp.data?.aggs_items ?? {});
-            callback?.(resp);
-          }
-        })
-        .catch(err => {
-          if (err.code === 'ERR_CANCELED') {
-            console.log('取消请求');
-          }
-        })
-        .finally(() => {
-          if (taskArgs.pending) {
-            setIsRequesting(false);
-          }
-          const index = taskPool.findIndex(t => t === taskArgs);
-          taskPool.splice(index, 1);
-          finallyFn?.();
-        });
-    }, 300);
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch field aggregations:', error);
+      return [];
+    }
+  };
+
+  /**
+   * 清除字段聚合缓存
+   * @param fieldName - 字段名，如果不传则清除所有
+   */
+  const clearFieldEggesCache = (fieldName?: string) => {
+    if (fieldName) {
+      const aggsItems = { ...indexFieldStore.indexFieldInfo.aggs_items };
+      delete aggsItems[fieldName];
+      indexFieldStore.updateIndexFieldEggsItems(aggsItems);
+    } else {
+      indexFieldStore.updateIndexFieldEggsItems({});
+    }
   };
 
   return {
-    requestFieldEgges,
-    isValidateEgges,
-    isRequesting,
-    setIsRequesting,
-    isValidateItem,
+    getFieldEgges,
+    clearFieldEggesCache,
   };
 };

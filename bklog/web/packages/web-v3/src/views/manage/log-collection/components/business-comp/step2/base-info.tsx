@@ -27,8 +27,8 @@
 import { defineComponent, ref, computed, watch, nextTick, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 import InfoTips from '../../common-comp/info-tips';
 import IndexSetSelect from './index-set-select';
 import $http from '@/api';
@@ -71,7 +71,13 @@ export default defineComponent({
 
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
 
     // ==================== 响应式数据 ====================
@@ -138,7 +144,7 @@ export default defineComponent({
     const getEnNameIsRepeat = async () => {
       try {
         const res = await $http.request('collect/getPreCheck', {
-          params: { collector_config_name_en: getCollectorConfigNameEn(), bk_biz_id: store.state.bkBizId },
+          params: { collector_config_name_en: getCollectorConfigNameEn(), bk_biz_id: globalStore.bkBizId },
         });
         if (res.data) {
           enNameErrorMessage.value = res.data.message;
@@ -155,19 +161,19 @@ export default defineComponent({
     const ruleData = ref({
       index_set_name: [
         {
-          message: t('必填项'),
+          content: t('必填项'),
           trigger: 'blur',
           validator: () => !!formData.value.index_set_name,
         },
       ],
       collector_config_name_en: [
         {
-          message: t('必填项'),
+          content: t('必填项'),
           trigger: 'blur',
           validator: () => !!getCollectorConfigNameEn(),
         },
         {
-          message: t('只支持输入字母，数字，下划线'),
+          content: t('只支持输入字母，数字，下划线'),
           trigger: 'blur',
           validator: () => {
             const value = getCollectorConfigNameEn();
@@ -175,7 +181,7 @@ export default defineComponent({
           },
         },
         {
-          message: t('不能少于5个字符'),
+          content: t('不能少于5个字符'),
           trigger: 'blur',
           validator: () => {
             const value = getCollectorConfigNameEn();
@@ -184,7 +190,7 @@ export default defineComponent({
         },
         {
           max: 50,
-          message: t('不能多于{n}个字符', { n: 50 }),
+          content: t('不能多于{n}个字符', { n: 50 }),
           trigger: 'blur',
           validator: () => {
             const value = getCollectorConfigNameEn();
@@ -194,7 +200,7 @@ export default defineComponent({
         {
           // 检查数据名是否可用
           validator: checkEnNameRepeat,
-          message: () => enNameErrorMessage.value,
+          content: () => enNameErrorMessage.value,
           trigger: 'blur',
         },
       ],

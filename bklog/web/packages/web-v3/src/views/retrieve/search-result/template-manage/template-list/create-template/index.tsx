@@ -25,7 +25,7 @@
  */
 
 import { defineComponent, ref } from "vue";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import useLocale from "@/hooks/use-locale";
 import $http from "@/api";
 
@@ -35,7 +35,12 @@ export default defineComponent({
   name: "CreateTemplate",
   setup(props, { slots, emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const popoverRef = ref<any>(null);
     const formRef = ref<any>(null);
@@ -76,7 +81,7 @@ export default defineComponent({
       $http
         .request("logClustering/createTemplate", {
           data: {
-            space_uid: store.state.spaceUid,
+            space_uid: globalStore.spaceUid,
             template_name: formData.value.name,
           },
         })

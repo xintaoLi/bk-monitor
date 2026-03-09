@@ -27,7 +27,7 @@
 import { computed, defineComponent, ref, watch } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import RetrieveHelper from '../../retrieve-helper';
 import CollectHead from './components/collect-head/collect-head';
@@ -54,7 +54,12 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     // 使用自定义 hook 管理状态
     const {
@@ -155,7 +160,7 @@ export default defineComponent({
 
     // 计算属性
     const allFavoriteNumber = computed(
-      () => store.state.favoriteList?.reduce((pre: number, cur: any) => pre + cur.favorites.length, 0) || 0,
+      () => (globalStore as any).favoriteList?.reduce((pre: number, cur: any) => pre + cur.favorites.length, 0) || 0,
     );
 
     const tabList = computed((): ITabItem[] => [

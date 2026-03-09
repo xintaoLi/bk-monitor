@@ -24,7 +24,7 @@
  * IN THE SOFTWARE.
  */
 import { computed, defineComponent, ref, watch, onMounted, shallowRef, set } from 'vue';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useLocale from '@/hooks/use-locale';
 import MainHeader from './main-header';
 import $http from '@/api';
@@ -87,7 +87,12 @@ export default defineComponent({
     },
   },
   setup(props, { expose, emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const initFilterSortMap = () => ({
@@ -132,14 +137,17 @@ export default defineComponent({
     const rawDataList = ref([]); // 存储原始接口数据
     const { addEvent } = useRetrieveEvent();
 
-    const retrieveParams = computed(() => store.getters.retrieveParams);
+    const retrieveParams = computed(() => retrieveStore.searchParams);
     const showGroupBy = computed(() => props.requestData?.group_by.length > 0 && displayType.value === 'group');
 
     const smallLoaderWidthList = computed(() => {
       return props.requestData?.year_on_year_hour > 0 ? loadingWidthList.compared : loadingWidthList.notCompared;
     });
 
-    const tableColumnWidth = computed(() => (store.getters.isEnLanguage ? enTableWidth : cnTableWidth));
+    const tableColumnWidth = computed(() => {
+      // TODO: 需要从 i18n 获取
+      return cnTableWidth;
+    });
 
     const loadingWidthList = {
       // loading表头宽度列表
@@ -412,7 +420,7 @@ export default defineComponent({
               index_set_id: props.indexId,
             },
             data: {
-              bk_biz_id: store.state.bkBizId,
+              bk_biz_id: globalStore.bkBizId,
               addition,
               size,
               keyword,

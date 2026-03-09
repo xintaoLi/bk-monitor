@@ -26,7 +26,7 @@
 
 import { defineComponent, onMounted, ref, watch } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useRouter from '@/hooks/use-router';
 import { t } from '@/hooks/use-locale';
 import * as authorityMap from '../../../common/authority-map';
@@ -54,7 +54,12 @@ export default defineComponent({
     UserReport,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
 
     // 从路由查询参数获取初始 tab 值
@@ -74,10 +79,12 @@ export default defineComponent({
     const tabs = ref([
       // tab配置
       {
+        header: TAB_TYPES.COLLECT,
         title: TAB_TYPES.COLLECT,
         count: 0,
       },
       {
+        header: TAB_TYPES.REPORT,
         title: TAB_TYPES.REPORT,
         count: 0,
       },
@@ -99,7 +106,7 @@ export default defineComponent({
       try {
         const params = {
           query: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         };
 
@@ -117,7 +124,7 @@ export default defineComponent({
       try {
         const params = {
           query: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         };
 
@@ -137,8 +144,8 @@ export default defineComponent({
 
     // 检查是否为灰度业务
     const checkGrayReleaseAccess = () => {
-      const bizId = store.state.bkBizId;
-      const spaceUid = store.state.spaceUid;
+      const bizId = globalStore.bkBizId;
+      const spaceUid = globalStore.spaceUid;
 
       // 获取总开关状态
       const { tgpa_task: tgpaTaskToggle } = window.FEATURE_TOGGLE;
@@ -195,16 +202,16 @@ export default defineComponent({
     calculatePaginationLimit();
 
     // tab点击事件
-    const handleTabClick = (title: TabType) => {
-      activeTab.value = title;
+    const handleTabClick = (header: TabType) => {
+      activeTab.value = header;
 
       // 更新路由查询参数
       const currentQuery = { ...router.currentRoute.query };
 
       // 根据 tab 类型设置查询参数
-      if (title === TAB_TYPES.COLLECT) {
+      if (header === TAB_TYPES.COLLECT) {
         currentQuery.tab = 'collect';
-      } else if (title === TAB_TYPES.REPORT) {
+      } else if (header === TAB_TYPES.REPORT) {
         currentQuery.tab = 'report';
       }
 
@@ -232,7 +239,7 @@ export default defineComponent({
     });
 
     watch(
-      () => store.state.spaceUid,
+      () => globalStore.spaceUid,
       (newSpaceUid, oldSpaceUid) => {
         if (newSpaceUid && newSpaceUid !== oldSpaceUid) {
           // 检查灰度业务权限
@@ -251,7 +258,7 @@ export default defineComponent({
             resources: [
               {
                 type: 'space',
-                id: store.state.spaceUid,
+                id: globalStore.spaceUid,
               },
             ],
           },

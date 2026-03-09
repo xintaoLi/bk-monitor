@@ -13,11 +13,16 @@ export function setupStore(app: App): void {
   app.use(pinia);
 }
 
+// 导出类型定义
+export * from './types';
+
 // 导出所有 store
 export * from './user';
 export * from './global';
 export * from './retrieve';
 export * from './collect';
 export * from './dashboard';
+export * from './index-field';
+export * from './storage';
 
 export default pinia;

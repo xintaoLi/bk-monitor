@@ -25,8 +25,7 @@
  */
 
 import { updateLastSelectedIndexId } from '@/common/util';
-import { BK_LOG_STORAGE } from '@/store/store.type';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useRouter from '@/hooks/use-router';
 
 export interface SearchCondition {
@@ -44,7 +43,12 @@ interface UseSearchTaskOptions {
  * 用于统一处理表格中的检索跳转逻辑
  */
 export const useSearchTask = ({ indexSetId }: UseSearchTaskOptions) => {
-  const store = useStore();
+  const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
   const router = useRouter();
 
   /**
@@ -54,14 +58,14 @@ export const useSearchTask = ({ indexSetId }: UseSearchTaskOptions) => {
    */
   const searchTask = (conditions: SearchCondition[], timeRange?: [string, string]) => {
     // 更新最后选择的索引集ID
-    updateLastSelectedIndexId(store.state.spaceUid, indexSetId);
+    updateLastSelectedIndexId(globalStore.spaceUid, indexSetId);
 
     // 设置搜索类型为UI模式
-    store.commit('updateStorage', { [BK_LOG_STORAGE.SEARCH_TYPE]: 0 });
+    storageStore.updateStorage({ [BK_LOG_STORAGE.SEARCH_TYPE]: 0 });
 
     // 构建查询参数
     const queryParams: any = {
-      spaceUid: store.state.spaceUid,
+      spaceUid: globalStore.spaceUid,
       search_mode: 'ui',
       addition: JSON.stringify(conditions),
     };

@@ -26,7 +26,7 @@
 
 import { defineComponent, ref, computed, watch, onMounted } from "vue";
 import $http from "@/api";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import { type ClusteringInfo } from "@/services/retrieve";
 import { type IResponseData } from "@/services/type";
 import ConfigItem from "./config-item";
@@ -75,7 +75,12 @@ export default defineComponent({
       label_name: [],
     };
 
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const strategyConfigData = ref({
       /** 新类策略初始数据 */
@@ -89,7 +94,7 @@ export default defineComponent({
     /** 数量突增告警告警是否保存过 */
     const increaseIsSubmit = ref(false);
 
-    const bkBizId = computed(() => store.state.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     watch(alarmIsSubmit, () => {
       props.strategySubmitStatus?.(alarmIsSubmit.value);

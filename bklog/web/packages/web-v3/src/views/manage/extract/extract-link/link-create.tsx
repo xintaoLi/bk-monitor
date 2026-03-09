@@ -28,7 +28,7 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import ValidateUserSelector from '@/components/user-selector';
 import useLocale from '@/hooks/use-locale';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import http from '@/api';
 
@@ -37,7 +37,13 @@ import './link-create.scss';
 export default defineComponent({
   name: 'ExtractLinkCreateTsx',
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
     const { t } = useLocale();
 
@@ -107,7 +113,7 @@ export default defineComponent({
           editInitLinkType.value = formData.value.link_type;
         } catch (e) {
           console.warn(e);
-          router.push({ name: 'extract-link-list', query: { spaceUid: store.state.spaceUid } });
+          router.push({ name: 'extract-link-list', query: { spaceUid: globalStore.spaceUid } });
         } finally {
           if (isK8sDeploy.value && editInitLinkType.value === 'common') {
             isDisableCommon.value = true;
@@ -197,7 +203,7 @@ export default defineComponent({
           (window as any)?.bkMessage?.success?.(t('创建成功'));
         }
         isSubmit.value = true;
-        router.push({ name: 'extract-link-list', query: { spaceUid: store.state.spaceUid } });
+        router.push({ name: 'extract-link-list', query: { spaceUid: globalStore.spaceUid } });
       } catch (e) {
         console.warn(e);
         submitLoading.value = false;

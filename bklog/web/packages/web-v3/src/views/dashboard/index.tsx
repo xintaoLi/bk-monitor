@@ -8,7 +8,7 @@
  */
 
 import { defineComponent, ref, onMounted } from 'vue';
-import { Button, Card, Grid } from 'bkui-vue';
+import { Button, Card, Grid } from 'tdesign-vue-next';
 import { useDashboardStore } from '@/stores';
 import { useRouter } from 'vue-router';
 

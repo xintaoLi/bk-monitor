@@ -9,6 +9,8 @@ export interface HttpRequestConfig extends AxiosRequestConfig {
   skipErrorHandler?: boolean; // 跳过全局错误处理
   showMessage?: boolean; // 是否显示错误消息
   cancelToken?: any; // 取消令牌
+  query?: Record<string, any>; // URL query params (compatibility)
+  [key: string]: any; // Allow additional properties
 }
 
 /**
@@ -287,10 +289,26 @@ class HttpRequest {
   }
 
   /**
-   * 原始请求方法
+   * 原始请求方法（单参数）
    */
-  public request<T = any>(config: HttpRequestConfig): Promise<T> {
-    return this.instance.request(config);
+  public request<T = any>(config: HttpRequestConfig): Promise<T>;
+  
+  /**
+   * 原始请求方法（双参数，兼容旧 API）
+   */
+  public request<T = any>(url: string, config?: HttpRequestConfig, extraOptions?: Record<string, any>): Promise<T>;
+  
+  /**
+   * 原始请求方法实现
+   */
+  public request<T = any>(urlOrConfig: string | HttpRequestConfig, config?: HttpRequestConfig, _extraOptions?: Record<string, any>): Promise<T> {
+    if (typeof urlOrConfig === 'string') {
+      // 双参数形式：url + config
+      return this.instance.request({ url: urlOrConfig, ...config });
+    } else {
+      // 单参数形式：config
+      return this.instance.request(urlOrConfig);
+    }
   }
 }
 

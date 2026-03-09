@@ -28,7 +28,7 @@ import { computed, defineComponent, ref, watch } from 'vue';
 
 import { messageSuccess } from '@/common/bkmagic';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import VueDraggable from 'vuedraggable';
 
 import './index.scss';
@@ -40,13 +40,19 @@ export default defineComponent({
   },
   setup(_, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const fieldConfigRef = ref();
     const displayFieldNames = ref<string[]>([]); // 展示的字段名
     const confirmLoading = ref(false);
 
-    const totalFiels = computed(() => store.state.indexFieldInfo.fields);
+    const totalFiels = computed(() => indexFieldStore.indexFieldInfo.fields);
     const totalFieldNames = computed(() => totalFiels.value.map(item => item.field_name));
     const restFieldNames = computed(() => totalFieldNames.value.filter((field) => {
       return !displayFieldNames.value.includes(field);
@@ -62,7 +68,7 @@ export default defineComponent({
     };
 
     watch(
-      () => store.state.retrieve.catchFieldCustomConfig,
+      () => (retrieveStore as any).catchFieldCustomConfig,
       (config) => {
         const fields = config.contextDisplayFields;
         if (fields?.length > 0) {

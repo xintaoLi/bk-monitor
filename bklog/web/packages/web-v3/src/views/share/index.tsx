@@ -9,7 +9,6 @@
 
 import { defineComponent } from 'vue';
 import { useRoute } from 'vue-router';
-import { Result, Button } from 'bkui-vue';
 
 /**
  * 分享页面
@@ -26,13 +25,11 @@ export default defineComponent({
     return () => (
       <div class='share-page'>
         <div class='share-content'>
-          <Result
-            title='分享页面'
-            subTitle={`分享ID: ${shareId}`}
-            icon='success'
-          >
-            <Button theme='primary'>查看详情</Button>
-          </Result>
+          <div class='share-result'>
+            <h2>分享页面</h2>
+            <p>分享ID: {shareId}</p>
+            <t-button theme='primary'>查看详情</t-button>
+          </div>
         </div>
       </div>
     );

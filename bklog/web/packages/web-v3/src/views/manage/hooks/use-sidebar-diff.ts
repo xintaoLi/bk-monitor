@@ -28,7 +28,7 @@ import { ref, computed, watch } from 'vue';
 
 import { deepClone, deepEqual } from '@/common/util';
 import useLocale from '@/hooks/use-locale';
-import { InfoBox } from 'bk-magic-vue';
+import { DialogPlugin } from 'tdesign-vue-next';
 
 export function useSidebarDiff(formData: Record<string, any>) {
   const { t } = useLocale();
@@ -59,11 +59,11 @@ export function useSidebarDiff(formData: Record<string, any>) {
   function isSidebarClosed(): Promise<boolean> {
     return new Promise(resolve => {
       if (isChange.value) {
-        InfoBox({
+        DialogPlugin.confirm({
           extCls: 'sideslider-close-cls',
-          title: t('确认离开当前页？'),
-          subTitle: t('离开将会导致未保存信息丢失'),
-          okText: t('离开'),
+          header: t('确认离开当前页？'),
+          body: t('离开将会导致未保存信息丢失'),
+          confirmBtn: t('离开'),
           confirmFn() {
             resolve(true);
             isChange.value = false;

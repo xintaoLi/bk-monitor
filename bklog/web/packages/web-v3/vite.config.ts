@@ -6,6 +6,8 @@ import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { TDesignResolver } from 'unplugin-vue-components/resolvers';
 import monacoEditorPlugin from 'vite-plugin-monaco-editor';
+// @ts-ignore - CommonJS interop issue
+const monacoPlugin = (monacoEditorPlugin as any).default || monacoEditorPlugin;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -44,7 +46,7 @@ export default defineConfig(({ mode }) => {
       }),
       
       // Monaco Editor 支持
-      monacoEditorPlugin({
+      monacoPlugin({
         languageWorkers: ['json', 'editorWorkerService'],
         customWorkers: [
           {
@@ -76,10 +78,7 @@ export default defineConfig(({ mode }) => {
       preprocessorOptions: {
         scss: {
           api: 'modern-compiler',
-          additionalData: `
-            @import "@/assets/styles/variables.scss";
-            @import "@/assets/styles/mixins.scss";
-          `,
+          additionalData: `@import "@/assets/styles/_shared.scss";`,
         },
       },
     },

@@ -28,9 +28,9 @@ import { defineComponent, ref, computed } from 'vue';
 
 import { xssFilter } from '@/common/util';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import BkUserSelector from '@blueking/user-selector';
-import { Message } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 
 import http from '@/api';
 
@@ -45,7 +45,13 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const isShowDialog = ref(false);
@@ -54,7 +60,7 @@ export default defineComponent({
     const chatName = ref(''); // 群聊名称
     const userApi = (window as any).BK_LOGIN_URL;
 
-    const userMeta = computed(() => store.state.userMeta);
+    const userMeta = computed(() => userStore.userInfo);
     const globalsData = computed(() => store.getters['globals/globalsData']);
     const esSourceList = computed(() => globalsData.value.es_source_type || []);
     const customTypeIntro = computed(() => filterSourceShow(esSourceList.value) || []);
@@ -92,11 +98,11 @@ export default defineComponent({
       try {
         const res = await http.request('collect/createWeWork', { data });
         if (res.data) {
-          Message({ theme: 'success', message: t('创建成功') });
+          MessagePlugin.success({ content: t('创建成功') });
           isShowDialog.value = false;
         }
       } catch {
-        Message({ theme: 'error', message: t('创建失败') });
+        MessagePlugin.error({ content: t('创建失败') });
         isShowDialog.value = false;
       }
     };

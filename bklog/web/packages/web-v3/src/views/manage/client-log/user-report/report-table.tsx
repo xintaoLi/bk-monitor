@@ -31,7 +31,7 @@ import EmptyStatus from '@/components/empty-status/index.vue';
 
 import { t } from '@/hooks/use-locale';
 import * as authorityMap from '../../../../common/authority-map';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import { useTableSetting } from '../hooks/use-table-setting';
 import { useSearchTask } from '../hooks/use-search-task';
 import { FileUploadStatus, UserReportItem } from './types';
@@ -78,7 +78,12 @@ export default defineComponent({
   },
   emits: ['page-change', 'page-limit-change', 'search', 'sort-change', 'upload', 'selection-change'],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const reportTableRef = ref(null);
 
@@ -339,12 +344,12 @@ export default defineComponent({
           resources: [
             {
               type: 'space',
-              id: store.state.spaceUid,
+              id: globalStore.spaceUid,
             },
           ],
         };
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       }
     };
 

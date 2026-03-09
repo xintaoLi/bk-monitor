@@ -27,7 +27,7 @@
 import { defineComponent, ref, onMounted, computed, watch } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { useOperation } from '../../../../hook/useOperation';
 import $http from '@/api';
@@ -55,13 +55,18 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const indexName = ref('');
     const tableData = ref([]);
     const basicLoading = ref(false);
     const collectionList = ref([]);
     const confirmLoading = ref(false);
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     const { handleMultipleSelected, tableLoading } = useOperation();
     onMounted(() => {
       fetchCollectionList();
@@ -205,12 +210,12 @@ export default defineComponent({
               }}
               columns={[
                 {
-                  title: t('字段'),
+                  header: t('字段'),
                   colKey: 'field_name',
                   ellipsis: true,
                 },
                 {
-                  title: t('类型'),
+                  header: t('类型'),
                   colKey: 'field_type',
                   ellipsis: true,
                 },

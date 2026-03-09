@@ -27,7 +27,7 @@
 import { defineComponent, onBeforeUnmount, onMounted, ref, computed, watch } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import { useRoute, useRouter } from 'vue-router/composables';
+import { useRoute, useRouter } from 'vue-router';
 import { useCollectList } from '../../hook/useCollectList';
 import CollectIssuedSlider from '../business-comp/step3/collect-issued-slider';
 import StepClassify from './step1-classify';
@@ -51,7 +51,7 @@ export default defineComponent({
     const DEFAULT_STEP = 1;
     const step = ref(DEFAULT_STEP);
     const typeKey = ref('linux');
-    const firstStep = [{ title: t('索引集分类'), icon: 1, components: StepClassify }];
+    const firstStep = [{ header: t('索引集分类'), icon: 1, components: StepClassify }];
     const { goListPage } = useCollectList();
     const dataConfig = ref({});
     const showCollectIssuedSlider = ref(false);
@@ -68,20 +68,20 @@ export default defineComponent({
     };
 
     const stepDesc = [
-      { title: t('采集配置'), icon: 2, components: StepConfiguration },
-      { title: t('字段清洗'), icon: 3, components: StepClean },
-      { title: t('存储'), icon: 4, components: StepStorage },
+      { header: t('采集配置'), icon: 2, components: StepConfiguration },
+      { header: t('字段清洗'), icon: 3, components: StepClean },
+      { header: t('存储'), icon: 4, components: StepStorage },
     ];
     /**
      * 第三方日志新建流程 （计算平台、第三方ES接入)流程
      */
-    const thirdLogStep = [{ title: t('采集配置'), icon: 2, components: StepBkDataCollection }];
+    const thirdLogStep = [{ header: t('采集配置'), icon: 2, components: StepBkDataCollection }];
     /**
      * 自定义日志新建流程
      */
     const customReportStep = [
-      { title: t('采集配置'), icon: 2, components: StepCustomReport },
-      { title: t('存储'), icon: 3, components: StepStorage },
+      { header: t('采集配置'), icon: 2, components: StepCustomReport },
+      { header: t('存储'), icon: 3, components: StepStorage },
     ];
 
     const currentStatus = ref({

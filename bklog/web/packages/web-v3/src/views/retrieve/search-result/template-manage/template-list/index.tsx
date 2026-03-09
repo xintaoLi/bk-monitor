@@ -24,7 +24,7 @@
  * IN THE SOFTWARE.
  */
 import { computed, defineComponent, ref, nextTick, watch } from "vue";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import useLocale from "@/hooks/use-locale";
 import $http from "@/api";
 import CreateTemplate from "./create-template";
@@ -50,13 +50,18 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const currentTemplateIndex = ref(0);
     const searchValue = ref("");
     const templateList = ref<TemplateItemType[]>([]);
 
-    const spaceUid = computed(() => store.state.spaceUid);
+    const spaceUid = computed(() => globalStore.spaceUid);
     const currentTemplate = computed(
       () => templateList.value[currentTemplateIndex.value],
     );

@@ -227,8 +227,8 @@ export const MENU_LIST = [
  * @param message 消息内容
  * @param theme 主题类型
  */
-export const showMessage = (message: string, theme: 'error' | 'success' | 'warning' = 'success'): void => {
-  window.mainComponent?.$bkMessage({ message, theme });
+export const showMessage = (content: string, theme: 'error' | 'success' | 'warning' = 'success'): void => {
+  window.mainComponent?.$bkMessagePlugin.success({ message, theme });
 };
 
 // 常量定义
@@ -422,3 +422,6 @@ export const getContainerNameList = (containerName = '') => {
   if (splitList.length === 1 && splitList[0] === '') return [];
   return splitList;
 };
+
+// Filter type for button type
+export type btnType = 'match' | 'not_match' | 'equal' | 'not_equal' | string;

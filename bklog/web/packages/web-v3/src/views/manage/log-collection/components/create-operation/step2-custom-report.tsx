@@ -27,8 +27,8 @@
 import { defineComponent, ref, computed, onMounted } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import { useRoute } from 'vue-router/composables';
-import useStore from '@/hooks/use-store';
+import { useRoute } from 'vue-router';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { useOperation } from '../../hook/useOperation';
 import BaseInfo from '../business-comp/step2/base-info';
@@ -49,7 +49,13 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const { cardRender } = useOperation();
     const baseInfoRef = ref();
@@ -103,7 +109,7 @@ export default defineComponent({
           ...res?.data,
           index_set_name: collector_config_name,
         };
-        store.commit('collect/setCurCollect', res.data);
+        (globalStore as any).commit('collect/setCurCollect', res.data);
       } else {
         const { retention } = configData.value;
         Object.assign(configData.value, {
@@ -128,7 +134,7 @@ export default defineComponent({
 
     const cardConfig = [
       {
-        title: t('基础信息'),
+        header: t('基础信息'),
         key: 'baseInfo',
         renderFn: renderBaseInfo,
       },

@@ -28,9 +28,9 @@ import { defineComponent, ref, computed, watch } from 'vue';
 
 import { messageError } from '@/common/bkmagic';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import ValidateUserSelector from '@/components/user-selector';
-import { Message } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 
 import { useSidebarDiff } from '../../hooks/use-sidebar-diff';
 import { useSpaceSelector } from '../../hooks/use-space-selector';
@@ -62,7 +62,13 @@ export default defineComponent({
   },
   emits: ['handleCancelSlider', 'handleUpdatedTable'],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     // 表单与组件引用
@@ -137,7 +143,7 @@ export default defineComponent({
         { required: true, trigger: 'blur' },
         {
           validator: (val: string) => /^[_A-Za-z0-9][_A-Za-z0-9-]{0,49}$/.test(val),
-          message: t('支持字母、数字、下划线、连字符，不能以连字符开头'),
+          content: t('支持字母、数字、下划线、连字符，不能以连字符开头'),
           trigger: 'blur',
         },
       ],
@@ -181,9 +187,9 @@ export default defineComponent({
     const isFirstShow = ref(true); // 是否是第一次渲染
     const selectZIndex = ref(3007);
 
-    const mySpaceList = computed(() => store.state.mySpaceList);
-    const userMeta = computed(() => store.state.userMeta);
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const mySpaceList = computed(() => (globalStore as any).mySpaceList);
+    const userMeta = computed(() => userStore.userInfo);
+    const bkBizId = computed(() => globalStore.bkBizId);
     const globalsData = computed(() => store.getters['globals/globalsData']);
     const isEdit = computed(() => props.editClusterId !== null);
 
@@ -504,7 +510,7 @@ export default defineComponent({
 
         confirmLoading.value = true;
         await http.request(url, { data: newPostData, params: paramsData });
-        Message({ theme: 'success', message: t('保存成功'), delay: 1500 });
+        MessagePlugin.success({ content: t('保存成功'), delay: 1500 });
         emit('handleUpdatedTable');
       } catch (e) {
         console.warn(e);
@@ -525,7 +531,7 @@ export default defineComponent({
         messageType = t('可见类型为业务属性时，业务标签不能为空');
       }
       if (messageType) {
-        Message({ theme: 'error', message: messageType });
+        MessagePlugin.error({ content: messageType });
         return false;
       }
       return true;

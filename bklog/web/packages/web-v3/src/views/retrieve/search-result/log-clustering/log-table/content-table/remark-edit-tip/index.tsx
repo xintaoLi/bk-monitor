@@ -26,7 +26,7 @@
 
 import { computed, defineComponent, ref, watch } from "vue";
 import useLocale from "@/hooks/use-locale";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import { bkMessage } from "bk-magic-vue";
 import { formatDate } from "@/common/util";
 import $http from "@/api";
@@ -58,7 +58,12 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const remarkTipsRef = ref<HTMLElement>();
     const formRef = ref<any>(null);
@@ -70,7 +75,7 @@ export default defineComponent({
       textInputStr: "",
     });
 
-    const username = computed(() => store.state.userMeta?.username);
+    const username = computed(() => userStore.userInfo?.username);
 
     const rules = {
       textInputStr: [

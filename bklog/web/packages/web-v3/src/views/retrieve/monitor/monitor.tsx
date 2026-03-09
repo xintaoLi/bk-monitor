@@ -26,7 +26,7 @@
 
 import { computed, defineComponent, provide, watch } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { TimeRangeType } from '../../../components/time-range/time-range';
 import { handleTransformToTimestamp } from '../../../components/time-range/utils';
@@ -67,7 +67,12 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     provide('handleChartDataZoom', props.handleChartDataZoom);
     const {
       isSearchContextStickyTop,
@@ -77,10 +82,10 @@ export default defineComponent({
       getIndexSetList,
       setDefaultRouteUrl,
     } = useMonitorAppInit(props.indexSetApi);
-    const isStartTextEllipsis = computed(() => store.state.storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR] === 'start');
+    const isStartTextEllipsis = computed(() => (globalStore as any).storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR] === 'start');
     const init = () => {
-      const result = handleTransformToTimestamp(props.timeRange as TimeRangeType, store.getters.retrieveParams.format);
-      store.commit('updateIndexItem', {
+      const result = handleTransformToTimestamp(props.timeRange as TimeRangeType, retrieveStore.searchParams.format);
+      (globalStore as any).commit('updateIndexItem', {
         start_time: result[0],
         end_time: result[1],
         datePickerValue: props.timeRange,
@@ -96,11 +101,12 @@ export default defineComponent({
       async val => {
         if (!val) return;
         getIndexSetList();
-        store.commit('updateIsSetDefaultTableColumn', false);
-        const result = handleTransformToTimestamp(val as TimeRangeType, store.getters.retrieveParams.format);
-        store.commit('updateIndexItemParams', { start_time: result[0], end_time: result[1], datePickerValue: val });
-        await store.dispatch('requestIndexSetFieldInfo');
-        store.dispatch('requestIndexSetQuery');
+        (globalStore as any).commit('updateIsSetDefaultTableColumn', false);
+        const result = handleTransformToTimestamp(val as TimeRangeType, retrieveStore.searchParams.format);
+        retrieveStore.updateIndexItemParams({ start_time: result[0], end_time: result[1], datePickerValue: val });
+        // TODO: 实现索引字段和查询请求
+        // await indexFieldStore.requestIndexSetFieldInfo();
+        // await retrieveStore.requestIndexSetQuery();
       },
     );
 
@@ -108,16 +114,16 @@ export default defineComponent({
       () => props.timezone,
       val => {
         if (!val) return;
-        store.commit('updateIndexItemParams', { timezone: val });
+        retrieveStore.updateIndexItemParams({ timezone: val });
         updateTimezone(val);
-        store.dispatch('requestIndexSetQuery');
+        // TODO: retrieveStore.requestIndexSetQuery();
       },
     );
 
     watch(
       () => props.refreshImmediate,
       () => {
-        store.dispatch('requestIndexSetQuery');
+        // TODO: retrieveStore.requestIndexSetQuery();
       },
     );
 

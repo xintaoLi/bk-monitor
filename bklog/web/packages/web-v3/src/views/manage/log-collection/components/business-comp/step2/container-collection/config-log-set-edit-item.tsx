@@ -27,7 +27,7 @@
 import { defineComponent, computed, ref, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import LabelChooseDialog from './label-choose-dialog';
 import LabelItemChoose from './label-item-choose';
@@ -72,7 +72,12 @@ export default defineComponent({
     // 使用国际化翻译函数
     const { t } = useLocale();
 
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     // 控制编辑状态
     const handleEdit = ref(false);
@@ -119,7 +124,7 @@ export default defineComponent({
 
     // 计算属性：是否为标签编辑
     const isLabelEdit = computed(() => props.editType === 'label_selector');
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     // 计算属性：获取对应的键名（match_expressions 或 match_annotations）
     const typeKeys = computed(() => (isLabelEdit.value ? 'match_expressions' : 'match_annotations'));

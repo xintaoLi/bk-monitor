@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import type { UserInfo } from '@/types';
+import type { UserStore } from './types';
 
 interface UserState {
   userInfo: UserInfo | null;
@@ -84,4 +85,4 @@ export const useUserStore = defineStore('user', {
   persist: {
     enabled: false, // 是否持久化
   },
-});
+}) as () => UserStore;

@@ -25,7 +25,7 @@
  */
 
 import { defineComponent, ref, watch } from 'vue';
-import { bkMessage } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 import useLocale from '@/hooks/use-locale';
 
 import './index.scss';
@@ -111,10 +111,7 @@ export default defineComponent({
     const handleEnterCompared = val => {
       const matchVal = val.match(/^(\d+)h$/);
       if (!matchVal) {
-        bkMessage({
-          theme: 'warning',
-          message: t('请按照提示输入'),
-        });
+        MessagePlugin.warning(t('请按照提示输入'));
         return;
       }
       changeCustomizeState(true);

@@ -31,7 +31,7 @@ import LogIpSelector, { toSelectorNode, toTransformNode } from '@/components/log
 import useLocale from '@/hooks/use-locale';
 import useRoute from '@/hooks/use-route';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import http from '@/api';
 // #else
@@ -53,7 +53,12 @@ export default defineComponent({
     PreviewFiles,
   },
   setup(_props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
     const router = useRouter();
     const route = useRoute();
@@ -88,7 +93,7 @@ export default defineComponent({
     });
 
     // 获取全局数据
-    const globalsData = computed(() => store.getters.globalsData);
+    const globalsData = computed(() => (globalStore as any).globalsData);
 
     // 检查是否为克隆模式并初始化克隆数据
     const checkIsClone = async () => {
@@ -127,7 +132,7 @@ export default defineComponent({
             host_list: requestIpList,
           },
           params: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         })
         .then(res => {
@@ -143,7 +148,7 @@ export default defineComponent({
     const getExtractLinkList = () => {
       http
         .request('extract/getExtractLinkList', {
-          data: { bk_biz_id: store.state.bkBizId },
+          data: { bk_biz_id: globalStore.bkBizId },
         })
         .then(res => {
           extractLinks.value = res.data;
@@ -159,7 +164,7 @@ export default defineComponent({
       http
         .request('extract/getAvailableExplorerPath', {
           data: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             ip_list: cloneData.ip_list,
           },
         })
@@ -190,7 +195,7 @@ export default defineComponent({
       try {
         const strategies = await http.request('extract/getAvailableExplorerPath', {
           data: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             ip_list: newIpList,
           },
         });
@@ -232,7 +237,7 @@ export default defineComponent({
       isSubmitLoading.value = true;
       // 根据预览地址选择的文件提交下载任务
       const requestData = {
-        bk_biz_id: store.state.bkBizId,
+        bk_biz_id: globalStore.bkBizId,
         ip_list: ipList.value, // 下载目标
         preview_directory: fileOrPath.value, // 目录
         preview_ip_list: previewRef.value?.getFindIpList(), // 预览地址
@@ -266,7 +271,7 @@ export default defineComponent({
       router.push({
         name: 'log-extract-task',
         query: {
-          spaceUid: store.state.spaceUid,
+          spaceUid: globalStore.spaceUid,
         },
       });
     };

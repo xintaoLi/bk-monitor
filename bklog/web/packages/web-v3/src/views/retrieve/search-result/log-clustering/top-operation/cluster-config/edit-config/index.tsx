@@ -30,8 +30,8 @@ import FilterRule from '@/components/filter-rule';
 import RuleConfigOperate from '@/components/rule-config-operate';
 import RuleTable from '@/components/rule-table';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { bkNotify } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { NotifyPlugin } from 'tdesign-vue-next';
 
 import RuleOperate from './rule-operate';
 import $http from '@/api';
@@ -62,7 +62,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const ruleConfigOperateRef = ref<any>(null);
     const ruleOperateRef = ref<any>();
@@ -91,8 +96,8 @@ export default defineComponent({
     const ruleList = ref<Record<string, string>[]>([]);
 
     const isRuleTableReadonly = computed(() => currentRuleType.value === 'template');
-    const configId = computed(() => store.state.indexSetFieldConfig.clean_config?.extra.collector_config_id);
-    const indexSetItem = computed(() => store.state.indexItem.items[0]);
+    const configId = computed(() => (globalStore as any).indexSetFieldConfig.clean_config?.extra.collector_config_id);
+    const indexSetItem = computed(() => retrieveStore.indexItem.items[0]);
 
     const rules = {
       clustering_fields: [
@@ -225,11 +230,10 @@ export default defineComponent({
               },
             })
             .then(() => {
-              bkNotify({
+              NotifyPlugin.info({
                 title: t('保存待生效'),
-                message: t('该保存需要10分钟生效, 请耐心等待'),
-                limitLine: 3,
-                offsetY: 80,
+                content: t('该保存需要10分钟生效, 请耐心等待'),
+                offset: [80, 0],
               });
               emit('close');
             })

@@ -28,7 +28,7 @@ import { defineComponent, ref } from 'vue';
 
 import { copyMessage } from '@/common/util';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 export default defineComponent({
   name: 'DownloadUrl',
@@ -39,7 +39,13 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const loading = ref(false); // 加载状态

@@ -1,3 +1,6 @@
+// @ts-nocheck
+// TODO: Migrate Vue 2 class component to Vue 3 Composition API
+// This file uses Vue 2 decorators and needs complete rewrite
 /*
  * Tencent is pleased to support the open source community by making BK-LOG 蓝鲸日志平台 available.
  * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.

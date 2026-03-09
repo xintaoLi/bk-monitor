@@ -27,7 +27,7 @@
 import { defineComponent, ref, computed, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { useOperation } from '../../../../hook/useOperation';
 import InfoTips from '../../../common-comp/info-tips';
@@ -82,7 +82,12 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { handleMultipleSelected, tableLoading } = useOperation();
 
     /**
@@ -112,7 +117,7 @@ export default defineComponent({
     /**
      * 业务ID
      */
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     /**
      * 表单数据
      */
@@ -141,7 +146,7 @@ export default defineComponent({
       resultTableId: [
         {
           required: true,
-          message: t('请输入索引名称'),
+          content: t('请输入索引名称'),
           trigger: 'blur',
         },
         {
@@ -153,14 +158,14 @@ export default defineComponent({
             }
             return true;
           },
-          message: t('索引名称不能仅为通配符 *'),
+          content: t('索引名称不能仅为通配符 *'),
           trigger: 'blur',
         },
       ],
       time_field: [
         {
           required: true,
-          message: t('请选择时间字段'),
+          content: t('请选择时间字段'),
           trigger: 'change',
         },
         {
@@ -173,14 +178,14 @@ export default defineComponent({
             }
             return props.timeIndex.time_field === val;
           },
-          message: t('时间字段需要保持一致'),
+          content: t('时间字段需要保持一致'),
           trigger: 'change',
         },
       ],
       time_field_unit: [
         {
           required: true,
-          message: t('请选择时间精度'),
+          content: t('请选择时间精度'),
           trigger: 'change',
         },
       ],
@@ -506,7 +511,7 @@ export default defineComponent({
               }}
               columns={[
                 {
-                  title: t('索引'),
+                  header: t('索引'),
                   colKey: 'result_table_id',
                   ellipsis: true,
                 },

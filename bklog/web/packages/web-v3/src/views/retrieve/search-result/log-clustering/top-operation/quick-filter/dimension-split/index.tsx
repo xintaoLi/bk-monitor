@@ -27,7 +27,7 @@
 import { computed, defineComponent, onMounted, ref } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import { bkInfoBox } from 'bk-magic-vue';
+import { DialogPlugin } from 'tdesign-vue-next';
 
 import $http from '@/api';
 
@@ -123,10 +123,10 @@ export default defineComponent({
         const catchDimensionSortStr = catchDimension.value.sort().join(',');
         const isShowInfo = dimensionSortStr !== catchDimensionSortStr;
         if (isShowInfo) {
-          bkInfoBox({
-            type: 'warning',
-            title: t('修改维度字段会影响已有备注、告警配置，如无必要，请勿随意变动。请确定是否修改？'),
-            confirmFn: async () => {
+          DialogPlugin.confirm({
+            theme: 'warning',
+            header: t('修改维度字段会影响已有备注、告警配置，如无必要，请勿随意变动。请确定是否修改？'),
+            onConfirm: async () => {
               await updateInitGroup();
               finishEmit();
             },

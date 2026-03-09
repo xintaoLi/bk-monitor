@@ -33,7 +33,7 @@ import useLocale from "@/hooks/use-locale";
 import { type RuleTemplate } from "@/services/log-clustering";
 import { bkMessage } from "bk-magic-vue";
 import dayjs from "dayjs";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 
 import $http from "@/api";
 import CreateTemplate from "./create-template";

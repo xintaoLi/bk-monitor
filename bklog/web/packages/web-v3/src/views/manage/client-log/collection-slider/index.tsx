@@ -26,9 +26,8 @@
 
 import { defineComponent, ref, watch } from 'vue';
 
-import useStore from '@/hooks/use-store';
-import { InfoBox, Message } from 'bk-magic-vue';
-import { BK_LOG_STORAGE } from '@/store/store.type';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import { t } from '@/hooks/use-locale';
 import { TRIGGER_FREQUENCY_OPTIONS, CLIENT_TYPE_OPTIONS, TASK_STAGE_OPTIONS, SUSTAIN_TIME_OPTIONS } from '../constant';
@@ -55,7 +54,12 @@ export default defineComponent({
   },
   emits: ['cancel-slider', 'updated-table'],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const confirmLoading = ref(false); // 确认按钮加载状态
     const formData = ref({
@@ -111,8 +115,8 @@ export default defineComponent({
         // 设置提交按钮为加载状态
         confirmLoading.value = true;
 
-        const postData = {
-          bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+        const postData: Record<string, any> = {
+          bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
           task_name: formData.value.task_name,
           openid: formData.value.openid,
           scene: formData.value.scene,
@@ -134,7 +138,7 @@ export default defineComponent({
         await http.request('collect/createCollectionTask', {
           data: postData,
         });
-        Message({ theme: 'success', message: t('保存成功'), delay: 1500 });
+        MessagePlugin.success({ content: t('保存成功'), delay: 1500 });
 
         // 通知父组件刷新列表
         emit('updated-table');
@@ -185,12 +189,12 @@ export default defineComponent({
         emit('cancel-slider');
         return;
       }
-      InfoBox({
-        title: t('确认离开当前页？'),
-        subTitle: t('离开将会导致未保存信息丢失'),
-        okText: t('离开'),
-        cancelText: t('取消'),
-        confirmFn: () => emit('cancel-slider'),
+      DialogPlugin.confirm({
+        header: t('确认离开当前页？'),
+        body: t('离开将会导致未保存信息丢失'),
+        confirmBtn: t('离开'),
+        cancelBtn: t('取消'),
+        onConfirm: () => emit('cancel-slider'),
       });
     };
 

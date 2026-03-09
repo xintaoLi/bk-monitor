@@ -26,7 +26,7 @@
 
 import { computed, defineComponent, ref, nextTick, watch } from "vue";
 import useLocale from "@/hooks/use-locale";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import tippy from "tippy.js";
 import RegexTable, { type RowData } from "./regex-table";
 import { bkMessage } from "bk-magic-vue";
@@ -65,7 +65,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const previewBtnRef = ref<HTMLElement>();
     const secondConfirmRef = ref<any>(null);
@@ -79,10 +84,10 @@ export default defineComponent({
     const isConfirmLoading = ref(false);
     const regexList = ref<RowData[]>([]);
 
-    const indexSetItem = computed(() => store.state.indexItem.items[0]);
+    const indexSetItem = computed(() => retrieveStore.indexItem.items[0]);
     const configId = computed(
       () =>
-        store.state.indexSetFieldConfig.clean_config?.extra.collector_config_id
+        (globalStore as any).indexSetFieldConfig.clean_config?.extra.collector_config_id
     );
     // 选中的划词
     let occupyOriginStr = "";

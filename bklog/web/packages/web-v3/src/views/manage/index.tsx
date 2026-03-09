@@ -9,7 +9,7 @@
 
 import { defineComponent, ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Menu } from 'bkui-vue';
+import { Menu } from 'tdesign-vue-next';
 import { useGlobalStore } from '@/stores';
 
 import './index.scss';

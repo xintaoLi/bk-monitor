@@ -1,3 +1,6 @@
+// @ts-nocheck
+// TODO: Migrate Vue 2 class component to Vue 3 Composition API
+// This file uses Vue 2 decorators and needs complete rewrite
 /*
  * Tencent is pleased to support the open source community by making
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.

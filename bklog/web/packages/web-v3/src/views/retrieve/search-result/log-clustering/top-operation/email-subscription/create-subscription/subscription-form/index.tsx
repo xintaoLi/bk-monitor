@@ -28,8 +28,8 @@ import { defineComponent, ref } from "vue";
 import SubscriptionContent from "./subscription-content";
 import EmailConfig from "./email-config";
 import SendConfig from "./send-config";
-import useStore from "@/hooks/use-store";
-import { useRoute } from "vue-router/composables";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
+import { useRoute } from "vue-router";
 import "./index.scss";
 
 export default defineComponent({
@@ -54,7 +54,12 @@ export default defineComponent({
     },
   },
   setup(props, { expose }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
 
     const subscriptionContentRef = ref<any>(null);
@@ -82,7 +87,7 @@ export default defineComponent({
             is_enabled: true,
             subscribers: [
               {
-                id: store.state.userMeta?.username || "",
+                id: userStore.userInfo?.username || "",
                 type: "user",
                 is_enabled: true,
               },

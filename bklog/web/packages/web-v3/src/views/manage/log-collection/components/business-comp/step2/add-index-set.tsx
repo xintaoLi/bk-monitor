@@ -27,7 +27,7 @@
 import { defineComponent, type PropType, ref, nextTick, computed, onMounted } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { showMessage } from '../../../utils';
 import $http from '@/api';
@@ -55,7 +55,12 @@ export default defineComponent({
 
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const inputRef = ref();
     const editFormRef = ref();
     const loading = ref(false);
@@ -63,13 +68,13 @@ export default defineComponent({
       index_set_name: [
         {
           required: true,
-          message: t('请输入索引集名称'),
+          content: t('请输入索引集名称'),
           trigger: 'blur',
         },
         {
           min: 1,
           max: 50,
-          message: t('索引集名称长度应在1-50个字符之间'),
+          content: t('索引集名称长度应在1-50个字符之间'),
           trigger: 'blur',
         },
       ],
@@ -77,7 +82,7 @@ export default defineComponent({
     const editData = ref<IListItemData>({
       index_set_name: '',
     });
-    const spaceUid = computed(() => store.getters.spaceUid);
+    const spaceUid = computed(() => globalStore.spaceUid);
 
     onMounted(() => {
       editData.value = { ...props.data };
@@ -86,7 +91,7 @@ export default defineComponent({
      *
      * @param config
      */
-    const handleRequest = async (config: { method: string; params?: any; data?: any; message: string }) => {
+    const handleRequest = async (config: { method: string; params?: any; data?: any; content: string; message?: string }) => {
       loading.value = true;
       const res = await $http.request(config.method, {
         params: config.params,

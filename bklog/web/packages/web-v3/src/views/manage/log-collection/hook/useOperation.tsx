@@ -31,7 +31,7 @@
 import { computed, ref, type Ref } from 'vue';
 
 import * as authorityMap from '@/common/authority-map';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import $http from '@/api';
 
@@ -60,8 +60,13 @@ type ResponseTransformCallback<T = unknown> = (_response: IApiResponse) => T;
  * @returns 返回操作相关的状态和方法
  */
 export const useOperation = () => {
-  const store = useStore();
-  const spaceUid = computed(() => store.getters.spaceUid);
+  const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
+  const spaceUid = computed(() => globalStore.spaceUid);
 
   // ==================== 状态管理 ====================
 

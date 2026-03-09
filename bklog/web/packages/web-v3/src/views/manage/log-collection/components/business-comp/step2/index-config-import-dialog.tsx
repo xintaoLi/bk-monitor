@@ -27,8 +27,8 @@
 import { computed, defineComponent, ref, watch, type PropType, onBeforeUnmount } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { bkMessage } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin } from 'tdesign-vue-next';
 import axios from 'axios';
 import $http from '@/api';
 import TableComponent from '../../common-comp/table-component';
@@ -102,7 +102,12 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     // const route = useRoute();
     const etlConfigEnum = {
       bk_log_text: t('直接入库'),
@@ -184,34 +189,34 @@ export default defineComponent({
 
     const allColumns = computed(() => [
       {
-        title: '',
+        header: '',
         colKey: '',
         cell: (h, { row }) => checkBoxSlot(row),
         width: 60,
         ellipsis: true,
       },
       {
-        title: t('索引集'),
+        header: t('索引集'),
         colKey: 'name',
         ellipsis: true,
       },
       {
-        title: t('采集路径'),
+        header: t('采集路径'),
         colKey: 'paths',
         ellipsis: true,
       },
       {
-        title: t('清洗模式'),
+        header: t('清洗模式'),
         colKey: 'eltString',
         ellipsis: true,
       },
       {
-        title: t('存储集群'),
+        header: t('存储集群'),
         colKey: 'storage_display_name',
         ellipsis: true,
       },
       {
-        title: t('存储时长'),
+        header: t('存储时长'),
         colKey: 'retention',
         ellipsis: true,
       },
@@ -365,9 +370,9 @@ export default defineComponent({
       // 验证同步类型
       if (!syncType.value.length) {
         setTimeout(() => {
-          bkMessage({
-            theme: 'error',
-            message: t('请选择需要同步的配置'),
+          MessagePlugin.error({
+            
+            content: t('请选择需要同步的配置'),
           });
         }, 100);
         return;
@@ -392,9 +397,9 @@ export default defineComponent({
         })
         .catch(err => {
           console.log('获取采集器详情失败:', err);
-          bkMessage({
-            theme: 'error',
-            message: t('获取配置信息失败，请稍后重试'),
+          MessagePlugin.error({
+            
+            content: t('获取配置信息失败，请稍后重试'),
           });
         })
         .finally(() => {
@@ -451,7 +456,7 @@ export default defineComponent({
           'collect/newCollectList',
           {
             data: {
-              space_uid: store.getters.spaceUid,
+              space_uid: globalStore.spaceUid,
               page: current,
               pagesize: pageSize,
               keyword: searchKeyword.value,

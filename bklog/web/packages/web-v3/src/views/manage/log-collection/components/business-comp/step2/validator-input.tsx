@@ -96,7 +96,7 @@ export default defineComponent({
       inputValue: [
         {
           validator: checkValidator,
-          message: t('必填项'),
+          content: t('必填项'),
           trigger: 'blur',
         },
       ],

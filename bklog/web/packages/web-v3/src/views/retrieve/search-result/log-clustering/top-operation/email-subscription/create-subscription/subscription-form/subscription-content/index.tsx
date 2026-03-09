@@ -23,11 +23,11 @@
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-import { useRoute } from "vue-router/composables";
+import { useRoute } from "vue-router";
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import useLocale from "@/hooks/use-locale";
 import $http from "@/api";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import { type IndexSetDataList } from "@/services/retrieve";
 import { transformDataKey } from "@/components/monitor-echarts/utils";
 
@@ -52,7 +52,12 @@ export default defineComponent({
   setup(props, { expose }) {
     const { t } = useLocale();
     const route = useRoute();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const formRef = ref<any>(null);
     const formData = ref({
@@ -166,7 +171,7 @@ export default defineComponent({
       $http
         .request("retrieve/getIndexSetList", {
           query: {
-            space_uid: store.state.space.space_uid,
+            space_uid: (globalStore as any).space.space_uid,
           },
         })
         .then((response) => {

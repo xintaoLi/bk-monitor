@@ -26,7 +26,7 @@
 import { defineComponent, ref } from "vue";
 import useLocale from "@/hooks/use-locale";
 import { bkMessage } from "bk-magic-vue";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import SubscriptionForm from "./subscription-form";
 import $http from "@/api";
 
@@ -55,7 +55,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const createSubscriptionFormRef = ref<any>(null);
     const isSaving = ref(false);
@@ -99,7 +104,7 @@ export default defineComponent({
                 is_enabled: true,
                 subscribers: [
                   {
-                    id: store.state.userMeta?.username || "",
+                    id: userStore.userInfo?.username || "",
                     type: "user",
                     is_enabled: true,
                   },

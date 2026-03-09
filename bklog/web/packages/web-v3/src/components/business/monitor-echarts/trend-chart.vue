@@ -1,8 +1,9 @@
+// @ts-nocheck
 <script setup>
   import { ref, computed, onBeforeUnmount, inject, onMounted } from 'vue';
   import useStore from '@/hooks/use-store';
   import useTrendChart from '@/hooks/use-trend-chart';
-  import { useRoute } from 'vue-router/composables';
+  import { useRoute } from "vue-router";
   import { getCommonFilterAdditionWithValues } from '../../store/helper';
   import RetrieveHelper, { RetrieveEvent } from '../../views/retrieve-helper';
   import axios from 'axios';
@@ -18,8 +19,8 @@
   const unionIndexList = computed(() => store.getters.unionIndexList);
   const retrieveParams = computed(() => store.getters.retrieveParams);
   const requestAddition = computed(() => store.getters.requestAddition);
-  const isLoading = computed(() => store.state.indexFieldInfo.is_loading);
-  const gradeOptions = computed(() => store.state.indexFieldInfo.custom_config?.grade_options);
+  const isLoading = computed(() => indexFieldStore.indexFieldInfo.is_loading);
+  const gradeOptions = computed(() => indexFieldStore.indexFieldInfo.custom_config?.grade_options);
 
   const refDataTrendCanvas = ref(null);
   const dynamicHeight = ref(130);

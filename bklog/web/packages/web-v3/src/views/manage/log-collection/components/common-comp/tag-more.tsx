@@ -70,7 +70,7 @@ export default defineComponent({
       default: '',
       type: String,
     },
-    title: {
+    header: {
       default: '',
       type: String,
     },

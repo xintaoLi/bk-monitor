@@ -28,8 +28,7 @@ import { defineComponent, ref, onMounted, onBeforeUnmount, watch } from 'vue';
 
 import { t } from '@/hooks/use-locale';
 import http from '@/api';
-import { BK_LOG_STORAGE } from '@/store/store.type';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useRouter from '@/hooks/use-router';
 import useUtils from '@/hooks/use-utils';
 import ReportTable from './report-table';
@@ -63,7 +62,12 @@ export default defineComponent({
   },
   emits: ['update-total'],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
 
     const searchKeyword = ref('');
@@ -298,7 +302,7 @@ export default defineComponent({
       try {
         const params = {
           query: {
-            bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+            bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
             page: pagination.value.current,
             pagesize: pagination.value.limit,
             ...(searchKeyword.value && { keyword: searchKeyword.value }),
@@ -434,7 +438,7 @@ export default defineComponent({
 
       try {
         const requestData: any = {
-          bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+          bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
         };
 
         if (data.file_name_list && data.file_name_list.length > 0) {

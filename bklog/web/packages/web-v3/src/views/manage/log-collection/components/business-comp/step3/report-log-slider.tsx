@@ -31,6 +31,10 @@ import useLocale from '@/hooks/use-locale';
 
 import './report-log-slider.scss';
 import { showMessage } from '../../../utils';
+import { defineComponent as _defineComponent } from 'vue';
+
+// JsonFormatWrapper stub
+const JsonFormatWrapper = { name: 'JsonFormatWrapper', props: { data: Object, deep: Number }, render() { return <pre>{JSON.stringify((this as any).data, null, 2)}</pre>; } };
 /**
  * 上报日志详情
  */

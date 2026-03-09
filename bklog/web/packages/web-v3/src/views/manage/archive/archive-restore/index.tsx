@@ -30,9 +30,9 @@ import * as authorityMap from '@/common/authority-map';
 import { formatFileSize } from '@/common/util';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useUtils from '@/hooks/use-utils';
-import { InfoBox, Message } from 'bk-magic-vue';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import RestoreSlider from './restore-slider.tsx';
 import http from '@/api';
@@ -46,7 +46,12 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const isTableLoading = ref(false); // 表格加载状态
@@ -66,7 +71,7 @@ export default defineComponent({
       limitList: [10, 20, 50, 100],
     });
 
-    const bkBizId = computed(() => store.getters.bkBizId); // 业务ID
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
     const authorityMapComputed = computed(() => authorityMap); // 权限映射
 
     // 搜索处理
@@ -272,10 +277,10 @@ export default defineComponent({
       }
 
       if (operateType === 'delete') {
-        InfoBox({
-          type: 'warning',
-          title: t('确认删除该回溯？'),
-          confirmFn: () => requestDelete(row),
+        DialogPlugin.confirm({
+          theme: 'warning',
+          header: t('确认删除该回溯？'),
+          onConfirm: () => requestDelete(row),
         });
       }
     };
@@ -293,9 +298,8 @@ export default defineComponent({
           const page =
             dataList.value.length <= 1 ? (pagination.current > 1 ? pagination.current - 1 : 1) : pagination.current;
 
-          Message({
-            theme: 'success',
-            message: t('删除成功'),
+          MessagePlugin.success({
+            content: t('删除成功'),
           });
 
           if (page !== pagination.current) {
@@ -316,8 +320,8 @@ export default defineComponent({
     const getOptionApplyData = async (paramData: any) => {
       try {
         isTableLoading.value = true;
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       } catch (err) {
         console.warn('权限申请失败:', err);
       } finally {

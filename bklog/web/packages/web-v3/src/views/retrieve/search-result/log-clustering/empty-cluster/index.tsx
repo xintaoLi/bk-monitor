@@ -26,8 +26,8 @@
 
 import { computed, defineComponent } from 'vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute, useRouter } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute, useRouter } from 'vue-router';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import './index.scss';
 
@@ -44,13 +44,18 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const router = useRouter();
 
-    const collectorConfigId = computed(() => store.state.indexSetFieldConfig.clean_config.extra?.collector_config_id);
-    const indexSetItem = computed(() => store.state.indexItem);
-    const isHaveAnalyzed = computed(() => (store.state.indexFieldInfo.fields || []).some(item => item.is_analyzed));
+    const collectorConfigId = computed(() => (globalStore as any).indexSetFieldConfig.clean_config.extra?.collector_config_id);
+    const indexSetItem = computed(() => retrieveStore.indexItem);
+    const isHaveAnalyzed = computed(() => (indexFieldStore.indexFieldInfo.fields || []).some(item => item.is_analyzed));
     const exhibitText = computed(() =>
       collectorConfigId.value ? t('当前无可用字段，请前往日志清洗进行设置') : t('当前索引集不支持日志聚类设置'),
     );
@@ -69,7 +74,7 @@ export default defineComponent({
           name: 'clean-edit',
           params: { collectorId: collectorConfigId.value },
           query: {
-            spaceUid: store.state.spaceUid,
+            spaceUid: globalStore.spaceUid,
             backRoute: route.name,
           },
         });

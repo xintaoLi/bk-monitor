@@ -29,8 +29,8 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import * as authorityMap from '@/common/authority-map';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { Message, InfoBox } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import ConfigSlider from './config-slider.tsx';
 import http from '@/api';
@@ -44,7 +44,12 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
     const directoryRef = ref<any>(null);
 
@@ -67,14 +72,14 @@ export default defineComponent({
     const userApi = ref(''); // 用户API
     const emptyType = ref('empty'); // 空状态类型
 
-    const spaceUid = computed(() => store.getters.spaceUid); // 空间UID
-    const bkBizId = computed(() => store.state.bkBizId); // 业务ID
-    const userMeta = computed(() => store.state.userMeta); // 用户元数据
+    const spaceUid = computed(() => globalStore.spaceUid); // 空间UID
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
+    const userMeta = computed(() => userStore.userInfo); // 用户元数据
 
     // 检查管理权限
     const checkManageAuth = async () => {
       try {
-        const res = await store.dispatch('checkAllowed', {
+        const res = await (globalStore as any).dispatch('checkAllowed', {
           action_ids: [authorityMap.MANAGE_EXTRACT_AUTH],
           resources: [
             {
@@ -141,7 +146,7 @@ export default defineComponent({
       if (!isAllowedManage.value) {
         try {
           isButtonLoading.value = true;
-          const res = await store.dispatch('getApplyData', {
+          const res = await globalStore.getApplyData({
             action_ids: [authorityMap.MANAGE_EXTRACT_AUTH],
             resources: [
               {
@@ -150,7 +155,7 @@ export default defineComponent({
               },
             ],
           });
-          store.commit('updateState', { authDialogData: res.data });
+          globalStore.updateState({ authDialogData: res.data });
         } catch (err) {
           console.warn(err);
         } finally {
@@ -181,10 +186,10 @@ export default defineComponent({
 
     // 处理删除策略
     const handleDeleteStrategy = (row: any) => {
-      InfoBox({
-        title: `${t('确定要删除')}【${row.strategy_name}】？`,
-        closeIcon: false,
-        confirmFn: () => confirmDeleteStrategy(row.strategy_id),
+      DialogPlugin.confirm({
+        header: `${t('确定要删除')}【${row.strategy_name}】？`,
+        closeBtn: false,
+        onConfirm: () => confirmDeleteStrategy(row.strategy_id),
       });
     };
 
@@ -197,9 +202,8 @@ export default defineComponent({
             strategy_id: id,
           },
         });
-        Message({
-          theme: 'success',
-          message: t('删除成功'),
+        MessagePlugin.success({
+          content: t('删除成功'),
         });
         await initStrategyList();
       } catch (e) {
@@ -221,9 +225,8 @@ export default defineComponent({
             data,
           });
           showManageDialog.value = false;
-          Message({
-            theme: 'success',
-            message: t('创建成功'),
+          MessagePlugin.success({
+            content: t('创建成功'),
           });
           await initStrategyList();
         } catch (e) {
@@ -239,9 +242,8 @@ export default defineComponent({
             },
             data,
           });
-          Message({
-            theme: 'success',
-            message: t('修改成功'),
+          MessagePlugin.success({
+            content: t('修改成功'),
           });
           showManageDialog.value = false;
           await initStrategyList();
@@ -265,12 +267,12 @@ export default defineComponent({
 
     // 处理关闭侧边栏
     const handleCloseSidebar = () => {
-      InfoBox({
-        title: t('确认离开当前页？'),
-        subTitle: t('离开将会导致未保存信息丢失'),
-        okText: t('离开'),
-        cancelText: t('取消'),
-        confirmFn: () => {
+      DialogPlugin.confirm({
+        header: t('确认离开当前页？'),
+        body: t('离开将会导致未保存信息丢失'),
+        confirmBtn: t('离开'),
+        cancelBtn: t('取消'),
+        onConfirm: () => {
           showManageDialog.value = false;
         },
       });

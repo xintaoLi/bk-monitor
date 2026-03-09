@@ -35,7 +35,7 @@ export default defineComponent({
   name: 'ClassifyCard',
   props: {
     data: {
-      type: Object as PropType<{ icon?: string; name?: string }>,
+      type: Object as PropType<{ icon?: string; name?: string; value?: string | number; [key: string]: any }>,
       default: () => ({}),
     },
     activeKey: {

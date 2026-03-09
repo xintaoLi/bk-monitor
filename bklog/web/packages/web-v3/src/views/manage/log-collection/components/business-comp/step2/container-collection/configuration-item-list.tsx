@@ -27,7 +27,7 @@
 import { defineComponent, computed, type PropType, ref, type ComponentPublicInstance } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import LineRuleConfig from '../line-rule-config';
 import LogFilter from '../log-filter';
@@ -127,7 +127,13 @@ export default defineComponent({
   setup(props: IConfigurationItemListProps, { emit, expose }) {
     // 使用国际化翻译函数
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     /**
      * 子组件引用数组

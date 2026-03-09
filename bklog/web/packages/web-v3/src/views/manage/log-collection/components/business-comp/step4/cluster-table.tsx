@@ -28,8 +28,8 @@ import { computed, defineComponent, ref, watch, type PropType } from 'vue';
 
 import { formatFileSize } from '@/common/util';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRouter } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRouter } from 'vue-router';
 import TableComponent from '../../common-comp/table-component';
 
 import './cluster-table.scss';
@@ -128,7 +128,12 @@ export default defineComponent({
     // ==================== 基础依赖 ====================
     const { t } = useLocale();
     const router = useRouter();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     // ==================== 常量定义 ====================
     /** 百分比基数 */
@@ -143,7 +148,7 @@ export default defineComponent({
     const columns = computed(() => {
       const baseColumns = [
         {
-          title: t('采集名'),
+          header: t('采集名'),
           colKey: 'storage_display_name',
           cell: (h, { row }: { row: IClusterItem }) => (
             <bk-radio checked={isSelected(row)}>
@@ -159,13 +164,13 @@ export default defineComponent({
           ellipsis: true,
         },
         {
-          title: t('总量'),
+          header: t('总量'),
           colKey: 'storage_total',
           width: 90,
           cell: (h, { row }: { row: IClusterItem }) => <span>{formatFileSize(row.storage_total)}</span>,
         },
         {
-          title: t('空闲率'),
+          header: t('空闲率'),
           colKey: 'storage_usage',
           width: 150,
           cell: (h, { row }: { row: IClusterItem }) => (
@@ -182,14 +187,14 @@ export default defineComponent({
           ),
         },
         {
-          title: t('索引数'),
+          header: t('索引数'),
           colKey: 'index_count',
           width: 80,
         },
       ];
       const bizCountColumns = [
         {
-          title: t('业务数'),
+          header: t('业务数'),
           colKey: 'biz_count',
           width: 80,
         },
@@ -284,7 +289,7 @@ export default defineComponent({
       const newUrl = router.resolve({
         name: 'es-cluster-manage',
         query: {
-          spaceUid: store.state.spaceUid,
+          spaceUid: globalStore.spaceUid,
         },
       });
       window.open(newUrl.href, '_blank');

@@ -37,8 +37,8 @@ import {
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
-import { InfoBox } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { DialogPlugin } from 'tdesign-vue-next';
 
 import { useDrag } from '../../hooks/use-drag';
 import EsSlider from './es-slider.tsx';
@@ -60,7 +60,12 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
     const { t } = useLocale();
 
@@ -121,9 +126,9 @@ export default defineComponent({
       selectedFields: settingFields.value.slice(0, 10),
     });
 
-    const bkBizId = computed(() => store.getters.bkBizId); // 业务ID
-    const spaceUid = computed(() => store.getters.spaceUid); // 空间ID
-    const globalsData = computed(() => store.getters.globalsData);
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
+    const spaceUid = computed(() => globalStore.spaceUid); // 空间ID
+    const globalsData = computed(() => (globalStore as any).globalsData);
     const authorityMapComputed = computed(() => authorityMap); // 权限映射
 
     // 来源过滤器
@@ -142,7 +147,7 @@ export default defineComponent({
     // 检查创建权限
     const checkCreateAuth = async () => {
       try {
-        const res = await store.dispatch('checkAllowed', {
+        const res = await (globalStore as any).dispatch('checkAllowed', {
           action_ids: [authorityMapComputed.value.CREATE_ES_SOURCE_AUTH],
           resources: [
             {
@@ -342,7 +347,7 @@ export default defineComponent({
       } else {
         try {
           tableLoading.value = true;
-          const res = await store.dispatch('getApplyData', {
+          const res = await globalStore.getApplyData({
             action_ids: [authorityMapComputed.value.CREATE_ES_SOURCE_AUTH],
             resources: [
               {
@@ -351,7 +356,7 @@ export default defineComponent({
               },
             ],
           });
-          store.commit('updateState', { authDialogData: res.data });
+          globalStore.updateState({ authDialogData: res.data });
         } catch (err) {
           console.warn(err);
         } finally {
@@ -365,7 +370,7 @@ export default defineComponent({
       router.push({
         name: 'es-index-set-create',
         query: {
-          spaceUid: store.state.spaceUid,
+          spaceUid: globalStore.spaceUid,
           cluster: row.cluster_config.cluster_id,
         },
       });
@@ -386,8 +391,8 @@ export default defineComponent({
             ],
           };
           tableLoading.value = true;
-          const res = await store.dispatch('getApplyData', paramData);
-          store.commit('updateState', { authDialogData: res.data });
+          const res = await globalStore.getApplyData(paramData);
+          globalStore.updateState({ authDialogData: res.data });
         } catch (err) {
           console.warn(err);
         } finally {
@@ -415,8 +420,8 @@ export default defineComponent({
             ],
           };
           tableLoading.value = true;
-          const res = await store.dispatch('getApplyData', paramData);
-          store.commit('updateState', { authDialogData: res.data });
+          const res = await globalStore.getApplyData(paramData);
+          globalStore.updateState({ authDialogData: res.data });
         } catch (err) {
           console.warn(err);
         } finally {
@@ -425,10 +430,10 @@ export default defineComponent({
         return;
       }
 
-      InfoBox({
-        type: 'warning',
-        subTitle: t('当前集群为{n}，确认要删除？', { n: row.cluster_config.domain_name }),
-        confirmFn: () => {
+      DialogPlugin.confirm({
+        theme: 'warning',
+        body: t('当前集群为{n}，确认要删除？', { n: row.cluster_config.domain_name }),
+        onConfirm: () => {
           handleDelete(row);
         },
       });

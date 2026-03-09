@@ -27,7 +27,7 @@
 import { defineComponent, ref, reactive, watch, computed, onMounted, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import type { IContainerConfigItem } from '../../../../type';
 import $http from '@/api';
 import './workload-selection.scss';
@@ -51,7 +51,12 @@ export default defineComponent({
   emits: ['update'],
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const formData = reactive({
       workload_type: '',
       workload_name: '',
@@ -66,7 +71,7 @@ export default defineComponent({
     const nameList = ref<Array<{ id: string; name: string }>>([]);
     // const placeHolderStr = ref(`${t('请输入应用名称')}, ${t('支持正则匹配')}`);
 
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     const typeListIDStrList = computed(() => typeList.value.map(item => item.id));
 

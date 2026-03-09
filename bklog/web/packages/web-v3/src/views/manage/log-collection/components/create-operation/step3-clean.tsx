@@ -27,8 +27,8 @@
 import { defineComponent, ref, onMounted, computed } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 import { useOperation } from '../../hook/useOperation';
 import { showMessage } from '../../utils';
 import FieldList from '../business-comp/step3/field-list';
@@ -74,13 +74,19 @@ export default defineComponent({
   emits: ['next', 'prev', 'cancel'],
 
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
     const route = useRoute();
     const defaultRegex = '(?P<request_ip>[d.]+)[^[]+[(?P<request_time>[^]]+)]';
     const { cardRender } = useOperation();
     const showReportLogSlider = ref(false);
-    const jsonText = ref({});
+    const jsonText = ref<Record<string, any>>({});
     const fieldListRef = ref();
 
     const templateDialogVisible = ref(false);
@@ -155,7 +161,7 @@ export default defineComponent({
     const defaultParticipleStr = ref('@&()=\'",;:<>[]{}/ \\n\\t\\r\\\\');
     const globalsData = computed(() => store.getters['globals/globalsData']);
     const curCollect = computed(() => store.getters['collect/curCollect']);
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     /**
      * 分隔符
      */
@@ -174,7 +180,7 @@ export default defineComponent({
      */
     const isUpdate = computed(() => route.name === 'collectEdit' && props.isEdit);
 
-    const formData = ref({
+    const formData = ref<Record<string, any>>({
       // 最后一次正确的结果，保存以此数据为准
       table_id: '',
       etl_config: 'bk_log_json',
@@ -299,7 +305,7 @@ export default defineComponent({
         })
         .then(async res => {
           if (res.data) {
-            store.commit('collect/setCurCollect', res.data);
+            (globalStore as any).commit('collect/setCurCollect', res.data);
             builtInFieldsList.value = curCollect.value.fields.filter(item => item.is_built_in);
             if (props.isEdit || props.isClone) {
               getDataLog('init');
@@ -322,7 +328,7 @@ export default defineComponent({
         },
         data: pathExample.value,
       };
-      const urlParams = {};
+      const urlParams: Record<string, any> = {};
       isDebugLoading.value = true;
       urlParams.collector_config_id = curCollect.value.collector_config_id;
       const updateData = { params: urlParams, data };
@@ -356,9 +362,9 @@ export default defineComponent({
     const debugHandler = (type = 'default') => {
       const isRefresh = type === 'refresh';
       const { etl_params } = formData.value;
-      const data = {
+      const data: Record<string, any> = {
         etl_config: cleaningMode.value,
-        etl_params: {},
+        etl_params: {} as Record<string, any>,
         data: logOriginal.value,
       };
       if (cleaningMode.value === 'bk_log_delimiter') {
@@ -368,7 +374,7 @@ export default defineComponent({
         data.etl_params.separator_regexp = etl_params.separator_regexp;
       }
       let requestUrl = 'clean/getEtlPreview';
-      const urlParams = {};
+      const urlParams: Record<string, any> = {};
       isDebugLoading.value = !isRefresh;
       isValueRefresh.value = isRefresh;
       /**
@@ -1016,12 +1022,12 @@ export default defineComponent({
     );
     const cardConfig = [
       {
-        title: t('清洗设置'),
+        header: t('清洗设置'),
         key: 'cleanSetting',
         renderFn: renderSetting,
       },
       {
-        title: t('高级设置'),
+        header: t('高级设置'),
         key: 'advancedSetting',
         renderFn: renderAdvanced,
       },

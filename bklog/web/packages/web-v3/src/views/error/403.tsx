@@ -8,7 +8,7 @@
  */
 
 import { defineComponent } from 'vue';
-import { Result, Button } from 'bkui-vue';
+import { Result, Button } from 'tdesign-vue-next';
 
 /**
  * 无权限页面

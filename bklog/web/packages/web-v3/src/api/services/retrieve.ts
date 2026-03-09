@@ -364,26 +364,8 @@ export const retrieveService = {
   } as ApiConfig,
 
   /**
-   * 无法确定具体结构，使用any[]
-  mention_list: {
-    id: string;
-    type: string;
-  }[];
-  mention_type: number;
-  app: string;
-  users: {
-    id: string;
-    display_name: string;
-    type: string;
-  }[];
-  strategy_count: number;
-  rules_count: number;
-  delete_allowed: boolean;
-  edit_allowed: boolean;
-  config_source: string;
-}[];
-
-/** 聚类告警列表 */
+   * userGroup
+   * 聚类告警列表
    */
   userGroup: {
     url: '/clustering_monitor/search_user_groups/',

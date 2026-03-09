@@ -27,7 +27,7 @@ interface Window {
   BKDATA_URL: string;
   COLLECTOR_GUIDE_URL: string;
   FEATURE_TOGGLE: Record<string, any>;
-  FEATURE_TOGGLE_WHITE_LIST: string[];
+  FEATURE_TOGGLE_WHITE_LIST: { [key: string]: string[] | undefined } & string[];
   SPACE_UID_WHITE_LIST: string[];
   FIELD_ANALYSIS_CONFIG: Record<string, any>;
   REAL_TIME_LOG_MAX_LENGTH: string;
@@ -58,4 +58,22 @@ interface Window {
   BK_PAAS_API_HOST: string;
   BK_USER_URL: string;
   BK_IAM_URL: string;
+  
+  // 添加缺少的属性
+  $t?: (key: string, ...args: any[]) => string;
+  mainComponent?: any;
+  __IS_MONITOR_COMPONENT__?: boolean;
+  graph_watermark?: boolean;
+  user_name?: string;
+  username?: string;
+  __IS_MONITOR_TRACE__?: boolean;
+  __IS_MONITOR_APM__?: boolean;
+}
+
+
+
+// IE/Edge browser compatibility
+interface Navigator {
+  msSaveOrOpenBlob?: (blob: Blob, filename?: string) => boolean;
+  msSaveBlob?: (blob: Blob, filename?: string) => boolean;
 }

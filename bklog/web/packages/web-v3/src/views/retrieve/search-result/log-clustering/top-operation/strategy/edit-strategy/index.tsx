@@ -27,7 +27,7 @@
 import { defineComponent, ref, computed, watch } from "vue";
 import useLocale from "@/hooks/use-locale";
 import $http from "@/api";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import { bkMessage } from "bk-magic-vue";
 import { StrategyType } from "../index";
 import { type UserGroupList } from "@/services/retrieve";
@@ -61,7 +61,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const rules = {
       interval: [
@@ -128,7 +133,7 @@ export default defineComponent({
     const formData = ref({} as any);
 
     const isAlarmType = computed(() => props.type === StrategyType.NEW_CLASS);
-    const bkBizId = computed(() => store.state.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     watch(
       () => [props.configData, isAlarmType.value, isShowDialog.value],

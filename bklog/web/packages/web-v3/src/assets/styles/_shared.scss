@@ -1,0 +1,77 @@
+// 共享的 SCSS 变量和 mixins
+// 这个文件用于 Vite additionalData，避免循环导入
+
+// ============ 颜色变量 ============
+$primary-color: #3a84ff;
+$success-color: #2dcb56;
+$warning-color: #ff9c01;
+$danger-color: #ea3536;
+$info-color: #3a84ff;
+
+// 文本颜色
+$text-primary: #63656e;
+$text-secondary: #979ba5;
+$text-disabled: #c4c6cc;
+
+// 背景颜色
+$bg-white: #ffffff;
+$bg-gray: #f5f7fa;
+$bg-dark: #2e2e2e;
+
+// 边框颜色
+$border-color: #dcdee5;
+$border-light: #f0f1f5;
+
+// 间距
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+// ============ Mixins ============
+// 清除浮动
+@mixin clearfix {
+  &::after {
+    content: '';
+    display: table;
+    clear: both;
+  }
+}
+
+// 文本省略
+@mixin text-ellipsis($lines: 1) {
+  @if $lines == 1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  } @else {
+    display: -webkit-box;
+    -webkit-line-clamp: $lines;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// Flex 居中
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Flex 两端对齐
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// 绝对定位居中
+@mixin absolute-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}

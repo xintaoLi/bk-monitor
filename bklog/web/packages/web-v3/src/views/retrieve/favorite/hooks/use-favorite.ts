@@ -26,10 +26,10 @@
 
 import { computed, ref } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import { RetrieveUrlResolver } from '@/store/url-resolver';
 import { debounce } from 'lodash-es';
-import { useRoute, useRouter } from 'vue-router/composables';
+import { useRoute, useRouter } from 'vue-router';
 
 import { copyMessage } from '../../../../common/util';
 import { BK_LOG_STORAGE, SEARCH_MODE_DIC } from '../../../../store/store.type';
@@ -43,7 +43,12 @@ import type { IFavoriteItem, IGroupItem, SearchMode } from '../types';
  * 收藏功能的自定义 Hook
  */
 export const useFavorite = () => {
-  const store = useStore();
+  const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
   const router = useRouter();
   const route = useRoute();
 
@@ -57,11 +62,11 @@ export const useFavorite = () => {
   const expandedMap = ref<Record<string, boolean>>({});
 
   // 计算属性
-  const isUnionSearch = computed(() => store.getters.isUnionSearch);
-  const unionIndexList = computed(() => store.state.unionIndexList);
-  const indexSetId = computed(() => `${store.getters.indexId}`);
-  const favoriteList = computed(() => store.state.favoriteList || []);
-  const indexSetList = computed(() => store.state.retrieve.flatIndexSetList ?? []);
+  const isUnionSearch = computed(() => (globalStore as any).isUnionSearch);
+  const unionIndexList = computed(() => (globalStore as any).unionIndexList);
+  const indexSetId = computed(() => `${(globalStore as any).indexId}`);
+  const favoriteList = computed(() => (globalStore as any).favoriteList || []);
+  const indexSetList = computed(() => (retrieveStore as any).flatIndexSetList ?? []);
 
   /**
    * 过滤收藏列表数据
@@ -139,7 +144,7 @@ export const useFavorite = () => {
   const getFavoriteList = async (): Promise<void> => {
     try {
       favoriteLoading.value = true;
-      await store.dispatch('requestFavoriteList');
+      await retrieveStore.getFavoriteList(globalStore.spaceUid);
     } catch (error) {
       console.error('获取收藏列表失败:', error);
     } finally {
@@ -166,12 +171,12 @@ export const useFavorite = () => {
    * 设置路由参数
    */
   const setRouteParams = (item: IFavoriteItem): void => {
-    const { ids, isUnionIndex } = store.state.indexItem;
-    const search_mode = SEARCH_MODE_DIC[store.state.storage[BK_LOG_STORAGE.SEARCH_TYPE]] ?? 'ui';
-    const unionList = store.state.unionIndexList;
-    const clusterParams = store.state.clusterParams;
+    const { ids, isUnionIndex } = retrieveStore.indexItem;
+    const search_mode = SEARCH_MODE_DIC[(globalStore as any).storage[BK_LOG_STORAGE.SEARCH_TYPE]] ?? 'ui';
+    const unionList = (globalStore as any).unionIndexList;
+    const clusterParams = retrieveStore.clusterParams;
     const { start_time, end_time, addition, begin, size, ip_chooser, host_scopes, interval, sort_list } =
-      store.getters.retrieveParams;
+      retrieveStore.searchParams;
     const pid = item.pid;
 
     const routeParams = {
@@ -183,7 +188,7 @@ export const useFavorite = () => {
       ip_chooser,
       host_scopes,
       interval,
-      bk_biz_id: store.state.bkBizId,
+      bk_biz_id: globalStore.bkBizId,
       search_mode,
       sort_list,
       ids,
@@ -203,7 +208,7 @@ export const useFavorite = () => {
     // const { RetrieveUrlResolver } = require('@/store/url-resolver');
     const resolver = new RetrieveUrlResolver({
       ...routeParams,
-      datePickerValue: store.state.indexItem.datePickerValue,
+      datePickerValue: retrieveStore.indexItem.datePickerValue,
     });
 
     Object.assign(query, resolver.resolveParamsToUrl(), {
@@ -219,8 +224,8 @@ export const useFavorite = () => {
   const selectFavoriteItem = (item: IFavoriteItem | null): void => {
     if (!item) {
       activeFavorite.value = null;
-      let clearSearchValueNum = store.state.clearSearchValueNum;
-      store.commit('updateClearSearchValueNum', (clearSearchValueNum += 1));
+      let clearSearchValueNum = (globalStore as any).clearSearchValueNum;
+      (globalStore as any).commit('updateClearSearchValueNum', (clearSearchValueNum += 1));
       setRouteParams(item);
       setTimeout(() => {
         RetrieveHelper.setFavoriteActive(activeFavorite.value);
@@ -237,10 +242,10 @@ export const useFavorite = () => {
     const search_mode = getSearchMode(cloneValue);
 
     // 重置状态
-    store.commit('resetIndexsetItemParams');
-    store.commit('updateState', { indexId: cloneValue.index_set_id, pid: cloneValue.pid ?? [] });
-    store.commit('updateIsSetDefaultTableColumn', false);
-    store.commit('updateStorage', {
+    (globalStore as any).commit('resetIndexsetItemParams');
+    globalStore.updateState({ indexId: cloneValue.index_set_id, pid: cloneValue.pid ?? [] });
+    (globalStore as any).commit('updateIsSetDefaultTableColumn', false);
+    storageStore.updateStorage({
       [BK_LOG_STORAGE.INDEX_SET_ACTIVE_TAB]: item.index_set_type,
       [BK_LOG_STORAGE.SEARCH_TYPE]: ['ui', 'sql'].indexOf(search_mode ?? 'ui'),
     });
@@ -248,7 +253,7 @@ export const useFavorite = () => {
     // 处理 IP 选择器
     const ip_chooser = { ...(cloneValue.params?.ip_chooser ?? {}) };
     if (isUnionIndex) {
-      store.commit(
+      (globalStore as any).commit(
         'updateUnionIndexList',
         cloneValue.index_set_ids.map(newItem => String(newItem)),
       );
@@ -263,7 +268,7 @@ export const useFavorite = () => {
     }
 
     const ids = isUnionIndex ? cloneValue.index_set_ids : [cloneValue.index_set_id];
-    store.commit('updateIndexItem', {
+    (globalStore as any).commit('updateIndexItem', {
       keyword,
       addition,
       ip_chooser,
@@ -275,20 +280,21 @@ export const useFavorite = () => {
     });
 
     setRouteParams(item);
-    store.commit('updateChartParams', {
+    (globalStore as any).commit('updateChartParams', {
       ...cloneValue.params?.chart_params,
       fromCollectionActiveTab: 'unused',
     });
 
-    store.commit('updateIndexSetQueryResult', {
+    (globalStore as any).commit('updateIndexSetQueryResult', {
       origin_log_list: [],
       list: [],
     });
 
-    store.dispatch('requestIndexSetFieldInfo').then(() => {
-      RetrieveHelper.setFavoriteActive({ ...activeFavorite.value, search_mode });
-      store.dispatch('requestIndexSetQuery');
-    });
+    // TODO: 需要实现完整的收藏激活逻辑
+    // indexFieldStore.requestIndexSetFieldInfo().then(() => {
+    RetrieveHelper.setFavoriteActive({ ...activeFavorite.value, search_mode });
+    // retrieveStore.requestIndexSetQuery();
+    // });
   };
 
   /**

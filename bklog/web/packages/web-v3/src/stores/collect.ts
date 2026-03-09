@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import http from '@/api';
+import type { CollectStore } from './types';
 
 /**
  * 采集项类型
@@ -369,4 +370,4 @@ export const useCollectStore = defineStore('collect', {
       },
     ],
   },
-});
+}) as () => CollectStore;

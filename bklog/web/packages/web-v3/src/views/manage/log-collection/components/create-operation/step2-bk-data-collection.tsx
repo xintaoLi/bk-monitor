@@ -27,8 +27,8 @@
 import { defineComponent, ref, watch, computed, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 
 import { useCollectList } from '../../hook/useCollectList';
 import { useOperation } from '../../hook/useOperation';
@@ -195,7 +195,12 @@ export default defineComponent({
     // ==================== 基础依赖 ====================
     const { t } = useLocale();
     const route = useRoute();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { bkBizId, spaceUid } = useCollectList();
     const { cardRender, handleMultipleSelected, tableLoading, sortByPermission } = useOperation();
 
@@ -331,12 +336,12 @@ export default defineComponent({
                   skeletonConfig={skeletonConfig}
                   columns={[
                     {
-                      title: t('字段'),
+                      header: t('字段'),
                       colKey: 'field_name',
                       ellipsis: true,
                     },
                     {
-                      title: t('类型'),
+                      header: t('类型'),
                       colKey: 'field_type',
                       ellipsis: true,
                     },
@@ -351,7 +356,7 @@ export default defineComponent({
                   skeletonConfig={skeletonConfig}
                   columns={[
                     {
-                      title: t('匹配到的索引'),
+                      header: t('匹配到的索引'),
                       colKey: 'result_table_id',
                       ellipsis: true,
                     },
@@ -442,17 +447,17 @@ export default defineComponent({
      */
     const cardConfig = [
       {
-        title: t('基础信息'),
+        header: t('基础信息'),
         key: 'baseInfo',
         renderFn: renderBaseInfo,
       },
       {
-        title: t('数据源'),
+        header: t('数据源'),
         key: 'dataSource',
         renderFn: renderDataSource,
       },
       {
-        title: t('字段设置'),
+        header: t('字段设置'),
         key: 'fieldSetting',
         renderFn: renderFieldSetting,
       },
@@ -475,7 +480,7 @@ export default defineComponent({
         })) as { data: IIndexSetData };
 
         // 更新store中的当前索引集
-        store.commit('collect/updateCurIndexSet', indexSetData);
+        (globalStore as any).commit('collect/updateCurIndexSet', indexSetData);
 
         // 更新配置数据
         const { indexes, index_set_name, view_roles, storage_cluster_id, sort_fields, target_fields } = indexSetData;

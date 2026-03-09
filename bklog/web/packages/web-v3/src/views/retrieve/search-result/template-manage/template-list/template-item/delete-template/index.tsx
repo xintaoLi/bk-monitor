@@ -26,7 +26,7 @@
 
 import { defineComponent, PropType, ref } from 'vue';
 import useLocale from '@/hooks/use-locale';
-import { bkMessage } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 import $http from '@/api';
 import { type TemplateItem } from '../../../index';
 import './index.scss';
@@ -54,10 +54,7 @@ export default defineComponent({
         })
         .then(res => {
           if (res.code === 0) {
-            bkMessage({
-              theme: 'success',
-              message: t('操作成功'),
-            });
+            MessagePlugin.success(t('操作成功'));
             emit('success');
           }
         })

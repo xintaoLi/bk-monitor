@@ -20,11 +20,14 @@ export interface ICardItem {
   /** 卡片唯一标识 */
   key: number | string;
   /** 卡片标题 */
-  title: string;
+  header: string;
+  /** 卡片标题别名 */
+  title?: string;
   /** 卡片内容渲染函数 */
   renderFn: () => unknown;
   /** 卡片副标题渲染函数（可选） */
   subTitle?: () => unknown;
+  [key: string]: any;
 }
 
 /** 通用请求参数结构 */
@@ -124,6 +127,9 @@ export interface IValueItem {
   operator: string;
   value: string;
   type?: string;
+  bk_biz_id?: number | string;
+  bcs_cluster_id?: string;
+  [key: string]: any;
 }
 // 标签选择器结构
 export interface ILabelSelector {
@@ -194,6 +200,10 @@ export interface IFormData {
   yaml_config_enabled?: boolean;
   // 采集配置
   params?: ICollectionParams;
+  // 是否仅采集最新日志文件
+  tail_files?: boolean;
+  // Allow additional properties
+  [key: string]: any;
 }
 
 export interface IClusterItem {

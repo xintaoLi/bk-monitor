@@ -25,9 +25,9 @@
  */
 import { computed, defineComponent, ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import ClusteringLoader from '@/skeleton/clustering-loader.vue';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useFieldNameHook from '@/hooks/use-field-name';
-import { useRoute, useRouter } from 'vue-router/composables';
+import { useRoute, useRouter } from 'vue-router';
 import $http from '@/api';
 import { RetrieveUrlResolver } from '@/store/url-resolver';
 import TopOperation from './top-operation';
@@ -57,7 +57,12 @@ export default defineComponent({
       compared: [150, 90, 90, 100, 100, ''],
     };
 
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const router = useRouter();
 
@@ -98,8 +103,8 @@ export default defineComponent({
       owners: [],
     });
 
-    const indexFieldInfo = computed(() => store.state.indexFieldInfo);
-    const indexSetFieldConfig = computed(() => store.state.indexSetFieldConfig);
+    const indexFieldInfo = computed(() => indexFieldStore.indexFieldInfo);
+    const indexSetFieldConfig = computed(() => (globalStore as any).indexSetFieldConfig);
     const totalFields = computed(() => (indexFieldInfo.value.fields || []) as Array<any>);
     const globalLoading = computed(() => indexFieldInfo.value.is_loading || isFieldInit.value);
     const clusteringConfig = computed(() => indexSetFieldConfig.value.clustering_config);
@@ -110,7 +115,7 @@ export default defineComponent({
     const indexSetId = computed(() =>
       window.__IS_MONITOR_COMPONENT__ ? (route.query.indexId as string) : route.params.indexId,
     );
-    const clusterParams = computed(() => store.state.clusterParams);
+    const clusterParams = computed(() => retrieveStore.clusterParams);
     const collectorConfigId = computed(() => indexSetFieldConfig.value.clean_config.extra?.collector_config_id);
 
     watch(indexSetId, () => {
@@ -119,7 +124,7 @@ export default defineComponent({
     });
 
     watch(isShowClusterStep, () => {
-      store.commit('updateState', { storeIsShowClusterStep: isShowClusterStep.value });
+      globalStore.updateState({ storeIsShowClusterStep: isShowClusterStep.value });
     });
     const stopPolling = () => {
       // 清除定时器
@@ -180,7 +185,7 @@ export default defineComponent({
 
     const initTableOperator = async () => {
       const { log_clustering_level_year_on_year: yearOnYearList, log_clustering_level: clusterLevel } =
-        store.state.globals.globalsData;
+        (globalStore as any).globals.globalsData;
       let patternLevel;
       if (clusterLevel && clusterLevel.length > 0) {
         // 判断奇偶数来取pattern中间值
@@ -234,7 +239,7 @@ export default defineComponent({
         });
       }
       Object.assign(requestData.value, queryRequestData);
-      store.commit('updateState', { clusterParams: requestData.value });
+      globalStore.updateState({ clusterParams: requestData.value });
       setRouteParams();
       isInitPage.value = false;
     };
@@ -254,7 +259,7 @@ export default defineComponent({
         case 'requestData': // 数据指纹的请求参数
           Object.assign(requestData.value, val);
           // 数据指纹对请求参数修改过的操作将数据回填到url上
-          store.commit('updateState', { clusterParams: requestData.value });
+          globalStore.updateState({ clusterParams: requestData.value });
           setRouteParams();
           break;
         case 'fingerOperateData': // 数据指纹操作的参数
@@ -282,7 +287,7 @@ export default defineComponent({
     const setRouteParams = () => {
       const query = { ...route.query };
       const resolver = new RetrieveUrlResolver({
-        clusterParams: store.state.clusterParams,
+        clusterParams: retrieveStore.clusterParams,
       });
       Object.assign(query, resolver.resolveParamsToUrl());
       router.replace({ query });
@@ -358,7 +363,7 @@ export default defineComponent({
         isClusterActive.value = true;
         confirmClusterStepStatus().then(() => {
           if (!isInitPage.value) {
-            store.commit('updateState', { clusterParams: requestData.value });
+            globalStore.updateState({ clusterParams: requestData.value });
             setRouteParams();
           }
         });
@@ -368,7 +373,7 @@ export default defineComponent({
     onBeforeUnmount(() => {
       if (isClusterActive.value) {
         isClusterActive.value = false;
-        store.commit('updateState', { clusterParams: null });
+        globalStore.updateState({ clusterParams: null });
         setRouteParams();
         stopPolling(); // 停止状态轮询
       }

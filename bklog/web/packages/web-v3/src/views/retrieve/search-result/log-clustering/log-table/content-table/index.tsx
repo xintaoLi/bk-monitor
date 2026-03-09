@@ -28,10 +28,10 @@ import { computed, defineComponent, isRef, ref, type PropType } from 'vue';
 import TextHighlight from 'vue-text-highlight';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 // import { BK_LOG_STORAGE } from '@/store/store.type';
 import BkUserSelector from '@blueking/user-selector';
-import { bkMessage } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 import tippy from 'tippy.js';
 
 import ClusterEventPopover from './cluster-popover';
@@ -122,7 +122,13 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     let activeMarkElement: HTMLElement | null = null;
     const isExternal = window.IS_EXTERNAL === true;
 
@@ -253,9 +259,9 @@ export default defineComponent({
       });
 
       // 聚类下钻只能使用ui模式
-      store.commit('updateIndexItem', { search_mode: 'ui' });
+      (globalStore as any).commit('updateIndexItem', { search_mode: 'ui' });
       // 新开页打开首页是原始日志，不需要传聚类参数，如果传了则会初始化为聚类
-      store.commit('updateState', { key: 'clusterParams', value: null });
+      globalStore.updateState({ key: 'clusterParams', value: null });
       store
         .dispatch('setQueryCondition', additionList)
         .then(([newSearchList, searchMode, isNewSearchPage]) => {
@@ -268,7 +274,7 @@ export default defineComponent({
             );
             window.open(openUrl, '_blank');
             // 新开页后当前页面回填聚类参数
-            store.commit('updateState', {
+            globalStore.updateState({
               key: 'clusterParams',
               value: props.requestData,
             });
@@ -302,10 +308,7 @@ export default defineComponent({
       currentRowId.value = row.id;
       // 当创建告警策略开启时，不允许删掉最后一个责任人
       if (row.strategy_enabled && !val.length) {
-        bkMessage({
-          theme: 'error',
-          message: t('删除失败，开启告警时，需要至少一个责任人'),
-        });
+        MessagePlugin.error(t('删除失败，开启告警时，需要至少一个责任人'));
         return;
       }
       $http
@@ -324,10 +327,7 @@ export default defineComponent({
           if (res.result) {
             const { owners } = res.data;
             updateTableRowData(row, 'owners', owners);
-            bkMessage({
-              theme: 'success',
-              message: t('操作成功'),
-            });
+            MessagePlugin.success(t('操作成功'));
           }
         });
     };
@@ -349,10 +349,7 @@ export default defineComponent({
         .then((res) => {
           if (res.result) {
             const { strategy_id } = res.data;
-            bkMessage({
-              theme: 'success',
-              message: t('操作成功'),
-            });
+            MessagePlugin.success(t('操作成功'));
             updateTableRowData(row, 'strategy_id', strategy_id);
             updateTableRowData(row, 'strategy_enabled', enabled);
           }
@@ -362,7 +359,7 @@ export default defineComponent({
     const handleStrategyInfoClick = (row) => {
       currentRowId.value = row.id;
       window.open(
-        `${window.MONITOR_URL}/?bizId=${store.state.bkBizId}#/strategy-config/detail/${row.strategy_id}`,
+        `${window.MONITOR_URL}/?bizId=${globalStore.bkBizId}#/strategy-config/detail/${row.strategy_id}`,
         '_blank',
       );
     };
@@ -420,7 +417,7 @@ export default defineComponent({
         value: [row.group[index]],
         from: 'cluster',
       }));
-      store.dispatch('setQueryCondition', addConditions);
+      // TODO: retrieveStore.setQueryCondition(addConditions);
       RetrieveHelper.searchValueChange('cluster', addConditions);
     };
 

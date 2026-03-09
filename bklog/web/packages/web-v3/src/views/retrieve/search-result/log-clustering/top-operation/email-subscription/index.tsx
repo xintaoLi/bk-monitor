@@ -25,8 +25,8 @@
  */
 
 import { computed, defineComponent, onMounted, ref } from 'vue';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 import { debounce } from 'throttle-debounce';
 import $http from '@/api';
 import useLocale from '@/hooks/use-locale';
@@ -50,14 +50,19 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const { t } = useLocale();
 
     const isCurrentIndexSetIdCreateSubscription = ref(false);
     const isShowQuickCreateSubscriptionDrawer = ref(false);
 
-    const bkBizId = computed(() => store.state.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     const goToMySubscription = () => {
       window.bus.$emit('showGlobalDialog');

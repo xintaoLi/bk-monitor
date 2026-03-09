@@ -31,7 +31,7 @@ import FieldsConfig from '@/components/common/fields-config.vue';
 import LogView from '@/components/log-view/index.vue';
 import useFieldNameHook from '@/hooks/use-field-name';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import $http from '@/api';
 import CommonHeader from '../components/common-header';
@@ -76,7 +76,12 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const logViewRef = ref();
@@ -224,7 +229,7 @@ export default defineComponent({
         return displayFieldNames;
       }
 
-      const allFields = store.getters.filteredFieldList;
+      const allFields = indexFieldStore.filteredFieldList;
       let textField = undefined;
       let logField = undefined;
       for (const field of allFields) {
@@ -244,7 +249,7 @@ export default defineComponent({
         return [showFieldName];
       }
 
-      const pageVisibleFields = store.getters.visibleFields.map(item => item.field_name);
+      const pageVisibleFields = indexFieldStore.visibleFields.map(item => item.field_name);
       if (pageVisibleFields.length) {
         return pageVisibleFields;
       }

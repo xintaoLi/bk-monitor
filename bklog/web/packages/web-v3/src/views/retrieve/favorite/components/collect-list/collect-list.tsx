@@ -28,7 +28,7 @@ import { defineComponent, ref, watch, computed } from 'vue';
 
 import BklogPopover from '@/components/bklog-popover';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { utcFormatDate } from '../../../../../common/util';
 import { useFavorite } from '../../hooks/use-favorite';
@@ -62,7 +62,12 @@ export default defineComponent({
   emits: ['refresh', 'select-item'],
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const expandedMap = ref({});
     /** 当前选中的收藏 */
     const selectedId = ref(null);
@@ -137,7 +142,7 @@ export default defineComponent({
     };
     const isShowEdit = ref(false);
     // 用户信息
-    const userMeta = computed(() => store.state.userMeta);
+    const userMeta = computed(() => userStore.userInfo);
     // 去掉个人收藏的组列表
     const unPrivateGroupList = computed(() => props.list.filter(g => g.group_type !== 'private'));
 

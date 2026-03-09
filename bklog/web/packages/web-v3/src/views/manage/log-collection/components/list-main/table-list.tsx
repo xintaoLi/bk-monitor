@@ -408,7 +408,7 @@ export default defineComponent({
     // 所有列定义
     const allColumns = computed(() => [
       {
-        title: t('采集名'),
+        header: t('采集名'),
         colKey: 'name',
         sorter: true,
         sortType: 'all',
@@ -429,7 +429,7 @@ export default defineComponent({
         ellipsis: true,
       },
       {
-        title: t('日用量'),
+        header: t('日用量'),
         colKey: 'daily_usage',
         sorter: true,
         sortType: 'all',
@@ -437,7 +437,7 @@ export default defineComponent({
         cell: (h, { row }: { row: ITableRowData }) => <span>{formatBytes(row.daily_usage)}</span>,
       },
       {
-        title: t('总用量'),
+        header: t('总用量'),
         colKey: 'total_usage',
         sorter: true,
         sortType: 'all',
@@ -445,13 +445,13 @@ export default defineComponent({
         cell: (h, { row }: { row: ITableRowData }) => <span>{formatBytes(row.total_usage)}</span>,
       },
       {
-        title: t('存储名'),
+        header: t('存储名'),
         colKey: 'bk_data_name',
         width: 180,
         ellipsis: true,
       },
       {
-        title: t('所属索引集'),
+        header: t('所属索引集'),
         colKey: 'index_set_name',
         width: 200,
         cell: (h, { row }: { row: ITableRowData }) => {
@@ -470,28 +470,28 @@ export default defineComponent({
         },
       },
       {
-        title: t('接入类型'),
+        header: t('接入类型'),
         colKey: 'log_access_type',
         width: 140,
         cell: (h, { row }: { row: ITableRowData }) => <span>{row.log_access_type_name || '--'}</span>,
         filter: getColumnsFilter(GLOBAL_CATEGORIES_ENUM),
       },
       {
-        title: t('日志类型'),
+        header: t('日志类型'),
         colKey: 'collector_scenario_id',
         width: 100,
         cell: (h, { row }: { row: ITableRowData }) => <span>{row.collector_scenario_name || '--'}</span>,
         filter: getColumnsFilter(COLLECTOR_SCENARIO_ENUM),
       },
       {
-        title: t('集群名'),
+        header: t('集群名'),
         colKey: 'storage_display_name',
         minWidth: 140,
         ellipsis: true,
         filter: getColumnsFilter(IFilterValues.value.storage_display_name),
       },
       {
-        title: t('过期时间'),
+        header: t('过期时间'),
         colKey: 'retention',
         cell: (h, { row }: { row: ITableRowData }) => (
           <span class={{ 'text-disabled': row.status === 'stop' }}>
@@ -501,7 +501,7 @@ export default defineComponent({
         width: 100,
       },
       {
-        title: t('标签'),
+        header: t('标签'),
         colKey: 'tags',
         showTips: false,
         cell: (h, { row }: { row: ITableRowData }) =>
@@ -516,21 +516,21 @@ export default defineComponent({
         width: 200,
       },
       {
-        title: t('采集状态'),
+        header: t('采集状态'),
         colKey: 'status',
         width: 100,
         cell: (h, { row }: { row: ITableRowData }) => renderStatus(row),
         filter: getColumnsFilter(STATUS_ENUM_FILTER),
       },
       {
-        title: t('创建人'),
+        header: t('创建人'),
         colKey: 'created_by',
         width: 100,
         cell: (h, { row }: { row: ITableRowData }) => getName(row.created_by),
         filter: getColumnsFilter(IFilterValues.value.created_by),
       },
       {
-        title: t('创建时间'),
+        header: t('创建时间'),
         colKey: 'created_at',
         sorter: true,
         sortType: 'all',
@@ -538,14 +538,14 @@ export default defineComponent({
         ellipsis: true,
       },
       {
-        title: t('更新人'),
+        header: t('更新人'),
         width: 100,
         colKey: 'updated_by',
         cell: (h, { row }: { row: ITableRowData }) => getName(row.updated_by),
         filter: getColumnsFilter(IFilterValues.value.updated_by),
       },
       {
-        title: t('更新时间'),
+        header: t('更新时间'),
         colKey: 'updated_at',
         sorter: true,
         sortType: 'all',
@@ -553,7 +553,7 @@ export default defineComponent({
         ellipsis: true,
       },
       {
-        title: t('操作'),
+        header: t('操作'),
         colKey: 'operation',
         width: 110,
         fixed: 'right',
@@ -1064,8 +1064,8 @@ export default defineComponent({
         if (row.status !== 'running') {
           window.mainComponent?.$bkInfo({
             type: 'warning',
-            subTitle: t('当前采集项名称为{n}，确认要删除？', { n: row.collector_config_name || row.name }),
-            confirmFn: () => {
+            body: t('当前采集项名称为{n}，确认要删除？', { n: row.collector_config_name || row.name }),
+            onConfirm: () => {
               requestDeleteCollect(row);
             },
           });

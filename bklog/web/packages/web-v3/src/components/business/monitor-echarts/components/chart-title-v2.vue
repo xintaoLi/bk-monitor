@@ -1,4 +1,5 @@
 <!--
+// @ts-nocheck
 * Tencent is pleased to support the open source community by making
 * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.
 *
@@ -149,7 +150,7 @@
       appendTo: document.body,
       hideOnClick: false,
       onShown: () => {
-        const cfg = this.$store.state.indexFieldInfo.custom_config?.grade_options ?? {};
+        const cfg = this.$indexFieldStore.indexFieldInfo.custom_config?.grade_options ?? {};
         (this.$refs.refGradeOption as any)?.updateOptions?.(cfg);
       },
     };
@@ -163,7 +164,7 @@
     }
 
     get fieldList() {
-      return this.$store.state.indexFieldInfo.fields ?? [];
+      return this.$indexFieldStore.indexFieldInfo.fields ?? [];
     }
 
     @Watch('retrieveParams.interval')

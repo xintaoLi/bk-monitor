@@ -29,9 +29,9 @@ import BklogPopover from '@/components/bklog-popover';
 import MatchMode from '@/global/match-mode';
 import useLocale from '@/hooks/use-locale';
 import { debounce } from 'lodash-es';
-import { useRoute } from 'vue-router/composables';
+import { useRoute } from 'vue-router';
 
-import useStore from '../../../hooks/use-store';
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from '../../../hooks/use-store';
 import GrepCliEditor from './grep-cli-editor';
 
 import './grep-cli.scss';
@@ -72,9 +72,14 @@ export default defineComponent({
       wordMatch: false,
     });
 
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const fieldList = computed(() =>
-      (store.state.indexFieldInfo.fields ?? []).filter(field => field.field_type === 'text'),
+      (indexFieldStore.indexFieldInfo.fields ?? []).filter(field => field.field_type === 'text'),
     );
 
     // 选择字段

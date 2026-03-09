@@ -1,0 +1,146 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary;
+  background-color: $bg-gray;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+a {
+  color: $primary-color;
+  text-decoration: none;
+  cursor: pointer;
+  
+  &:hover {
+    color: lighten($primary-color, 10%);
+  }
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+button {
+  outline: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  outline: none;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $border-color;
+  border-radius: 3px;
+  
+  &:hover {
+    background: darken($border-color, 10%);
+  }
+}
+
+// 通用工具类
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-ellipsis {
+  @include text-ellipsis(1);
+}
+
+.flex-center {
+  @include flex-center;
+}
+
+.flex-between {
+  @include flex-between;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-height {
+  height: 100%;
+}
+
+// 间距工具类
+@each $key, $value in (xs: $spacing-xs, sm: $spacing-sm, md: $spacing-md, lg: $spacing-lg, xl: $spacing-xl) {
+  .m-#{$key} {
+    margin: $value;
+  }
+  
+  .mt-#{$key} {
+    margin-top: $value;
+  }
+  
+  .mr-#{$key} {
+    margin-right: $value;
+  }
+  
+  .mb-#{$key} {
+    margin-bottom: $value;
+  }
+  
+  .ml-#{$key} {
+    margin-left: $value;
+  }
+  
+  .p-#{$key} {
+    padding: $value;
+  }
+  
+  .pt-#{$key} {
+    padding-top: $value;
+  }
+  
+  .pr-#{$key} {
+    padding-right: $value;
+  }
+  
+  .pb-#{$key} {
+    padding-bottom: $value;
+  }
+  
+  .pl-#{$key} {
+    padding-left: $value;
+  }
+}

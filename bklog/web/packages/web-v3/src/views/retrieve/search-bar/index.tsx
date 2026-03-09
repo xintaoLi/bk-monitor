@@ -29,17 +29,16 @@ import { computed, defineComponent, ref, nextTick } from 'vue';
 import useElementEvent from '@/hooks/use-element-event';
 import useLocale from '@/hooks/use-locale';
 import useResizeObserve from '@/hooks/use-resize-observe';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useRetrieveParams from '@/hooks/use-retrieve-params';
 import aiBluekingSvg from '@/images/ai/ai-bluking-2.svg';
 import RetrieveHelper, { RetrieveEvent } from '../../retrieve-helper';
 import V2SearchBar from '../../retrieve-v2/search-bar/index.vue';
 import V3AiMode from './ai-mode/index';
-import { bkMessage } from 'bk-magic-vue';
+import { MessagePlugin } from 'tdesign-vue-next';
 
 import { handleTransformToTimestamp } from '@/components/time-range/utils';
 import { AiQueryResult, AiQueryContent } from './types';
-import { BK_LOG_STORAGE } from '@/store/store.type';
 
 import './index.scss';
 
@@ -55,7 +54,12 @@ export default defineComponent({
   name: 'V3Searchbar',
   setup() {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
 
     const searchBarHeight = ref(0);
     const searchBarRef = ref<any>(null);
@@ -65,7 +69,7 @@ export default defineComponent({
     const searchMode = ref<'normal' | 'ai'>('normal');
     const aiQueryResult = ref<AiQueryResult>(DEFAULT_AI_QUERY_RESULT);
 
-    const aiFilterList = computed<string[]>(() => (store.state.aiMode.filterList ?? []).filter(f => !/^\s*\*?\s*$/.test(f)),
+    const aiFilterList = computed<string[]>(() => (retrieveStore.aiMode.filterList ?? []).filter(f => !/^\s*\*?\s*$/.test(f)),
     );
 
     const { setRouteParamsByKeywordAndAddition } = useRetrieveParams();
@@ -90,7 +94,7 @@ export default defineComponent({
      * 获取字段配置
      */
     const fieldsJsonValue = computed(() => {
-      const fieldConfig = store.state.indexFieldInfo.fields.reduce((acc, field) => {
+      const fieldConfig = indexFieldStore.indexFieldInfo.fields.reduce((acc, field) => {
         return {
           ...acc,
           [field.field_name]: {
@@ -107,13 +111,13 @@ export default defineComponent({
      * 是否激活AI助手
      * @TODO 本周发布BKOP开启助手，上云环境关闭助手，此处需要暂时调整为 false
      */
-    const isAiAssistantActive = computed(() => store.state.features.isAiAssistantActive);
-    const formatValue = computed(() => store.getters.retrieveParams.format);
+    const isAiAssistantActive = computed(() => globalStore.features.isAiAssistantActive);
+    const formatValue = computed(() => retrieveStore.searchParams.format);
 
     /**
      * 当前搜索模式：'ui' | 'sql'
      */
-    const currentSearchMode = computed<'ui' | 'sql'>(() => (store.state.storage[BK_LOG_STORAGE.SEARCH_TYPE] === 1 ? 'sql' : 'ui'),
+    const currentSearchMode = computed<'ui' | 'sql'>(() => ((globalStore as any).storage[BK_LOG_STORAGE.SEARCH_TYPE] === 1 ? 'sql' : 'ui'),
     );
     /**
      * 更新AI助手位置
@@ -166,18 +170,18 @@ export default defineComponent({
         // 切换模式
         if (searchMode.value === 'normal') {
           // 从非 AI 模式切换到 AI 模式
-          const keyword = store.getters.retrieveParams.keyword;
+          const keyword = retrieveStore.searchParams.keyword;
 
           // 将 keyword 添加为 filterList 的一个选项（过滤空值和通配符）
-          store.state.aiMode.filterList = [keyword].filter(f => !/^\s*\*?\s*$/.test(f));
-          store.state.aiMode.active = true;
+          retrieveStore.aiMode.filterList = [keyword].filter(f => !/^\s*\*?\s*$/.test(f));
+          retrieveStore.aiMode.active = true;
 
-          store.commit('updateAiMode', {
+          retrieveStore.updateAiMode({
             active: true,
             filterList: [keyword].filter(f => !/^\s*\*?\s*$/.test(f)),
           });
 
-          store.commit('updateIndexItemParams', { keyword: '' });
+          retrieveStore.updateIndexItemParams({ keyword: '' });
           aiQueryResult.value.queryString = '';
           aiQueryResult.value.parseResult = undefined;
           aiQueryResult.value.explain = undefined;
@@ -224,15 +228,15 @@ export default defineComponent({
           const keyword = keywordParts.join(' AND ');
 
           // 先更新 storage 和 indexItem，确保 V2SearchBar 能读取到正确的模式
-          store.commit('updateStorage', { [BK_LOG_STORAGE.SEARCH_TYPE]: 1 });
-          store.commit('updateIndexItemParams', { keyword, search_mode: 'sql' });
+          storageStore.updateStorage({ [BK_LOG_STORAGE.SEARCH_TYPE]: 1 });
+          retrieveStore.updateIndexItemParams({ keyword, search_mode: 'sql' });
 
           // 更新路由参数以同步状态（需要在 nextTick 之前更新，确保路由参数正确）
           setRouteParamsByKeywordAndAddition();
 
           searchMode.value = 'normal';
-          store.state.aiMode.active = false;
-          store.state.aiMode.filterList = [];
+          retrieveStore.aiMode.active = false;
+          retrieveStore.aiMode.filterList = [];
           Object.assign(aiQueryResult.value, {
             startTime: undefined,
             endTime: undefined,
@@ -309,7 +313,7 @@ export default defineComponent({
       //     title: t('AI编辑'),
       //   },
       //   {
-      //     index_set_id: store.state.indexItem.ids[0],
+      //     index_set_id: retrieveStore.indexItem.ids[0],
       //     description: '',
       //     domain: window.location.origin,
       //     fields: fieldsJsonValue.value,
@@ -338,7 +342,7 @@ export default defineComponent({
         if (startTime && endTime) {
           const results = handleTransformToTimestamp([startTime, endTime], formatValue.value);
           Object.assign(queryParams, { start_time: results[0], end_time: results[1] });
-          store.commit('updateIndexItemParams', { datePickerValue: [startTime, endTime] });
+          retrieveStore.updateIndexItemParams({ datePickerValue: [startTime, endTime] });
           aiQueryResult.value.startTime = startTime;
           aiQueryResult.value.endTime = endTime;
           needReplace = true;
@@ -351,13 +355,13 @@ export default defineComponent({
         }
 
         if (needReplace) {
-          store.commit('updateIndexItemParams', queryParams);
-          store.commit('updateStorage', { [BK_LOG_STORAGE.SEARCH_TYPE]: 1 });
+          retrieveStore.updateIndexItemParams(queryParams);
+          storageStore.updateStorage({ [BK_LOG_STORAGE.SEARCH_TYPE]: 1 });
 
           const { start_time, end_time } = queryParams as any;
           setRouteParamsByKeywordAndAddition({ start_time, end_time }).then(() => {
             RetrieveHelper.fire(RetrieveEvent.SEARCH_VALUE_CHANGE);
-            store.dispatch('requestIndexSetQuery');
+            // TODO: retrieveStore.requestIndexSetQuery();
           });
         }
 
@@ -365,10 +369,7 @@ export default defineComponent({
         aiQueryResult.value.explain = explain;
       } catch (e) {
         console.error(e);
-        bkMessage({
-          theme: 'error',
-          message: e.message,
-        });
+        MessagePlugin.error(e.message);
       }
     };
 
@@ -407,7 +408,7 @@ export default defineComponent({
 
       RetrieveHelper.aiAssitantHelper
         .requestTextToQueryString({
-          index_set_id: store.state.indexItem.ids[0],
+          index_set_id: retrieveStore.indexItem.ids[0],
           description: value,
           domain: window.location.origin,
           fields: fieldsJsonValue.value,
@@ -429,9 +430,9 @@ export default defineComponent({
      */
     const handleFilterChange = (newFilterList: string[]) => {
       // 更新 store 中的 filterList
-      store.state.aiMode.filterList = newFilterList;
+      retrieveStore.aiMode.filterList = newFilterList;
       // 触发查询
-      store.dispatch('requestIndexSetQuery');
+      // TODO: retrieveStore.requestIndexSetQuery();
       // 更新 URL 参数
       setRouteParamsByKeywordAndAddition();
     };
@@ -492,7 +493,7 @@ export default defineComponent({
             const triggerSource = `${currentSearchMode.value}_mode` as 'ui_mode' | 'sql_mode';
 
             if (triggerSource === 'sql_mode') {
-              store.commit('updateIndexItemParams', { keyword: value });
+              retrieveStore.updateIndexItemParams({ keyword: value });
             }
 
             handleTextToQuery(value, triggerSource);

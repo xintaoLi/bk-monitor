@@ -27,10 +27,10 @@ import { defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { readBlobRespToJson } from '@/common/util';
 import useFieldAliasRequestParams from '@/hooks/use-field-alias-request-params';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import RequestPool from '@/store/request-pool';
 import { debounce } from 'lodash-es';
-import { useRoute, useRouter } from 'vue-router/composables';
+import { useRoute, useRouter } from 'vue-router';
 import useRetrieveEvent from '@/hooks/use-retrieve-event';
 
 import RetrieveHelper, { RetrieveEvent } from '../../retrieve-helper';
@@ -50,7 +50,12 @@ export default defineComponent({
     GrepCliResult,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const route = useRoute();
     const router = useRouter();
@@ -85,12 +90,12 @@ export default defineComponent({
      * 如果 log 字段不存在，则设置为第一个 field_type 为 text 的字段
      */
     const setDefaultFieldValue = () => {
-      if (field.value === '' && store.state.indexFieldInfo.fields.length > 0) {
-        const logField = store.state.indexFieldInfo.fields.find(field => field.field_name === 'log');
+      if (field.value === '' && indexFieldStore.indexFieldInfo.fields.length > 0) {
+        const logField = indexFieldStore.indexFieldInfo.fields.find(field => field.field_name === 'log');
         if (logField) {
           field.value = logField.field_name;
         } else {
-          const textField = store.state.indexFieldInfo.fields.find(field => field.field_type === 'text');
+          const textField = indexFieldStore.indexFieldInfo.fields.find(field => field.field_type === 'text');
           if (textField) {
             field.value = textField.field_name;
           }
@@ -128,12 +133,12 @@ export default defineComponent({
       RequestPool.execCanceToken(cancelTokenKey);
       const requestCancelToken = RequestPool.getCancelToken(cancelTokenKey);
 
-      const { start_time, end_time, keyword, addition } = store.state.indexItem;
+      const { start_time, end_time, keyword, addition } = retrieveStore.indexItem;
       const { alias_settings: aliasSettings, sort_list: sortList } = useFieldAliasRequestParams();
 
       const params: any = {
         method: 'post',
-        url: `/search/index_set/${store.state.indexId}/grep_query/`,
+        url: `/search/index_set/${globalStore.indexSetId}/grep_query/`,
         cancelToken: requestCancelToken,
         withCredentials: true,
         baseURL: baseUrl,
@@ -152,10 +157,10 @@ export default defineComponent({
         },
       };
 
-      if (store.state.isExternal) {
+      if (globalStore.isExternal) {
         Object.assign(params, {
           headers: {
-            'X-Bk-Space-Uid': store.state.spaceUid,
+            'X-Bk-Space-Uid': globalStore.spaceUid,
           },
         });
       }
@@ -306,7 +311,7 @@ export default defineComponent({
       if (!field.value) {
         return;
       }
-      const { start_time, end_time, keyword, addition } = store.state.indexItem;
+      const { start_time, end_time, keyword, addition } = retrieveStore.indexItem;
       const { alias_settings: aliasSettings, sort_list: sortList } = useFieldAliasRequestParams();
       const data = {
         start_time,
@@ -321,7 +326,7 @@ export default defineComponent({
       http
         .request('retrieve/getGrepResultTotal', {
           params: {
-            index_set_id: store.state.indexId,
+            index_set_id: globalStore.indexSetId,
           },
           data,
         })

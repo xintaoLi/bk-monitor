@@ -28,8 +28,8 @@ import { computed, defineComponent, onMounted, ref, onBeforeMount } from 'vue';
 
 import LogIpSelector, { toTransformNode, toSelectorNode } from '@/components/log-ip-selector/log-ip-selector'; // 日志IP选择器组件
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 
 import { useCollectList } from '../../hook/useCollectList'; // 收集列表相关功能
 import { useOperation } from '../../hook/useOperation'; // 操作相关功能
@@ -110,7 +110,13 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const { bkBizId } = useCollectList();
     const { cardRender } = useOperation();
@@ -655,7 +661,7 @@ export default defineComponent({
         initializeBaseFormData(res.data);
         initConfig(res.data);
         // 更新 store 中的当前采集配置
-        store.commit('collect/setCurCollect', res.data);
+        (globalStore as any).commit('collect/setCurCollect', res.data);
         setTimeout(() => {
           isConfigChange.value = false;
         }, 2000);
@@ -1080,15 +1086,15 @@ export default defineComponent({
     );
     const cardConfig = [
       {
-        title: t('基础信息'),
+        header: t('基础信息'),
         key: 'baseInfo',
         renderFn: renderBaseInfo,
       },
       {
-        title: t('源日志信息'),
+        header: t('源日志信息'),
         key: 'sourceLogInfo',
         renderFn: renderSourceLogInfo,
-        subTitle: () => {
+        body: () => {
           if (!props.isEdit) {
             return (
               <span
@@ -1105,7 +1111,7 @@ export default defineComponent({
         },
       },
       {
-        title: t('链路配置'),
+        header: t('链路配置'),
         key: 'linkConfiguration',
         renderFn: renderLinkConfig,
       },
@@ -1309,7 +1315,7 @@ export default defineComponent({
         ...params,
         paths: extractPaths(params),
       };
-      const urlParams = {};
+      const urlParams: Record<string, any> = {};
       let requestUrl = 'collect/addCollection';
       if (isUpdate.value) {
         urlParams.collector_config_id = route.params.collectorId;
@@ -1359,7 +1365,7 @@ export default defineComponent({
             ...formData.value,
             ...res.data,
           };
-          store.commit(`collect/${isUpdate.value ? 'updateCurCollect' : 'setCurCollect'}`, newConfig);
+          (globalStore as any).commit(`collect/${isUpdate.value ? 'updateCurCollect' : 'setCurCollect'}`, newConfig);
           res.result && showMessage(t('保存成功'));
           emit('next', newConfig);
         })

@@ -248,13 +248,13 @@ export default defineComponent({
     };
     /** 下拉选中 */
     const handleAddSortFields = (value) => {
-      const options = props.selectList.find(item => item.id === value);
-      tagList.value.push(options.id);
+      const options = props.selectList.find((item: any) => item.id === value) as any;
+      tagList.value.push(options?.id);
       emitChange();
     };
 
     const isDisabled = (id: string) => {
-      return tagList.value.some(item => item === id);
+      return tagList.value.some((item: any) => item === id);
     };
 
     const renderSelect = () => (
@@ -269,7 +269,7 @@ export default defineComponent({
         >
           <i class='bk-icon icon-plus left-icon' />
         </div>
-        {props.selectList.map(item => (
+        {props.selectList.map((item: any) => (
           <bk-option
             id={item.id}
             key={item.id}

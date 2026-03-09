@@ -29,7 +29,7 @@ import { defineComponent, ref, computed, watch, nextTick } from 'vue';
 import { formatDate } from '@/common/util';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import FileDatePicker from './file-date-picker.tsx';
 import http from '@/api';
@@ -62,7 +62,12 @@ export default defineComponent({
   },
 
   setup(props, { emit, expose }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const isLoading = ref(false); // 加载状态
@@ -129,7 +134,7 @@ export default defineComponent({
       http
         .request('extract/getExplorerList', {
           data: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             ip_list: ipList,
             path: path || props.fileOrPath,
             time_range: timeRange.value,
@@ -205,7 +210,7 @@ export default defineComponent({
       http
         .request('extract/getExplorerList', {
           data: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             ip_list: findIpList,
             path,
             time_range: timeRangeVal,

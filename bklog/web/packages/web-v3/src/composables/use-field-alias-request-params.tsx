@@ -25,7 +25,7 @@
  */
 import { computed } from 'vue';
 
-import useStore from './use-store';
+import useStore, { useGlobalStore, useRetrieveStore, useIndexFieldStore } from './use-store';
 
 /**
  * 字段别名请求参数 Composable
@@ -33,7 +33,12 @@ import useStore from './use-store';
  * @returns 请求参数对象
  */
 export default () => {
-  const store = useStore();
+  const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
   /**
    * 字段别名设置
@@ -41,7 +46,7 @@ export default () => {
    */
   const alias_settings = computed(() =>
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
-    (store.state.indexFieldInfo?.fields ?? [])
+    (indexFieldStore.indexFieldInfo?.fields ?? [])
       .filter((f: any) => f.query_alias)
       .map((f: any) => ({
         field_name: f.field_name,
@@ -55,9 +60,9 @@ export default () => {
    * 根据本地排序状态返回不同的排序列表
    */
   const sort_list = computed(() =>
-    store.state.localSort
-      ? (store.state.indexItem.sort_list ?? [])
-      : (store.state.retrieve.catchFieldCustomConfig.sortList ?? []),
+    (globalStore as any).localSort
+      ? (retrieveStore.indexItem.sort_list ?? [])
+      : ((retrieveStore as any).catchFieldCustomConfig?.sortList ?? []),
   );
 
   return {

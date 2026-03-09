@@ -30,7 +30,7 @@ import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
 import useRoute from '@/hooks/use-route';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useUtils from '@/hooks/use-utils';
 
 import DownloadUrl from './download-url.tsx';
@@ -51,7 +51,13 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
     const router = useRouter();
     const route = useRoute();
@@ -91,7 +97,7 @@ export default defineComponent({
         emptyType.value = searchKeyword.value ? 'search-empty' : 'empty';
         const payload: any = {
           query: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             page: pagination.value.current,
             pagesize: pagination.value.limit,
           },
@@ -143,7 +149,7 @@ export default defineComponent({
             host_list: hostList,
           },
           params: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         });
         displayNameList.value = res.data;
@@ -279,7 +285,7 @@ export default defineComponent({
         await http.request('extract/reDownloadFile', {
           data: {
             task_id,
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         });
         await initTaskList();

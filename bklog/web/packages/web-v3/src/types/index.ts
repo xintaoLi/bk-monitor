@@ -33,3 +33,26 @@ export * from './business'
 export * from './common'
 export * from './router'
 export * from './store'
+
+// Domain type stubs
+export interface SpaceInfo {
+  space_uid: string;
+  space_name: string;
+  space_type_id?: string;
+  bk_biz_id?: number;
+  [key: string]: any;
+}
+
+export interface BizInfo {
+  bk_biz_id: number;
+  bk_biz_name: string;
+  [key: string]: any;
+}
+
+export interface UserInfo {
+  username: string;
+  display_name?: string;
+  email?: string;
+  phone?: string;
+  [key: string]: any;
+}

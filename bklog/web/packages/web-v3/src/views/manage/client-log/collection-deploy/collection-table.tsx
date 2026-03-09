@@ -31,8 +31,7 @@ import EmptyStatus from '@/components/empty-status/index.vue';
 
 import { t } from '@/hooks/use-locale';
 import * as authorityMap from '../../../../common/authority-map';
-import useStore from '@/hooks/use-store';
-import { BK_LOG_STORAGE } from '@/store/store.type';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import { TRIGGER_FREQUENCY_OPTIONS, CLIENT_TYPE_OPTIONS } from '../constant';
 import { TaskStatus, TaskScene } from './types';
 import { useTableSetting } from '../hooks/use-table-setting';
@@ -91,7 +90,12 @@ export default defineComponent({
     'sort-change',
   ],
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const logTableRef = ref(null); // 表格引用
 
@@ -209,7 +213,7 @@ export default defineComponent({
         try {
           const params = {
             query: {
-              bk_biz_id: store.state.storage[BK_LOG_STORAGE.BK_BIZ_ID],
+              bk_biz_id: (globalStore as any).storage[BK_LOG_STORAGE.BK_BIZ_ID],
               id,
             },
           };
@@ -227,12 +231,12 @@ export default defineComponent({
           resources: [
             {
               type: 'space',
-              id: store.state.spaceUid,
+              id: globalStore.spaceUid,
             },
           ],
         };
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       }
     };
 

@@ -27,7 +27,7 @@
 import { defineComponent, ref, watch, computed, onBeforeUnmount, onMounted, nextTick, type PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import tippy, { type Instance, type SingleTarget } from 'tippy.js';
 
 import InfoTips from '../../../common-comp/info-tips';
@@ -113,7 +113,12 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     // ==================== Refs 定义 ====================
     /** Tippy 菜单面板引用 */
@@ -125,7 +130,7 @@ export default defineComponent({
     /** Tippy 实例 */
     let tippyInstance: Instance | null = null;
     /** 业务 ID */
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     /** 选择集群提示配置 */
     const chooseClusterTips = ref({
       content: t('请先选择集群'),

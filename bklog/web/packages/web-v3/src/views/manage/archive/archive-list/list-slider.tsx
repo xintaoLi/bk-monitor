@@ -28,8 +28,8 @@ import { defineComponent, ref, reactive, computed, watch, onMounted, nextTick } 
 
 import * as authorityMap from '@/common/authority-map';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { InfoBox, Message } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import http from '@/api';
 
@@ -54,7 +54,13 @@ export default defineComponent({
   emits: ['handleCancelSlider', 'handleUpdatedTable'],
 
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale(); // 获取国际化函数
     const validateForm = ref<any>(null); // 表单验证引用
 
@@ -83,7 +89,7 @@ export default defineComponent({
       trigger: 'blur',
     };
 
-    const bkBizId = computed(() => store.getters.bkBizId); // 业务ID
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
     const globalsData = computed(() => store.getters['globals/globalsData']); // 全局数据
     const authorityMapComputed = computed(() => authorityMap); // 权限映射
 
@@ -166,12 +172,12 @@ export default defineComponent({
 
     // 取消处理
     const handleCancel = () => {
-      InfoBox({
-        title: t('确认离开当前页？'),
-        subTitle: t('离开将会导致未保存信息丢失'),
-        okText: t('离开'),
-        cancelText: t('取消'),
-        confirmFn: () => emit('handleCancelSlider'),
+      DialogPlugin.confirm({
+        header: t('确认离开当前页？'),
+        body: t('离开将会导致未保存信息丢失'),
+        confirmBtn: t('离开'),
+        cancelBtn: t('取消'),
+        onConfirm: () => emit('handleCancelSlider'),
       });
     };
 
@@ -204,9 +210,9 @@ export default defineComponent({
         document.body.click();
       } else {
         customRetentionDay.value = '';
-        Message({
-          theme: 'error',
-          message: t('请输入有效数值'),
+        MessagePlugin.error({
+          
+          content: t('请输入有效数值'),
         });
       }
     };
@@ -247,9 +253,8 @@ export default defineComponent({
         });
 
         // 提示保存成功
-        Message({
-          theme: 'success',
-          message: t('保存成功'),
+        MessagePlugin.success({
+          content: t('保存成功'),
           delay: 1500,
         });
 

@@ -28,8 +28,8 @@ import { computed, ref } from 'vue';
 
 import * as authorityMap from '@/common/authority-map';
 import { projectManages } from '@/common/util';
-import useStore from '@/hooks/use-store';
-import { useRouter, useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRouter, useRoute } from 'vue-router';
 import { getOperatorCanClick } from '../utils';
 import type {
   CollectOperateType,
@@ -58,17 +58,23 @@ type RouteName =
  * 采集列表的自定义 Hook
  */
 export const useCollectList = () => {
-  const store = useStore();
+  const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
   const router = useRouter();
   const route = useRoute();
   const loadingStatus = ref(false);
   const isAllowedCreate = ref<boolean | null>(null);
   const isTableLoading = ref(false);
-  const spaceUid = computed(() => store.getters.spaceUid);
-  const bkBizId = computed(() => store.getters.bkBizId);
+  const spaceUid = computed(() => globalStore.spaceUid);
+  const bkBizId = computed(() => globalStore.bkBizId);
   const authGlobalInfo = computed(() => store.getters['globals/authContainerInfo']);
-  const isShowMaskingTemplate = computed(() => store.getters.isShowMaskingTemplate);
-  const collectProject = computed(() => projectManages(store.state.topMenu, 'collection-item'));
+  const isShowMaskingTemplate = computed(() => (globalStore as any).isShowMaskingTemplate);
+  const collectProject = computed(() => projectManages((globalStore as any).topMenu, 'collection-item'));
   /**
    * 跳转到采集项列表
    */
@@ -87,7 +93,7 @@ export const useCollectList = () => {
    */
   const checkCreateAuth = async () => {
     try {
-      const res = (await store.dispatch('checkAllowed', {
+      const res = (await (globalStore as any).dispatch('checkAllowed', {
         action_ids: [authorityMap.CREATE_COLLECTION_AUTH],
         resources: [
           {
@@ -124,8 +130,8 @@ export const useCollectList = () => {
   const getOptionApplyData = async (paramData: IAuthApplyDataParams) => {
     try {
       isTableLoading.value = true;
-      const res = (await store.dispatch('getApplyData', paramData)) as IGetApplyDataResponse;
-      store.commit('updateAuthDialogData', res?.data);
+      const res = (await globalStore.getApplyData(paramData)) as IGetApplyDataResponse;
+      (globalStore as any).commit('updateAuthDialogData', res?.data);
     } catch (err) {
       console.log(err);
     } finally {
@@ -271,11 +277,11 @@ export const useCollectList = () => {
     }
 
     // 记录当前操作对象，供目标页回显/继续编辑使用
-    store.commit('collect/setCurCollect', row);
+    (globalStore as any).commit('collect/setCurCollect', row);
 
     const finalQuery = {
       ...query,
-      spaceUid: String(store.state.spaceUid),
+      spaceUid: String(globalStore.spaceUid),
       backRoute: backRoute ?? undefined,
     };
 

@@ -28,8 +28,8 @@ import { defineComponent, ref, reactive, computed, watch } from 'vue';
 
 import * as authorityMap from '@/common/authority-map';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { Message, InfoBox } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import http from '@/api';
 
@@ -82,7 +82,12 @@ export default defineComponent({
   emits: ['handleCancelSlider', 'handleUpdatedTable'],
 
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const confirmLoading = ref(false); // 确认按钮加载状态
@@ -111,7 +116,7 @@ export default defineComponent({
     });
 
     // 获取业务ID和编辑状态
-    const bkBizId = computed(() => store.getters.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     const isEdit = computed(() => props.editClusterId !== null);
 
     // 必填规则抽离
@@ -177,12 +182,12 @@ export default defineComponent({
 
     // 取消操作/关闭侧滑弹窗
     const handleCancel = () => {
-      InfoBox({
-        title: t('确认离开当前页？'),
-        subTitle: t('离开将会导致未保存信息丢失'),
-        okText: t('离开'),
-        cancelText: t('取消'),
-        confirmFn: () => emit('handleCancelSlider'),
+      DialogPlugin.confirm({
+        header: t('确认离开当前页？'),
+        body: t('离开将会导致未保存信息丢失'),
+        confirmBtn: t('离开'),
+        cancelBtn: t('取消'),
+        onConfirm: () => emit('handleCancelSlider'),
       });
     };
 
@@ -262,9 +267,8 @@ export default defineComponent({
         });
 
         // 提示保存成功
-        Message({
-          theme: 'success',
-          message: t('保存成功'),
+        MessagePlugin.success({
+          content: t('保存成功'),
           delay: 1500,
         });
 
@@ -286,7 +290,7 @@ export default defineComponent({
         const event = new Event('click');
         document.dispatchEvent(event);
 
-        const res = await store.dispatch('getApplyData', {
+        const res = await globalStore.getApplyData({
           action_ids: [authorityMap.MANAGE_ES_SOURCE_AUTH],
           resources: [
             {

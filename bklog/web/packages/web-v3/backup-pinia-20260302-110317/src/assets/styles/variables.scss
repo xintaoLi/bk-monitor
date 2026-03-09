@@ -1,0 +1,73 @@
+// 颜色变量
+$primary-color: #3a84ff;
+$success-color: #2dcb56;
+$warning-color: #ff9c01;
+$danger-color: #ea3536;
+$info-color: #3a84ff;
+
+// 文本颜色
+$text-primary: #63656e;
+$text-secondary: #979ba5;
+$text-disabled: #c4c6cc;
+$text-white: #ffffff;
+
+// 背景颜色
+$bg-white: #ffffff;
+$bg-gray: #f5f7fa;
+$bg-dark: #2e2e2e;
+$bg-hover: #f0f1f5;
+
+// 边框颜色
+$border-color: #dcdee5;
+$border-light: #e8eaec;
+
+// 阴影
+$box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+$box-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
+
+// 间距
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+// 圆角
+$border-radius-sm: 2px;
+$border-radius-md: 4px;
+$border-radius-lg: 8px;
+
+// 字体大小
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-md: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+
+// 字体粗细
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 600;
+
+// 层级
+$z-index-dropdown: 1000;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
+
+// 过渡动画
+$transition-fast: 0.15s;
+$transition-base: 0.3s;
+$transition-slow: 0.5s;
+
+// 布局
+$header-height: 52px;
+$sidebar-width: 240px;
+$sidebar-collapsed-width: 64px;
+
+// 断点
+$breakpoint-xs: 576px;
+$breakpoint-sm: 768px;
+$breakpoint-md: 992px;
+$breakpoint-lg: 1200px;
+$breakpoint-xl: 1600px;

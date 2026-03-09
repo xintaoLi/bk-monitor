@@ -25,7 +25,7 @@
  */
 import { computed, defineComponent, ref, watch } from 'vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import $http from '@/api';
 import FilterRule from '@/components/filter-rule';
 import PreviewResult from './preview-result';
@@ -69,7 +69,12 @@ export default defineComponent({
     };
 
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const previewResultRef = ref();
     const quickClusterFromRef = ref();
@@ -122,7 +127,7 @@ export default defineComponent({
         try {
           const rules = filterRuleRef.value.getValue();
           const data = {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
             clustering_fields: formData.value.clustering_fields,
             filter_rules: rules.map(item => ({
               fields_name: item.field_name,

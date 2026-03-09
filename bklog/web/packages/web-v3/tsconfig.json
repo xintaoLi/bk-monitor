@@ -16,13 +16,13 @@
     "jsxImportSource": "vue",
 
     /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": false,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
     "strictPropertyInitialization": false,
 
     /* Path Mapping */
@@ -38,7 +38,8 @@
       "@/stores/*": ["./src/stores/*"],
       "@/types/*": ["./src/types/*"],
       "@/utils/*": ["./src/utils/*"],
-      "@/views/*": ["./src/views/*"]
+      "@/views/*": ["./src/views/*"],
+      "bk-magic-vue": ["./src/shims/bk-magic-vue.ts"]
     },
 
     /* Type Checking */

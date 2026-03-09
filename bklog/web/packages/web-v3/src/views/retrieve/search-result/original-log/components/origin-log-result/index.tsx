@@ -29,8 +29,7 @@ import { parseTableRowData, readBlobRespToJson, parseBigNumberList, xssFilter } 
 
 import JsonFormatter from '@/global/json-formatter.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { BK_LOG_STORAGE } from '@/store/store.type';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import SearchBar from '@/views/retrieve-v2/search-bar/index.vue';
 import DOMPurify from 'dompurify';
 import { cloneDeep, debounce } from 'lodash-es';
@@ -59,7 +58,12 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
 
     const searchBarRef = ref<any>();
     const tableRef = ref<HTMLElement>();
@@ -68,15 +72,15 @@ export default defineComponent({
     const listLoading = ref(false);
     const isCollapsed = ref(false);
 
-    const fieldsMap = computed(() => (store.state.indexFieldInfo.fields || []).reduce((dataMap, item) => {
+    const fieldsMap = computed(() => (indexFieldStore.indexFieldInfo.fields || []).reduce((dataMap, item) => {
       dataMap[item.field_name] = item;
       return dataMap;
     }, {}),
     );
 
-    const timeField = computed(() => store.state.indexFieldInfo.time_field);
+    const timeField = computed(() => indexFieldStore.indexFieldInfo.time_field);
     const timeFieldType = computed(() => fieldsMap.value[timeField.value]?.field_type);
-    const visibleFields = computed(() => store.getters.visibleFields);
+    const visibleFields = computed(() => indexFieldStore.visibleFields);
 
     const requestOtherparams = cloneDeep(props.retrieveParams);
     delete requestOtherparams.format;
@@ -120,7 +124,7 @@ export default defineComponent({
       // size = props.logIndex > 50 ? props.logIndex + 20 : 50;
       const requestData = {
         ...requestOtherparams,
-        sort_list: store.state.indexFieldInfo.default_sort_list.filter(item => item.length > 0 && !!item[1]) || [],
+        sort_list: indexFieldStore.indexFieldInfo.default_sort_list.filter(item => item.length > 0 && !!item[1]) || [],
         size,
         begin,
       };
@@ -133,9 +137,9 @@ export default defineComponent({
         data: requestData,
         headers: {},
       };
-      if (store.state.isExternal) {
+      if (globalStore.isExternal) {
         params.headers = {
-          'X-Bk-Space-Uid': store.state.spaceUid,
+          'X-Bk-Space-Uid': globalStore.spaceUid,
         };
       }
       axiosInstance(params)
@@ -184,7 +188,7 @@ export default defineComponent({
         'is not': `is ${/true/i.test(value[0]) ? 'false' : 'true'}`,
       };
 
-      const targetField = store.state.visibleFields?.find(item => item.field_name === field);
+      const targetField = (globalStore as any).visibleFields?.find(item => item.field_name === field);
 
       const textType = targetField?.field_type ?? '';
       const isVirtualObjNode = targetField?.is_virtual_obj_node ?? false;
@@ -326,8 +330,8 @@ export default defineComponent({
 
       choosedIndex.value = index;
       const rowInfo = row;
-      const contextFields = store.state.indexSetOperatorConfig.contextAndRealtime.extra?.context_fields;
-      const timeField = store.state.indexFieldInfo.time_field;
+      const contextFields = (globalStore as any).indexSetOperatorConfig.contextAndRealtime.extra?.context_fields;
+      const timeField = indexFieldStore.indexFieldInfo.time_field;
       const dialogNewParams = {};
       Object.assign(dialogNewParams, {
         dtEventTimeStamp: rowInfo.dtEventTimeStamp,
@@ -341,7 +345,7 @@ export default defineComponent({
               dialogNewParams[field] = rowInfo[field];
             }
           } else {
-            dialogNewParams[field] = parseTableRowData(rowInfo, field, '', store.state.isFormatDate, '');
+            dialogNewParams[field] = parseTableRowData(rowInfo, field, '', (globalStore as any).isFormatDate, '');
           }
         });
       } else {
@@ -405,7 +409,7 @@ export default defineComponent({
       // init: () => handleSearch(requestOtherparams.search_mode, false),
       init: () => {
         // 初始化搜索框
-        const modeIndex = store.state.storage[BK_LOG_STORAGE.SEARCH_TYPE];
+        const modeIndex = (globalStore as any).storage[BK_LOG_STORAGE.SEARCH_TYPE];
         searchBarRef.value.setLocalMode(modeIndex);
         requestOtherparams.search_mode = modeIndex === 0 ? 'ui' : 'sql';
         const addition = props.retrieveParams.addition;
@@ -439,7 +443,7 @@ export default defineComponent({
           }
         }
         // 设置外部数据
-        const outerLogResult = store.state.indexSetQueryResult;
+        const outerLogResult = retrieveStore.indexSetQueryResult;
         total = outerLogResult.total;
         logList.value = outerLogResult.list.slice();
         begin = logList.value.length;

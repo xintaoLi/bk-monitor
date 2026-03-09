@@ -26,7 +26,7 @@
 import { RetrieveUrlResolver } from '@/store/url-resolver';
 import { useRoute } from './use-route';
 import { useRouter } from './use-router';
-import useStore from './use-store';
+import useStore, { useRetrieveStore } from './use-store';
 
 /**
  * 检索参数管理 Composable
@@ -34,7 +34,12 @@ import useStore from './use-store';
  * @returns 参数管理对象
  */
 export default () => {
-  const store = useStore();
+  // const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
   const route = useRoute();
   const router = useRouter();
 
@@ -47,8 +52,8 @@ export default () => {
     const query = { ...route.query };
 
     const resolver = new RetrieveUrlResolver({
-      keyword: store.getters.retrieveParams.keyword,
-      addition: store.getters.retrieveParams.addition,
+      keyword: retrieveStore.searchParams.keyword,
+      addition: retrieveStore.searchParams.addition,
     });
 
     Object.assign(query, resolver.resolveParamsToUrl());

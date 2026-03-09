@@ -27,7 +27,7 @@
 import { computed, type ComputedRef, defineComponent } from "vue";
 
 import { debounce } from "lodash-es";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 
 // #if MONITOR_APP !== 'apm' && MONITOR_APP !== 'trace'
 import GraphAnalysis from "../../retrieve-v2/search-result-panel/graph-analysis";
@@ -44,7 +44,7 @@ import SearchResultTab from "../../retrieve-v2/search-result-tab/index.vue";
 import RetrieveHelper, { RetrieveEvent } from "../../retrieve-helper";
 import Grep from "../grep";
 import { RouteQueryTab } from "../index.type";
-import useStore from "@/hooks/use-store";
+import useStore, { useGlobalStore, useRetrieveStore, useUserStore, useStorageStore, useIndexFieldStore, useCollectStore } from "@/hooks/use-store";
 import LogClustering from "./log-clustering";
 import useRetrieveEvent from "@/hooks/use-retrieve-event";
 
@@ -55,7 +55,12 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const route = useRoute();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const debounceUpdateTabValue = debounce((value) => {
       const isClustering = value === "clustering";
@@ -76,7 +81,7 @@ export default defineComponent({
       debounceUpdateTabValue(tab);
 
       if (triggerTrend) {
-        store.dispatch("requestIndexSetQuery");
+        (globalStore as any).dispatch("requestIndexSetQuery");
         setTimeout(() => {
           RetrieveHelper.fire(RetrieveEvent.TREND_GRAPH_SEARCH);
         }, 300);

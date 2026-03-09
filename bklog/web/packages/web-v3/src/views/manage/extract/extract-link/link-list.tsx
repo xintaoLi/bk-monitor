@@ -30,8 +30,8 @@ import * as authorityMap from '@/common/authority-map';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
-import { Message, InfoBox } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import http from '@/api';
 
@@ -40,7 +40,12 @@ import './link-list.scss';
 export default defineComponent({
   name: 'ExtractLinkList',
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
     const { t } = useLocale();
 
@@ -63,12 +68,12 @@ export default defineComponent({
       limitList: [10, 20, 50, 100],
     });
 
-    const spaceUid = computed(() => store.getters.spaceUid); // 空间UID
+    const spaceUid = computed(() => globalStore.spaceUid); // 空间UID
 
     // 权限校验，校验通过后拉取链路列表
     const checkManageAuth = async () => {
       try {
-        const res = await store.dispatch('checkAllowed', {
+        const res = await (globalStore as any).dispatch('checkAllowed', {
           action_ids: [authorityMap.MANAGE_EXTRACT_AUTH],
           resources: [
             {
@@ -136,7 +141,7 @@ export default defineComponent({
       } else {
         try {
           isButtonLoading.value = true;
-          const res = await store.dispatch('getApplyData', {
+          const res = await globalStore.getApplyData({
             action_ids: [authorityMap.MANAGE_EXTRACT_AUTH],
             resources: [
               {
@@ -145,7 +150,7 @@ export default defineComponent({
               },
             ],
           });
-          store.commit('updateState', { authDialogData: res.data });
+          globalStore.updateState({ authDialogData: res.data });
         } catch (err) {
           console.warn(err);
         } finally {
@@ -170,10 +175,10 @@ export default defineComponent({
 
     // 删除链路
     const handleDeleteStrategy = (row: any) => {
-      InfoBox({
-        title: `${t('确定要删除')}【${row.name}】？`,
+      DialogPlugin.confirm({
+        header: `${t('确定要删除')}【${row.name}】？`,
         confirmLoading: true,
-        confirmFn: () => confirmDeleteStrategy(row.link_id),
+        onConfirm: () => confirmDeleteStrategy(row.link_id),
       });
     };
 
@@ -186,9 +191,8 @@ export default defineComponent({
             link_id: id,
           },
         });
-        Message({
-          theme: 'success',
-          message: t('删除成功'),
+        MessagePlugin.success({
+          content: t('删除成功'),
         });
         await initList();
       } catch (e) {

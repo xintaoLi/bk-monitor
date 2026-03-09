@@ -74,12 +74,12 @@ export default defineComponent({
       key: [
         {
           validator: checkName,
-          message: t('标签名称不符合正则{n}', { n: '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]' }),
+          content: t('标签名称不符合正则{n}', { n: '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]' }),
           trigger: 'blur',
         },
         {
           required: true,
-          message: t('必填项'),
+          content: t('必填项'),
           trigger: 'blur',
         },
       ],

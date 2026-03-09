@@ -27,7 +27,7 @@
 import { defineComponent, ref, onMounted, watch, computed, nextTick } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 // import { debounce } from 'throttle-debounce';
 
 import {
@@ -69,7 +69,13 @@ export default defineComponent({
 
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     // -------------------------- 响应式数据 --------------------------
     /** 过滤器开关状态 */

@@ -1,0 +1,104 @@
+/*
+ * Tencent is pleased to support the open source community by making
+ * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.
+ *
+ * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
+ *
+ * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ *
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ *
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+import type { ApiConfig } from '@/types/api'
+
+/**
+ * 元数据相关 API 服务
+ */
+export const metaService = {
+  /**
+   * 获取通知类型列表
+   */
+  type: {
+    url: '/meta/msg_type/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 获取支持的语言列表
+   */
+  language: {
+    url: '/meta/language/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 修改用户语言设置
+   */
+  updateLanguage: {
+    url: '/meta/language/',
+    method: 'post',
+  } as ApiConfig,
+
+  /**
+   * 获取接入场景列表
+   */
+  scenario: {
+    url: '/meta/scenario/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 获取菜单列表
+   */
+  menu: {
+    url: '/meta/menu/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 根据业务 ID 获取业务名、运维人员 ID 信息
+   */
+  getMaintainerApi: {
+    url: '/meta/biz_maintainer/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 获取用户指引
+   */
+  getUserGuide: {
+    url: '/meta/user_guide/',
+    method: 'get',
+  } as ApiConfig,
+
+  /**
+   * 更新用户指引状态
+   */
+  updateUserGuide: {
+    url: '/meta/update_user_guide/',
+    method: 'post',
+  } as ApiConfig,
+
+  /**
+   * 获取环境变量
+   */
+  getEnvConstant: {
+    url: '/meta/index_html_environment/',
+    method: 'get',
+  } as ApiConfig,
+}

@@ -27,8 +27,8 @@
 import { computed, defineComponent, ref } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 
 import $http from '@/api';
 
@@ -59,7 +59,12 @@ export default defineComponent({
     const DIALOG_MIN_TOP = 70;
 
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const matchLines = ref(null);
     const isMatchLoading = ref(false);
@@ -76,11 +81,11 @@ export default defineComponent({
     ]);
 
     const getDialogWidth = computed(() => {
-      return store.getters.isEnLanguage ? '800' : '680';
+      return false // TODO: 需要从 i18n 获取 ? '800' : '680';
     });
 
     const getLabelWidth = computed(() => {
-      return store.getters.isEnLanguage ? EN_LABEL_WIDTH : CN_LABEL_WIDTH;
+      return false // TODO: 需要从 i18n 获取 ? EN_LABEL_WIDTH : CN_LABEL_WIDTH;
     });
 
     const dialogTop = computed(() => {

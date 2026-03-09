@@ -36,7 +36,8 @@ if (!window.mainComponent?.$t) {
     $i18n: i18n,
   };
 }
-import JsonFormatWrapper from '@/global/json-format-wrapper.vue';
+// import JsonFormatWrapper from '@/global/json-format-wrapper.vue'; // TODO: create this component
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import useStore from '@/hooks/use-store';
 
 import MonitorApmLog from './monitor';

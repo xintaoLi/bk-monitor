@@ -28,7 +28,7 @@ import { defineComponent, ref, nextTick } from 'vue';
 
 import ValidateUserSelector from '@/components/user-selector';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import ModuleSelect from './module-select.tsx';
 import ValidateInput from './validate-input.tsx';
@@ -73,7 +73,12 @@ export default defineComponent({
   emits: ['handleUpdatedTable', 'handleCancelSlider'],
 
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const isChangeOperatorLoading = ref(false); // 修改执行人加载状态
@@ -155,7 +160,7 @@ export default defineComponent({
 
     // 修改执行人
     const changeOperator = async () => {
-      const { operator } = store.state.userMeta;
+      const { operator } = userStore.userInfo;
       if (operator) {
         manageStrategyData.value.operator = operator;
         isValidatedComputed();
@@ -165,7 +170,7 @@ export default defineComponent({
       try {
         isChangeOperatorLoading.value = true;
         const res = await http.request('userInfo/getUsername');
-        store.commit('updateState', { userMeta: res.data });
+        globalStore.updateState({ userMeta: res.data });
         manageStrategyData.value.operator = res.data.operator;
         isValidatedComputed();
       } catch (e) {

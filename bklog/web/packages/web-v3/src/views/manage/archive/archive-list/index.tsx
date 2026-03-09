@@ -30,8 +30,8 @@ import * as authorityMap from '@/common/authority-map';
 import { formatFileSize, clearTableFilter } from '@/common/util';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { InfoBox, Message } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import RestoreSlider from '../archive-restore/restore-slider.tsx';
 import ListSlider from './list-slider.tsx';
@@ -49,7 +49,12 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale(); // 获取国际化函数
     const archiveTable = ref<any>(null); // 表格引用
 
@@ -70,7 +75,7 @@ export default defineComponent({
       limitList: [10, 20, 50, 100],
     });
 
-    const bkBizId = computed(() => store.getters.bkBizId); // 业务ID
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
     const authorityMapComputed = computed(() => authorityMap); // 权限映射计算属性
 
     // 获取文件大小
@@ -188,10 +193,10 @@ export default defineComponent({
       }
 
       if (operateType === 'delete') {
-        InfoBox({
-          type: 'warning',
-          subTitle: t('当前归档ID为{n}，确认要删除？', { n: row.archive_config_id }),
-          confirmFn: () => {
+        DialogPlugin.confirm({
+          theme: 'warning',
+          body: t('当前归档ID为{n}，确认要删除？', { n: row.archive_config_id }),
+          onConfirm: () => {
             requestDelete(row);
           },
         });
@@ -212,9 +217,8 @@ export default defineComponent({
           if (res.result) {
             const page =
               dataList.value.length <= 1 ? (pagination.current > 1 ? pagination.current - 1 : 1) : pagination.current;
-            Message({
-              theme: 'success',
-              message: t('删除成功'),
+            MessagePlugin.success({
+              content: t('删除成功'),
             });
             if (page !== pagination.current) {
               handlePageChange(page);
@@ -230,8 +234,8 @@ export default defineComponent({
     const getOptionApplyData = async (paramData: any) => {
       try {
         isTableLoading.value = true;
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       } catch (err) {
         console.warn(err);
       } finally {

@@ -28,10 +28,10 @@ import { defineComponent, ref, computed, onMounted, watch, type PropType, nextTi
 
 import OtherImport from '@/components/import-from-other-index-set';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { bkMessage } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin } from 'tdesign-vue-next';
 import dayjs from 'dayjs';
-import { useRouter } from 'vue-router/composables';
+import { useRouter } from 'vue-router';
 
 import { base64ToRuleArr } from './util';
 import $http from '@/api';
@@ -58,7 +58,12 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
 
     const ruleType = ref('template');
@@ -74,7 +79,7 @@ export default defineComponent({
     >([]);
 
     const isCustomize = computed(() => ruleType.value === 'customize');
-    const spaceUid = computed(() => store.state.spaceUid);
+    const spaceUid = computed(() => globalStore.spaceUid);
     const currentTemplate = computed(() => {
       if (!templateRuleId.value) {
         return {} as any;
@@ -218,10 +223,7 @@ export default defineComponent({
           });
           emit('rule-list-change', list);
         } catch {
-          bkMessage({
-            theme: 'error',
-            message: t('不是有效的json文件'),
-          });
+          MessagePlugin.error(t('不是有效的json文件'));
         }
       };
       // 以Text的形式读取文件:
@@ -239,10 +241,7 @@ export default defineComponent({
     /** 导出规则 */
     const handleExportRule = () => {
       if (!props.ruleList.length) {
-        bkMessage({
-          theme: 'error',
-          message: t('聚类规则为空，无法导出规则'),
-        });
+        MessagePlugin.error(t('聚类规则为空，无法导出规则'));
         return;
       }
       const eleLink = document.createElement('a');
@@ -274,7 +273,7 @@ export default defineComponent({
 
     const handleGoTemplateManage = (templateId?: number) => {
       const query = {
-        collectorConfigId: store.state.indexSetFieldConfig.clean_config.extra.collector_config_id,
+        collectorConfigId: (globalStore as any).indexSetFieldConfig.clean_config.extra.collector_config_id,
       };
       if (templateId) {
         Object.assign(query, { templateId });

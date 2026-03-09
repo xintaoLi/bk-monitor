@@ -33,6 +33,10 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    header: {
+      type: String,
+      default: '',
+    },
     title: {
       type: String,
       default: '',

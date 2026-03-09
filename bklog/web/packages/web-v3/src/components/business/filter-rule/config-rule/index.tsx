@@ -29,8 +29,7 @@ import { defineComponent, ref, computed, watch, onMounted } from 'vue';
 import { getRegExp } from '@/common/util';
 import useFieldEgges from '@/hooks/use-field-egges';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { BK_LOG_STORAGE } from '@/store/store.type';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import ControlOperate from './control-operate';
 import RuleTrigger from './rule-trigger';
@@ -55,7 +54,12 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  const storageStore = useStorageStore();
     const { isRequesting, isValidateItem, requestFieldEgges, setIsRequesting, isValidateEgges } = useFieldEgges();
 
     const fieldListMainRef = ref(null);
@@ -77,13 +81,13 @@ export default defineComponent({
     const activeIndex = ref(0);
     const hoverIndex = ref(0);
 
-    const indexFieldInfo = computed(() => store.state.indexFieldInfo);
-    const fieldTypeMap = computed(() => store.state.globals.fieldTypeMap);
+    const indexFieldInfo = computed(() => indexFieldStore.indexFieldInfo);
+    const fieldTypeMap = computed(() => indexFieldStore.fieldTypeMap);
     const isFieldListEmpty = computed(() => !indexFieldInfo.value.fields.length);
     const isSearchEmpty = computed(() => !(isFieldListEmpty.value || filterFieldList.value.length));
     const exceptionType = computed(() => (isFieldListEmpty.value ? 'empty' : 'search-empty'));
     const textDir = computed(() => {
-      const textEllipsisDir = store.state.storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR];
+      const textEllipsisDir = storageStore[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR];
       return textEllipsisDir === 'start' ? 'rtl' : 'ltr';
     });
     const filterFieldList = computed(() => {
@@ -98,7 +102,7 @@ export default defineComponent({
     const currentFieldInfo = computed(() => filterFieldList.value[activeIndex.value]);
 
     const activeItemMatchList = computed(() => {
-      return (store.state.indexFieldInfo.aggs_items[currentFieldInfo.value.field_name] ?? [])
+      return (indexFieldStore.indexFieldInfo.aggs_items[currentFieldInfo.value.field_name] ?? [])
         .filter(
           item => !(formData.value.values ?? []).includes(item),
         );

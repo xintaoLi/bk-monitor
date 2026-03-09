@@ -27,7 +27,7 @@
 import { defineComponent, ref, onMounted, nextTick } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import http from '@/api';
 
@@ -57,7 +57,12 @@ export default defineComponent({
   emits: ['handleConfirm', 'handleValueChange'],
 
   setup(props, { emit }) {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
 
     const isLoading = ref(true); // 加载状态
@@ -82,7 +87,7 @@ export default defineComponent({
         isLoading.value = true;
         const res = await http.request('collect/getExtractBizTopo', {
           query: {
-            bk_biz_id: store.state.bkBizId,
+            bk_biz_id: globalStore.bkBizId,
           },
         });
         topoList.value = res.data;

@@ -28,21 +28,26 @@ import { defineComponent, ref, computed, watch, onMounted } from 'vue';
 
 import useRoute from '@/hooks/use-route';
 import useRouter from '@/hooks/use-router';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import './index.scss';
 
 export default defineComponent({
   name: 'Extract',
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const router = useRouter();
     const route = useRoute();
 
     const isRender = ref(true);
     const isLoading = ref(false);
 
-    const bkBizId = computed(() => store.state.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
 
     watch(bkBizId, () => {
       isLoading.value = true;
@@ -54,8 +59,8 @@ export default defineComponent({
     });
 
     onMounted(() => {
-      const newBkBizId = store.state.bkBizId;
-      const spaceUid = store.state.spaceUid;
+      const newBkBizId = globalStore.bkBizId;
+      const spaceUid = globalStore.spaceUid;
 
       router.replace({
         query: {

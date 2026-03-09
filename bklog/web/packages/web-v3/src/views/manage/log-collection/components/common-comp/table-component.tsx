@@ -26,12 +26,12 @@
 
 import { defineComponent, type PropType, computed, ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue';
 
-import { ConfigProvider as TConfigProvider, Table as TTable } from 'tdesign-vue';
+import { ConfigProvider as TConfigProvider, Table as TTable } from 'tdesign-vue-next';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import ItemSkeleton from '@/skeleton/item-skeleton';
 import useLocale from '@/hooks/use-locale';
 import tippy, { type Instance } from 'tippy.js';
-import 'tdesign-vue/es/style/index.css';
+import 'tdesign-vue-next/es/style/index.css';
 import './table-component.scss';
 
 /**

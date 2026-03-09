@@ -27,8 +27,8 @@
 import { computed, defineComponent, nextTick, ref } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { bkMessage } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin } from 'tdesign-vue-next';
 
 import { parseTableRowData } from '../../../common/util';
 import { GradeFieldValueType, type GradeSetting } from '../../../views/retrieve-core/interface';
@@ -108,7 +108,12 @@ export default defineComponent({
   emits: ['change'],
   setup(_, { emit, expose }) {
     const { $t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     /**
      * 分级类别
      */
@@ -131,7 +136,7 @@ export default defineComponent({
     const isLoading = ref(false);
 
     const fieldList = computed(() =>
-      (store.state.indexFieldInfo.fields ?? []).filter(f => f.es_doc_values && f.field_type === 'keyword'),
+      (indexFieldStore.indexFieldInfo.fields ?? []).filter(f => f.es_doc_values && f.field_type === 'keyword'),
     );
 
     const gradeOptionField = computed(() => fieldList.value.find(f => f.field_name === gradeOptionForm.value.field));
@@ -140,7 +145,7 @@ export default defineComponent({
         const storedValues = gradeOptionForm.value.settings.flatMap(item => item.fieldValue ?? []);
         return Array.from(
           new Set([
-            ...store.state.indexSetQueryResult.list.map(item =>
+            ...retrieveStore.indexSetQueryResult.list.map(item =>
               parseTableRowData(item, gradeOptionForm.value.field, gradeOptionField.value?.field_type, true),
             ),
             ...storedValues,
@@ -164,9 +169,9 @@ export default defineComponent({
         $http
           .request('retrieve/setIndexSetCustomConfig', {
             data: {
-              index_set_id: store.state.indexId,
-              index_set_ids: store.state.indexItem.ids,
-              index_set_type: store.state.indexItem.isUnionIndex ? 'union' : 'single',
+              index_set_id: globalStore.indexSetId,
+              index_set_ids: retrieveStore.indexItem.ids,
+              index_set_type: retrieveStore.indexItem.isUnionIndex ? 'union' : 'single',
               index_set_config: {
                 grade_options: gradeOptionForm.value,
               },
@@ -175,16 +180,13 @@ export default defineComponent({
           .then(resp => {
             if (resp.result) {
               emit('change', { event: e, isSave, data: gradeOptionForm.value });
-              store.commit('updateIndexSetCustomConfig', {
+              retrieveStore.updateIndexSetCustomConfig({
                 grade_options: structuredClone(gradeOptionForm.value),
               });
               return;
             }
 
-            bkMessage({
-              theme: 'error',
-              message: resp.message,
-            });
+            MessagePlugin.error(resp.message);
           })
           .finally(() => {
             isLoading.value = false;

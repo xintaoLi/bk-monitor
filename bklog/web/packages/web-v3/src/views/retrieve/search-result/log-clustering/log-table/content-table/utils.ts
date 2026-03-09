@@ -47,7 +47,7 @@ function monitorLink(routeParams: IRouterParams) {
 }
 
 export function getConditionRouterParams(searchList, searchMode, isNewLink, append = {}) {
-  const indexItem = window.mainComponent.$store.state.indexItem;
+  const indexItem = window.mainComponent.$retrieveStore.indexItem;
   const getIPChooserStr = ipChooser => {
     if (typeof ipChooser === 'object') {
       return JSON.stringify(ipChooser);

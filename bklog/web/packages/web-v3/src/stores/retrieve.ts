@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { random } from '@/utils';
 import http from '@/api';
+import type { RetrieveStore } from './types';
 
 /**
  * 索引集项类型
@@ -65,6 +66,20 @@ interface RetrieveState {
   // 收藏夹
   favoriteList: any[];
   favoriteGroups: any[];
+
+  // 索引项信息（新增）
+  indexItem: any;
+  indexSetQueryResult: any;
+
+  // 聚类相关（新增）
+  storeIsShowClusterStep: boolean;
+  clusterParams: any;
+
+  // AI 模式（新增）
+  aiMode: any;
+
+  // 索引项参数（新增）
+  indexItemParams: any;
 }
 
 /**
@@ -131,6 +146,13 @@ export const useRetrieveStore = defineStore('retrieve', {
     searchHistory: [],
     favoriteList: [],
     favoriteGroups: [],
+    // 新增字段
+    indexItem: null,
+    indexSetQueryResult: { list: [] },
+    storeIsShowClusterStep: false,
+    clusterParams: null,
+    aiMode: null,
+    indexItemParams: {},
   }),
 
   getters: {
@@ -146,6 +168,13 @@ export const useRetrieveStore = defineStore('retrieve', {
      */
     rootIndexSetList(): IndexSetItem[] {
       return this.indexSetList.filter(item => !item.is_child_node);
+    },
+
+    /**
+     * 是否是联合检索（新增）
+     */
+    isUnionSearch(): boolean {
+      return this.indexItem?.isUnionIndex ?? false;
     },
   },
 
@@ -347,6 +376,13 @@ export const useRetrieveStore = defineStore('retrieve', {
     },
 
     /**
+     * 获取收藏列表（别名，兼容旧代码）
+     */
+    async fetchFavoriteList(spaceUid: string) {
+      return this.getFavoriteList(spaceUid);
+    },
+
+    /**
      * 获取收藏分组
      */
     async getFavoriteGroups(spaceUid: string) {
@@ -361,6 +397,85 @@ export const useRetrieveStore = defineStore('retrieve', {
         throw error;
       }
     },
+
+    /**
+     * 更新 AI 模式（新增）
+     */
+    updateAiMode(mode: any) {
+      this.aiMode = mode;
+    },
+
+    /**
+     * 更新索引项参数（新增）
+     */
+    updateIndexItemParams(params: any) {
+      this.indexItemParams = {
+        ...this.indexItemParams,
+        ...params,
+      };
+    },
+
+    /**
+     * 更新索引项（新增）
+     */
+    updateIndexItem(item: any) {
+      this.indexItem = item;
+    },
+
+    /**
+     * 更新联合索引列表（新增）
+     */
+    updateUnionIndexList(data: any) {
+      if (this.indexItem) {
+        this.indexItem = {
+          ...this.indexItem,
+          ...data,
+        };
+      }
+    },
+
+    /**
+     * 更新索引集查询结果（新增）
+     */
+    updateIndexSetQueryResult(result: any) {
+      this.indexSetQueryResult = result;
+    },
+
+    /**
+     * 更新聚类步骤显示状态（新增）
+     */
+    updateStoreIsShowClusterStep(isShow: boolean) {
+      this.storeIsShowClusterStep = isShow;
+    },
+
+    /**
+     * 更新聚类参数（新增）
+     */
+    updateClusterParams(params: any) {
+      this.clusterParams = params;
+    },
+
+    /**
+     * 更新索引集自定义配置（新增）
+     */
+    updateIndexSetCustomConfig(config: any) {
+      // 合并到 catchFieldCustomConfig
+      this.catchFieldCustomConfig = {
+        ...this.catchFieldCustomConfig,
+        ...config,
+      };
+    },
+
+    /**
+     * 通用状态更新方法（新增）
+     */
+    updateState(payload: Record<string, any>) {
+      Object.keys(payload).forEach(key => {
+        if (key in this.$state) {
+          (this as any)[key] = payload[key];
+        }
+      });
+    },
   },
 
   persist: {
@@ -373,4 +488,4 @@ export const useRetrieveStore = defineStore('retrieve', {
       },
     ],
   },
-});
+}) as () => RetrieveStore;

@@ -26,9 +26,8 @@
 
 import { computed, defineComponent } from 'vue';
 
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
-import { BK_LOG_STORAGE } from '../../store/store.type';
 import V3Container from './container';
 import V3Collection from './favorite';
 import V3Searchbar from './search-bar';
@@ -46,7 +45,12 @@ import './segment-pop.scss';
 export default defineComponent({
   name: 'RetrieveV3',
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const aiAssitantRef = RetrieveHelper.aiAssitantHelper.getAiAssitantInstance();
 
     const {
@@ -57,7 +61,7 @@ export default defineComponent({
       isPreApiLoaded,
     } = useAppInit();
 
-    const isStartTextEllipsis = computed(() => store.state.storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR] === 'start');
+    const isStartTextEllipsis = computed(() => (globalStore as any).storage[BK_LOG_STORAGE.TEXT_ELLIPSIS_DIR] === 'start');
 
     /**
      * AI 助手关闭
@@ -71,7 +75,7 @@ export default defineComponent({
      * @returns
      */
     const renderAiAssitant = () => {
-      if (!store.state.features.isAiAssistantActive) {
+      if (!globalStore.features.isAiAssistantActive) {
         return null;
       }
 

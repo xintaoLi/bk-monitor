@@ -116,7 +116,12 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    // const store = useStore();
+    // const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
 
     const loading = ref<boolean>(false);
     // const curCollect = computed(() => store.getters['collect/curCollect']);

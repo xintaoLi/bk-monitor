@@ -27,8 +27,8 @@
 import { computed, defineComponent, onMounted, ref } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { useRoute } from 'vue-router/composables';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { useRoute } from 'vue-router';
 
 import { useOperation } from '../../hook/useOperation';
 import { showMessage } from '../../utils';
@@ -65,16 +65,22 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const route = useRoute();
     const { cardRender, sortByPermission } = useOperation();
     const activeName = ref(['shared', 'exclusive']);
     const storageList = ref([]);
     const clusterSelect = ref();
-    const clusterData = ref({});
+    const clusterData = ref<Record<string, any>>({});
     const loading = ref(false);
     const submitLoading = ref(false);
-    const formData = ref({
+    const formData = ref<Record<string, any>>({
       ...{
         storage_replies: 1,
         retention: 7,
@@ -84,18 +90,18 @@ export default defineComponent({
       },
       ...props.configData,
     });
-    const cleanStash = ref({});
+    const cleanStash = ref<Record<string, any>>({});
 
-    const bkBizId = computed(() => store.state.bkBizId);
+    const bkBizId = computed(() => globalStore.bkBizId);
     const curCollect = computed(() => store.getters['collect/curCollect']);
     const collapseList = computed(() => [
       {
-        title: t('共享集群'),
+        header: t('共享集群'),
         key: 'shared',
         data: storageList.value.filter(item => item.is_platform),
       },
       {
-        title: t('业务独享集群'),
+        header: t('业务独享集群'),
         key: 'exclusive',
         tips: t('你可以随时切换所选集群，切换集群后，不会造成数据丢失。原数据将在新集群存储时长到期后自动清除。'),
         data: storageList.value.filter(item => !item.is_platform),
@@ -356,12 +362,12 @@ export default defineComponent({
     );
     const cardConfig = [
       {
-        title: t('集群选择'),
+        header: t('集群选择'),
         key: 'cluster',
         renderFn: renderCluster,
       },
       {
-        title: t('存储信息'),
+        header: t('存储信息'),
         key: 'storage',
         renderFn: renderStorage,
       },
@@ -446,7 +452,7 @@ export default defineComponent({
         .then(res => {
           if (res.data) {
             emit('cancel');
-            store.commit('collect/updateCurCollect', { ...formData.value, ...data, ...res.data });
+            (globalStore as any).commit('collect/updateCurCollect', { ...formData.value, ...data, ...res.data });
           }
         })
         .catch(() => {

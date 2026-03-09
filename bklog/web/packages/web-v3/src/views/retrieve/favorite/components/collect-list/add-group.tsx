@@ -27,7 +27,7 @@
 import { computed, defineComponent, ref, reactive, watch, PropType } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 
 import { useFavorite } from '../../hooks/use-favorite';
 import { IFavoriteItem } from '../../types';
@@ -61,9 +61,14 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     /** 当前业务名 */
-    const spaceUid = computed(() => store.state.spaceUid);
+    const spaceUid = computed(() => globalStore.spaceUid);
     const formData = reactive({ group_name: '' });
     const isShowAddGroup = ref(false);
     const checkInputFormRef = ref(null);

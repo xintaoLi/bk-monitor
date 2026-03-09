@@ -35,3 +35,5 @@ export function useRouteHook() {
 }
 
 export default useRouteHook
+
+export { useRouteHook as useRoute };

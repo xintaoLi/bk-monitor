@@ -30,8 +30,8 @@ import * as authorityMap from '@/common/authority-map';
 import { clearTableFilter } from '@/common/util';
 import EmptyStatus from '@/components/empty-status/index.vue';
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
-import { InfoBox, Message } from 'bk-magic-vue';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 
 import RepositorySlider from './repository-slider.tsx';
 import http from '@/api';
@@ -45,7 +45,13 @@ export default defineComponent({
     EmptyStatus,
   },
   setup() {
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     const { t } = useLocale();
     const repositoryTable = ref<any>(null);
 
@@ -75,7 +81,7 @@ export default defineComponent({
       cos: 'COS',
     }));
 
-    const bkBizId = computed(() => store.getters.bkBizId); // 业务ID
+    const bkBizId = computed(() => globalStore.bkBizId); // 业务ID
     const authorityMapComputed = computed(() => authorityMap); // 权限映射计算属性
     const globalsData = computed(() => store.getters['globals/globalsData']); // 全局数据
 
@@ -202,10 +208,10 @@ export default defineComponent({
         });
       }
       if (operateType === 'delete') {
-        InfoBox({
-          type: 'warning',
-          subTitle: t('当前仓库名称为{n}，确认要删除？', { n: row.repository_name }),
-          confirmFn: () => requestDeleteRepo(row),
+        DialogPlugin.confirm({
+          theme: 'warning',
+          body: t('当前仓库名称为{n}，确认要删除？', { n: row.repository_name }),
+          onConfirm: () => requestDeleteRepo(row),
         });
       }
     };
@@ -221,9 +227,8 @@ export default defineComponent({
         })
         .then((res: any) => {
           if (res.result) {
-            Message({
-              theme: 'success',
-              message: t('删除成功'),
+            MessagePlugin.success({
+              content: t('删除成功'),
             });
             if (tableDataPaged.value.length <= 1) {
               pagination.current = pagination.current > 1 ? pagination.current - 1 : 1;
@@ -239,8 +244,8 @@ export default defineComponent({
     const getOptionApplyData = async (paramData: any) => {
       try {
         isTableLoading.value = true;
-        const res = await store.dispatch('getApplyData', paramData);
-        store.commit('updateState', { authDialogData: res.data });
+        const res = await globalStore.getApplyData(paramData);
+        globalStore.updateState({ authDialogData: res.data });
       } catch (err) {
         console.warn(err);
       } finally {

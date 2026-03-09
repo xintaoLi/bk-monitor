@@ -27,7 +27,7 @@
 import { defineComponent, ref, computed, onBeforeUnmount, onMounted, nextTick, type PropType, watch } from 'vue';
 
 import useLocale from '@/hooks/use-locale';
-import useStore from '@/hooks/use-store';
+import { useGlobalStore, useUserStore, useRetrieveStore, useCollectStore, useIndexFieldStore, useStorageStore, BK_LOG_STORAGE } from '@/stores';
 import tippy, { type Instance } from 'tippy.js';
 import TableComponent from '../../common-comp/table-component';
 
@@ -156,7 +156,13 @@ export default defineComponent({
 
   setup(props, { emit, expose }) {
     const { t } = useLocale();
-    const store = useStore();
+    const globalStore = useGlobalStore();
+    const store = { getters: globalStore as any, state: globalStore as any };
+  // const retrieveStore = useRetrieveStore();
+  // const userStore = useUserStore();
+  // const collectStore = useCollectStore();
+  // const indexFieldStore = useIndexFieldStore();
+  // const storageStore = useStorageStore();
     // 最大 int 类型值
     const MAX_INT_VALUE = 2_147_483_647;
     const REQUIRED_FIELD_MSG = t('必填项');
@@ -1045,7 +1051,7 @@ export default defineComponent({
     };
     const columns = ref([
       {
-        title: t('来源'),
+        header: t('来源'),
         colKey: 'is_built_in',
         align: 'center',
         width: 62,
@@ -1053,13 +1059,13 @@ export default defineComponent({
         className: () => 'fields-tag-column',
       },
       {
-        title: t('字段名'),
+        header: t('字段名'),
         colKey: 'field_name',
         cell: renderFieldName,
         className: () => 'fields-table-column',
       },
       {
-        title: t('类型'),
+        header: t('类型'),
         colKey: 'field_type',
         className: () => 'fields-table-column',
         cell: (h, { row }) => (
@@ -1103,19 +1109,19 @@ export default defineComponent({
         ),
       },
       {
-        title: t('分词符'),
+        header: t('分词符'),
         colKey: 'is_analyzed',
         cell: renderWordBreaker,
         className: () => 'fields-analyzed-column',
       },
       {
-        title: 'title-slot-name',
+        header: 'title-slot-name',
         colKey: 'value',
         cell: renderValue,
         className: () => 'fields-value-column',
       },
       {
-        title: t('操作'),
+        header: t('操作'),
         colKey: 'operation',
         width: 70,
         cell: (h, { row }) => (
