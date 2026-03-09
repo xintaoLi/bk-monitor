@@ -30,7 +30,7 @@
 import { Component, Model, Emit, Prop, Watch, Ref } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Table, TableColumn, Input, Button, Checkbox } from 'bk-magic-vue';
+import { Table, Input, Button, Checkbox } from 'tdesign-vue-next';
 
 import $http from '../../api';
 import * as authorityMap from '../../common/authority-map';
@@ -403,69 +403,6 @@ export default class MaskingSelectRuleTable extends tsc<IProps> {
   }
 
   render() {
-    const ruleNameSlot = {
-      default: ({ row }) => (
-        <div class='rule-name-box'>
-          <span
-            class='title-overflow'
-            v-bk-overflow-tips
-          >
-            {row.rule_name}
-          </span>
-          {row.is_public && <span class='tag global'>{this.$t('全局')}</span>}
-          {row.is_add && <span class='tag new'>{'New'}</span>}
-        </div>
-      ),
-    };
-
-    const matchingMethodSlot = {
-      default: ({ row }) => (
-        <div class='rule-name-box'>
-          <span
-            class='title-overflow'
-            v-bk-overflow-tips
-          >
-            {this.getMatchMethodStr(row)}
-          </span>
-        </div>
-      ),
-    };
-
-    const matchingContentSlot = {
-      default: ({ row }) => (
-        <div class='rule-name-box'>
-          <span
-            class='title-overflow'
-            v-bk-overflow-tips
-          >
-            {this.getMatchContentStr(row)}
-          </span>
-        </div>
-      ),
-    };
-
-    const maskingRulesSlot = {
-      default: ({ row }) => (
-        <div class='rule-name-box'>
-          <span
-            class='title-overflow'
-            v-bk-overflow-tips
-          >
-            {this.getMaskingRuleStr(row)}
-          </span>
-        </div>
-      ),
-    };
-
-    const checkBoxSlot = {
-      default: ({ row }) => (
-        <Checkbox
-          checked={this.getItemChecked(row.id)}
-          disabled={this.getCheckBoxDisable(row.id)}
-          onChange={(val: boolean) => this.handleSelectItem(val, row.id)}
-        />
-      ),
-    };
     return (
       <div class='masking-select-rule-table'>
         <div class='input-box'>
@@ -507,39 +444,80 @@ export default class MaskingSelectRuleTable extends tsc<IProps> {
           pagination={this.pagination}
           render-directive='if'
           size='small'
-          on-page-change={this.pageChange}
-          on-page-limit-change={this.pageLimitChange}
+          columns={[
+            {
+              width: 50,
+              title: ({ h }) => this.renderHeaderCheckBox(h),
+              cell: ({ row }) => (
+                <Checkbox
+                  checked={this.getItemChecked(row.id)}
+                  disabled={this.getCheckBoxDisable(row.id)}
+                  onChange={(val: boolean) => this.handleSelectItem(val, row.id)}
+                />
+              ),
+            },
+            {
+              colKey: 'rule_name',
+              title: this.$t('规则名称'),
+              cell: ({ row }) => (
+                <div class='rule-name-box'>
+                  <span
+                    class='title-overflow'
+                    v-bk-overflow-tips
+                  >
+                    {row.rule_name}
+                  </span>
+                  {row.is_public && <span class='tag global'>{this.$t('全局')}</span>}
+                  {row.is_add && <span class='tag new'>{'New'}</span>}
+                </div>
+              ),
+            },
+            {
+              colKey: 'match_method',
+              title: this.$t('匹配方式'),
+              cell: ({ row }) => (
+                <div class='rule-name-box'>
+                  <span
+                    class='title-overflow'
+                    v-bk-overflow-tips
+                  >
+                    {this.getMatchMethodStr(row)}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              colKey: 'match_content',
+              title: this.$t('匹配内容'),
+              cell: ({ row }) => (
+                <div class='rule-name-box'>
+                  <span
+                    class='title-overflow'
+                    v-bk-overflow-tips
+                  >
+                    {this.getMatchContentStr(row)}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              colKey: 'masking_result',
+              title: this.$t('脱敏算子'),
+              cell: ({ row }) => (
+                <div class='rule-name-box'>
+                  <span
+                    class='title-overflow'
+                    v-bk-overflow-tips
+                  >
+                    {this.getMaskingRuleStr(row)}
+                  </span>
+                </div>
+              ),
+            },
+          ]}
+          onPageChange={this.pageChange}
+          onPageSizeChange={this.pageLimitChange}
         >
-          <TableColumn
-            width='50'
-            render-header={this.renderHeaderCheckBox}
-            scopedSlots={checkBoxSlot}
-          />
-
-          <TableColumn
-            key={'rule_name'}
-            label={this.$t('规则名称')}
-            scopedSlots={ruleNameSlot}
-          />
-
-          <TableColumn
-            key={'match_method'}
-            label={this.$t('匹配方式')}
-            scopedSlots={matchingMethodSlot}
-          />
-
-          <TableColumn
-            key={'match_content'}
-            label={this.$t('匹配内容')}
-            scopedSlots={matchingContentSlot}
-          />
-
-          <TableColumn
-            key={'masking_result'}
-            label={this.$t('脱敏算子')}
-            scopedSlots={maskingRulesSlot}
-          />
-
           <div slot='empty'>
             <EmptyStatus
               emptyType={this.emptyType}

@@ -30,7 +30,7 @@
 import { Component, ModelSync, Watch, Emit } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Dialog, Table } from 'bk-magic-vue';
+import { Table } from 'tdesign-vue-next';
 
 import './index.scss';
 
@@ -41,7 +41,7 @@ interface IProps {
 const { $i18n } = window.mainComponent;
 
 @Component({
-  components: { Dialog, Table },
+  components: { Table },
 })
 export default class IndexImportModal extends tsc<IProps> {
   @ModelSync('value', 'change', { type: Boolean }) localIsShowValue!: boolean;
@@ -249,26 +249,6 @@ export default class IndexImportModal extends tsc<IProps> {
   }
 
   render() {
-    const spanSlot = {
-      default: ({ row, column }) => (
-        <div
-          class='title-overflow'
-          v-bk-overflow-tips
-        >
-          <span>{row[column.property] || '--'}</span>
-        </div>
-      ),
-    };
-    const checkBoxSlot = {
-      default: ({ row }) => (
-        <div class='import-check-box'>
-          <bk-checkbox
-            class='group-check-box'
-            checked={this.getCheckedStatus(row)}
-          />
-        </div>
-      ),
-    };
     return (
       <bk-dialog
         width={1200}
@@ -316,45 +296,72 @@ export default class IndexImportModal extends tsc<IProps> {
               </div>
             </bk-form-item>
             <bk-form-item label={this.$t('请选择目标索引集')}>
-              <bk-table
+              <Table
                 v-bkloading={{ isLoading: this.isTableLoading }}
                 data={this.collectShowList}
-                limit-list={this.pagination.limitList}
+                columns={[
+                  {
+                    width: 60,
+                    title: '',
+                    cell: ({ row }) => (
+                      <div class='import-check-box'>
+                        <bk-checkbox
+                          class='group-check-box'
+                          checked={this.getCheckedStatus(row)}
+                        />
+                      </div>
+                    ),
+                  },
+                  {
+                    title: '索引集',
+                    colKey: 'collector_config_name',
+                    cell: ({ row }) => (
+                      <div
+                        class='title-overflow'
+                        v-bk-overflow-tips
+                      >
+                        <span>{row.collector_config_name || '--'}</span>
+                      </div>
+                    ),
+                  },
+                  {
+                    title: '采集路径',
+                    colKey: 'paths',
+                    cell: ({ row }) => (
+                      <div
+                        class='title-overflow'
+                        v-bk-overflow-tips
+                      >
+                        <span>{row.paths || '--'}</span>
+                      </div>
+                    ),
+                  },
+                  {
+                    title: '采集模式',
+                    colKey: 'etl_config',
+                  },
+                  {
+                    title: '存储集群',
+                    colKey: 'storage_display_name',
+                    cell: ({ row }) => (
+                      <div
+                        class='title-overflow'
+                        v-bk-overflow-tips
+                      >
+                        <span>{row.storage_display_name || '--'}</span>
+                      </div>
+                    ),
+                  },
+                  {
+                    title: '存储时长',
+                    colKey: 'retention',
+                  },
+                ]}
                 pagination={this.pagination}
-                on-page-change={this.handleCollectPageChange}
-                on-page-limit-change={this.handleCollectLimitChange}
-                on-row-click={this.handleRowCheckChange}
-              >
-                <bk-table-column
-                  width='60'
-                  label=''
-                  prop=''
-                  scopedSlots={checkBoxSlot}
-                />
-                <bk-table-column
-                  label='索引集'
-                  prop='collector_config_name'
-                  scopedSlots={spanSlot}
-                />
-                <bk-table-column
-                  label='采集路径'
-                  prop='paths'
-                  scopedSlots={spanSlot}
-                />
-                <bk-table-column
-                  label='采集模式'
-                  prop='etl_config'
-                />
-                <bk-table-column
-                  label='存储集群'
-                  prop='storage_display_name'
-                  scopedSlots={spanSlot}
-                />
-                <bk-table-column
-                  label='存储时长'
-                  prop='retention'
-                />
-              </bk-table>
+                onPageChange={this.handleCollectPageChange}
+                onPageSizeChange={this.handleCollectLimitChange}
+                onRowClick={({ row }) => this.handleRowCheckChange(row)}
+              />
             </bk-form-item>
           </bk-form>
         </div>

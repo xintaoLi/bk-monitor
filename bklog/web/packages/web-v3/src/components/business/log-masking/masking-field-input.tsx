@@ -29,7 +29,7 @@
 
 import { Component, Prop, Emit, Mixins } from 'vue-property-decorator';
 
-import { Button, Tab, TabPanel, Alert } from 'bk-magic-vue';
+import { Button, Tabs, TabPanel, Alert } from 'tdesign-vue-next';
 
 import $http from '../../api';
 import MonacoEditor from '../../components/collection-access/components/step-add/monaco-editor.vue';
@@ -271,7 +271,7 @@ export default class MaskingFieldInput extends Mixins(classDragMixin) {
             <span class='text'>{this.inputFix ? this.$t('取消钉住') : this.$t('钉住')}</span>
           </div>
         </div>
-        <Tab
+        <Tabs
           class={{ 'hidden-input is-not-log': !this.jsonValueList.length }}
           active={this.activeTab}
           type='border-card'
@@ -336,7 +336,7 @@ export default class MaskingFieldInput extends Mixins(classDragMixin) {
               <span>{this.$t('暂无采样日志')}</span>
             </div>
           )}
-        </Tab>
+        </Tabs>
         <div class='sync-rule-box'>
           <Button
             disabled={!this.jsonValueList.length}

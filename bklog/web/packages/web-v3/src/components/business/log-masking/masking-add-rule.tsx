@@ -33,7 +33,7 @@ import { Component, Model, Emit, Prop, Ref, Watch } from 'vue-property-decorator
 import { Component as tsc } from 'vue-tsx-support';
 
 import {
-  Sideslider,
+  Drawer,
   Form,
   FormItem,
   Input,
@@ -42,12 +42,11 @@ import {
   RadioGroup,
   Radio,
   Collapse,
-  CollapseItem,
+  CollapsePanel,
   Table,
-  TableColumn,
   Dialog,
   TagInput,
-} from 'bk-magic-vue';
+} from 'tdesign-vue-next';
 
 import $http from '../../api';
 
@@ -475,18 +474,18 @@ export default class MaskingAddRule extends tsc<IProps> {
         header-border={false}
         outer-border={false}
         row-border={false}
-      >
-        <TableColumn
-          key={'scenario_name'}
-          label={this.$t('日志来源')}
-          prop={'scenario_name'}
-        />
-
-        <TableColumn
-          key={'ids'}
-          width='125'
-          scopedSlots={{
-            default: ({ row }) => (
+        columns={[
+          {
+            colKey: 'scenario_name',
+            title: this.$t('日志来源'),
+          },
+          {
+            colKey: 'ids',
+            width: 125,
+            align: 'center',
+            title: this.$t('应用次数'),
+            sortable: true,
+            cell: ({ row }) => (
               <Button
                 text
                 onClick={() => this.handleJumpAccess(row)}
@@ -494,25 +493,21 @@ export default class MaskingAddRule extends tsc<IProps> {
                 {row.ids.length}
               </Button>
             ),
-          }}
-          align='center'
-          label={this.$t('应用次数')}
-          prop={'ids'}
-          sortable
-        />
-      </Table>
+          },
+        ]}
+      />
     );
 
     return (
-      <Sideslider
-        width={640}
-        is-show={this.value}
-        title={this.$t('{n}脱敏规则', { n: this.isEdit ? this.$t('编辑') : this.$t('新增') })}
-        quick-close
+      <Drawer
+        size={640}
+        visible={this.value}
+        header={this.$t('{n}脱敏规则', { n: this.isEdit ? this.$t('编辑') : this.$t('新增') })}
+        closeOnOverlayClick
         transfer
         {...{
           on: {
-            'update:isShow': this.hiddenSlider,
+            'update:visible': this.hiddenSlider,
             shown: this.showSlider,
           },
         }}
@@ -680,7 +675,7 @@ export default class MaskingAddRule extends tsc<IProps> {
             ext-cls='regular-debugging'
             v-model={this.activeCollapse}
           >
-            <CollapseItem
+            <CollapsePanel
               disabled={!this.matchExpressionCheckValue}
               name='1'
             >
@@ -738,7 +733,7 @@ export default class MaskingAddRule extends tsc<IProps> {
                   </div>
                 </div>
               </div>
-            </CollapseItem>
+            </CollapsePanel>
           </Collapse>
 
           <Dialog
@@ -771,7 +766,7 @@ export default class MaskingAddRule extends tsc<IProps> {
             </div>
           </Dialog>
         </div>
-      </Sideslider>
+      </Drawer>
     );
   }
 }

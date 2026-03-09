@@ -31,7 +31,8 @@
 import { Component, Prop } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Alert, Button, Input, Table, TableColumn, Tag, Switcher, TableSettingContent, Dialog } from 'bk-magic-vue';
+import { Alert, Button, Input, Table, Tag, Switch, Dialog } from 'tdesign-vue-next';
+import { TableSettingContent } from 'bk-magic-vue';
 
 import $http from '../../api';
 import * as authorityMap from '../../common/authority-map';
@@ -669,7 +670,7 @@ export default class MaskingSetting extends tsc<IProps> {
           v-cursor={{ active: !this.isAllowed }}
           onClick={() => this.handleChangeRuleSwitch(row)}
         >
-          <Switcher
+          <Switch
             v-model={row.isActive}
             disabled={this.isDisabledClick(row)}
             pre-check={() => false}
@@ -714,18 +715,18 @@ export default class MaskingSetting extends tsc<IProps> {
         header-border={false}
         outer-border={false}
         row-border={false}
-      >
-        <TableColumn
-          key={'scenario_name'}
-          label={this.$t('日志来源')}
-          prop={'scenario_name'}
-        />
-
-        <TableColumn
-          key={'ids'}
-          width='125'
-          scopedSlots={{
-            default: ({ row }) => (
+        columns={[
+          {
+            colKey: 'scenario_name',
+            title: this.$t('日志来源'),
+          },
+          {
+            colKey: 'ids',
+            width: 125,
+            align: 'center',
+            title: this.$t('接入项'),
+            sortable: true,
+            cell: ({ row }) => (
               <Button
                 text
                 onClick={() => this.handleJumpAccess(row)}
@@ -733,13 +734,9 @@ export default class MaskingSetting extends tsc<IProps> {
                 {row.ids.length}
               </Button>
             ),
-          }}
-          align='center'
-          label={this.$t('接入项')}
-          prop={'ids'}
-          sortable
-        />
-      </Table>
+          },
+        ]}
+      />
     );
 
     return (
@@ -776,131 +773,114 @@ export default class MaskingSetting extends tsc<IProps> {
           pagination={this.pagination}
           render-directive='if'
           size='small'
-          on-page-change={this.pageChange}
-          on-page-limit-change={this.pageLimitChange}
+          columns={[
+            {
+              colKey: 'ruleName',
+              width: this.getTableWidth.ruleName,
+              title: this.$t('规则名称'),
+              cell: ({ row }) => ruleNameSlot.default({ row }),
+            },
+            ...(this.checkFields('matchFields')
+              ? [
+                  {
+                    colKey: 'matchFields',
+                    width: this.getTableWidth.matchFields,
+                    title: this.$t('匹配字段名'),
+                    cell: ({ row }) => matchFieldNameSlot.default({ row }),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('matchPattern')
+              ? [
+                  {
+                    colKey: 'matchPattern',
+                    title: this.$t('匹配正则表达式'),
+                    cell: ({ row }) => matchExpressionSlot.default({ row }),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('maskingRules')
+              ? [
+                  {
+                    colKey: 'maskingRules',
+                    width: this.getTableWidth.maskingRules,
+                    title: (this.$t('label-脱敏算子') as string).replace('label-', ''),
+                    cell: ({ row }) => maskingRuleSlot.default({ row }),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('accessNum')
+              ? [
+                  {
+                    colKey: 'accessNum',
+                    width: this.getTableWidth.accessNum,
+                    align: 'center',
+                    title: this.$t('接入项'),
+                    sortable: true,
+                    cell: ({ row }) => accessItemSlot.default({ row }),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('updatedBy')
+              ? [
+                  {
+                    colKey: 'updatedBy',
+                    title: this.$t('变更人'),
+                    cell: ({ row }) => (
+                      <span
+                        class='overflow-tips'
+                        v-bk-overflow-tips
+                      >
+                        {row.updatedBy}
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('updatedAt')
+              ? [
+                  {
+                    colKey: 'updatedAt',
+                    title: this.$t('变更时间'),
+                    cell: ({ row }) => (
+                      <span
+                        class='overflow-tips'
+                        v-bk-overflow-tips
+                      >
+                        {row.updatedAt}
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
+            ...(this.checkFields('isActive')
+              ? [
+                  {
+                    colKey: 'isActive',
+                    width: this.getTableWidth.isActive,
+                    align: 'center',
+                    title: this.$t('启/停'),
+                    cell: ({ row }) => switcherSlot.default({ row }),
+                  },
+                ]
+              : []),
+            {
+              colKey: 'operate',
+              width: this.getTableWidth.operate,
+              title: this.$t('操作'),
+              cell: ({ row }) => operatorSlot.default({ row }),
+            },
+          ]}
+          onPageChange={this.pageChange}
+          onPageSizeChange={this.pageLimitChange}
         >
-          <TableColumn
-            key={'ruleName'}
-            width={this.getTableWidth.ruleName}
-            label={this.$t('规则名称')}
-            render-header={this.$renderHeader}
-            scopedSlots={ruleNameSlot}
+          <TableSettingContent
+            v-en-style='width: 580px;'
+            slot='setting'
+            fields={this.tableSetting.fields}
+            selected={this.tableSetting.selectedFields}
+            on-setting-change={this.handleSettingChange}
           />
-
-          {this.checkFields('matchFields') ? (
-            <TableColumn
-              key={'matchFields'}
-              width={this.getTableWidth.matchFields}
-              label={this.$t('匹配字段名')}
-              render-header={this.$renderHeader}
-              scopedSlots={matchFieldNameSlot}
-            />
-          ) : undefined}
-
-          {this.checkFields('matchPattern') ? (
-            <TableColumn
-              key={'matchPattern'}
-              label={this.$t('匹配正则表达式')}
-              scopedSlots={matchExpressionSlot}
-            />
-          ) : undefined}
-
-          {this.checkFields('maskingRules') ? (
-            <TableColumn
-              key={'maskingRules'}
-              width={this.getTableWidth.maskingRules}
-              filter-method={this.operatorFilterMethod}
-              filter-multiple={false}
-              filters={this.operatorFilters}
-              label={(this.$t('label-脱敏算子') as string).replace('label-', '')}
-              prop='operator'
-              render-header={this.$renderHeader}
-              scopedSlots={maskingRuleSlot}
-            />
-          ) : undefined}
-
-          {this.checkFields('accessNum') ? (
-            <TableColumn
-              key={'accessNum'}
-              width={this.getTableWidth.accessNum}
-              align='center'
-              label={this.$t('接入项')}
-              prop='accessNum'
-              render-header={this.$renderHeader}
-              scopedSlots={accessItemSlot}
-              sortable
-            />
-          ) : undefined}
-
-          {this.checkFields('updatedBy') ? (
-            <TableColumn
-              key={'updatedBy'}
-              scopedSlots={{
-                default: ({ row }) => [
-                  <span
-                    key={row}
-                    class='overflow-tips'
-                    v-bk-overflow-tips
-                  >
-                    {row.updatedBy}
-                  </span>,
-                ],
-              }}
-              filter-method={this.sourceFilterMethod}
-              filter-multiple={false}
-              filters={this.updateSourceFilters}
-              label={this.$t('变更人')}
-              prop={'updatedBy'}
-              render-header={this.$renderHeader}
-            />
-          ) : undefined}
-
-          {this.checkFields('updatedAt') ? (
-            <TableColumn
-              key={'updatedAt'}
-              scopedSlots={{
-                default: ({ row }) => [
-                  <span
-                    key={row}
-                    class='overflow-tips'
-                    v-bk-overflow-tips
-                  >
-                    {row.updatedAt}
-                  </span>,
-                ],
-              }}
-              label={this.$t('变更时间')}
-              prop={'updatedAt'}
-              render-header={this.$renderHeader}
-            />
-          ) : undefined}
-
-          {this.checkFields('isActive') ? (
-            <TableColumn
-              key={'isActive'}
-              width={this.getTableWidth.isActive}
-              align='center'
-              label={this.$t('启/停')}
-              scopedSlots={switcherSlot}
-            />
-          ) : undefined}
-
-          <TableColumn
-            key={'operate'}
-            width={this.getTableWidth.operate}
-            label={this.$t('操作')}
-            scopedSlots={operatorSlot}
-          />
-
-          <TableColumn type='setting'>
-            <TableSettingContent
-              v-en-style='width: 580px;'
-              // key={`${this.tableKey}__settings`}
-              fields={this.tableSetting.fields}
-              selected={this.tableSetting.selectedFields}
-              on-setting-change={this.handleSettingChange}
-            />
-          </TableColumn>
 
           <div slot='empty'>
             <EmptyStatus

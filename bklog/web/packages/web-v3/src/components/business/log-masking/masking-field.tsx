@@ -30,7 +30,7 @@
 import { Component, Emit, Prop, Ref } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Dialog, Tag, Input, Switcher, Table, TableColumn, Button, Popover, Sideslider } from 'bk-magic-vue';
+import { Dialog, Tag, Input, Switch, Table, Button, Popup, Drawer } from 'tdesign-vue-next';
 import VueDraggable from 'vuedraggable';
 
 import $http from '../../api';
@@ -1542,7 +1542,7 @@ export default class MaskingField extends tsc<IProps> {
       const showPreviewList = previewList.slice(rLength);
       if (showNum > 0 && pIndex === rLength - 1) {
         return (
-          <Popover
+          <Popup
             ext-cls='preview-prop'
             tippy-options={{
               placement: 'top',
@@ -1576,7 +1576,7 @@ export default class MaskingField extends tsc<IProps> {
                 </div>
               ))}
             </div>
-          </Popover>
+          </Popup>
         );
       }
       return;
@@ -1631,7 +1631,7 @@ export default class MaskingField extends tsc<IProps> {
                 onChange={this.handleSearchChange}
                 onEnter={this.searchField}
               />
-              <Switcher
+              <Switch
                 v-model={this.previewSwitch}
                 theme='primary'
               />
@@ -1643,27 +1643,28 @@ export default class MaskingField extends tsc<IProps> {
             v-bkloading={{ isLoading: this.tableLoading }}
             data={this.tableShowList}
             size='small'
+            columns={[
+              {
+                colKey: 'column_name',
+                title: this.$t('字段信息'),
+                cell: ({ row }) => fieldSlot.default({ row }),
+              },
+              {
+                colKey: 'match_method',
+                title: ({ h }) => this.renderHeaderRule(h),
+                cell: ({ row }) => maskingRuleSlot.default({ row }),
+              },
+              ...(this.previewSwitch
+                ? [
+                    {
+                      colKey: 'match_content',
+                      title: ({ h }) => this.renderHeaderPreview(h),
+                      cell: ({ row }) => maskingPreviewSlot.default({ row }),
+                    },
+                  ]
+                : []),
+            ]}
           >
-            <TableColumn
-              key={'column_name'}
-              label={this.$t('字段信息')}
-              scopedSlots={fieldSlot}
-            />
-
-            <TableColumn
-              key={'match_method'}
-              render-header={this.renderHeaderRule}
-              scopedSlots={maskingRuleSlot}
-            />
-
-            {this.previewSwitch && (
-              <TableColumn
-                key={'match_content'}
-                render-header={this.renderHeaderPreview}
-                scopedSlots={maskingPreviewSlot}
-              />
-            )}
-
             <div slot='empty'>
               <EmptyStatus
                 emptyType={this.emptyType}
@@ -1678,16 +1679,16 @@ export default class MaskingField extends tsc<IProps> {
           </Table>
         </div>
 
-        <Sideslider
-          width={640}
+        <Drawer
+          size={640}
           ext-cls={`${this.isMarginRight && 'open-add-rule-sideslider'}`}
-          is-show={this.isShowRuleSideslider}
-          title={this.$t('选择脱敏规则')}
-          quick-close
+          visible={this.isShowRuleSideslider}
+          header={this.$t('选择脱敏规则')}
+          closeOnOverlayClick
           transfer
           {...{
             on: {
-              'update:isShow': () => (this.isShowRuleSideslider = false),
+              'update:visible': () => (this.isShowRuleSideslider = false),
             },
           }}
         >
@@ -1706,7 +1707,7 @@ export default class MaskingField extends tsc<IProps> {
               onSubmit={selectList => this.handleSelectRule(selectList)}
             />
           </div>
-        </Sideslider>
+        </Drawer>
 
         <Dialog
           width='640'

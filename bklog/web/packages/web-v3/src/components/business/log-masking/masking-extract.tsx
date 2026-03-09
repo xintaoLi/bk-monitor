@@ -30,7 +30,8 @@
 import { Component, Model, Emit, Ref } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Sideslider, Form, FormItem, Input, Button, type Popover } from 'bk-magic-vue';
+import { Drawer, Form, FormItem, Input, Button } from 'tdesign-vue-next';
+import type { PopupInstanceFunctions } from 'tdesign-vue-next';
 
 import MaskingSelectRuleTable from './masking-select-rule-table';
 
@@ -52,7 +53,7 @@ export default class MaskingExtract extends tsc<IProps> {
   directoryList = [{}];
   suffixList = [{}];
 
-  @Ref('ruleTable') private readonly ruleTableRef: Popover;
+  @Ref('ruleTable') private readonly ruleTableRef: PopupInstanceFunctions;
 
   @Emit('change')
   hiddenSlider() {
@@ -144,17 +145,17 @@ export default class MaskingExtract extends tsc<IProps> {
       </div>
     );
     return (
-      <Sideslider
-        width={640}
+      <Drawer
+        size={640}
         ext-cls={`${this.isMarginRight && 'open-add-rule-sideslider'}`}
-        is-show={this.value}
-        title={'新增提取'}
-        quick-close
+        visible={this.value}
+        header={'新增提取'}
+        closeOnOverlayClick
         transfer
         on-hidden={() => this.destroyPopoverInstance()}
         {...{
           on: {
-            'update:isShow': this.hiddenSlider,
+            'update:visible': this.hiddenSlider,
           },
         }}
       >
@@ -290,7 +291,7 @@ export default class MaskingExtract extends tsc<IProps> {
           </div>
           {tableSlot()}
         </div>
-      </Sideslider>
+      </Drawer>
     );
   }
 }
