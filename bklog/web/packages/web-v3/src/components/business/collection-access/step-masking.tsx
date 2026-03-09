@@ -30,7 +30,7 @@
 import { Component, Emit, Prop, Ref } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Button } from 'bk-magic-vue';
+import { Button } from 'tdesign-vue-next';
 
 import $http from '../../api';
 import { deepEqual } from '../../common/util';

@@ -30,7 +30,7 @@
 import { Component, PropSync, Prop, Emit, Ref } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Select, Option, Tag, Form, FormItem, Input } from 'bk-magic-vue';
+import { Select, Option, Tag, Form, FormItem, Input } from 'tdesign-vue-next';
 
 import $http from '../../api';
 import { xssFilter } from '../../common/util';

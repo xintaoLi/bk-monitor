@@ -39,7 +39,7 @@ import {
 } from './type';
 import ValidatorInput from './validator-input';
 
-import type { Form } from 'bk-magic-vue';
+import type { FormInstanceFunctions } from 'tdesign-vue-next';
 
 import './index.scss';
 
@@ -248,9 +248,9 @@ export default class LogFilter extends tsc<object> {
 
         if (this.activeType === 'separator') {
           // 字符串类型过滤暂时无过滤参数（全文）
-          matchNotError = await (container?.$refs[`match-${fIndex}-${fIndex}-${iIndex}`] as Form)?.validate();
+          matchNotError = await (container?.$refs[`match-${fIndex}-${fIndex}-${iIndex}`] as FormInstanceFunctions)?.validate();
         }
-        const valueNotError = await (container?.$refs[`value-${fIndex}-${fIndex}-${iIndex}`] as Form)?.validate();
+        const valueNotError = await (container?.$refs[`value-${fIndex}-${fIndex}-${iIndex}`] as FormInstanceFunctions)?.validate();
         if (isCanSubmit) {
           isCanSubmit = matchNotError && valueNotError;
         }

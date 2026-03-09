@@ -30,7 +30,7 @@
 import { Component, Model, Prop } from 'vue-property-decorator';
 import { Component as tsc } from 'vue-tsx-support';
 
-import { Dialog } from 'bk-magic-vue';
+import { Dialog } from 'tdesign-vue-next';
 
 import './index.scss';
 
