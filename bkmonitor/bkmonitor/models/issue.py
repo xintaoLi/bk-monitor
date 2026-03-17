@@ -13,7 +13,6 @@ from django.db import models
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from alarm_backends.core.cache.strategy import StrategyCacheManager
 from bkmonitor.utils.db import JsonField
 from bkmonitor.utils.model_manager import AbstractRecordModel
 
@@ -115,6 +114,8 @@ class StrategyIssueConfigService:
         """
         aggregate_dimensions = config_data.get("aggregate_dimensions", [])
         conditions = config_data.get("conditions", [])
+
+        from alarm_backends.core.cache.strategy import StrategyCacheManager
 
         strategy = StrategyCacheManager.get_strategy_by_id(strategy_id)
         if not strategy:
