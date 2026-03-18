@@ -89,12 +89,21 @@ def get_table_info_by_data_id(
     for rt in rt_qs:
         table_id: str = rt.table_id
         access_vm_record = table_id_vm_config.get(table_id)
+        vm_cluster_name = ""
+        vm_cluster_id = 0
+        if access_vm_record:
+            if access_vm_record.vm_cluster_id:
+                vm_cluster_id = access_vm_record.vm_cluster_id
+                vm_cluster_name = cluster_name_map.get(vm_cluster_id, "")
+
         result.append(
             TableDataInfo(
                 result_table_id=table_id,
                 vm_result_table_id=access_vm_record.vm_result_table_id if access_vm_record else "",
-                vm_cluster_id=access_vm_record.vm_cluster_id if access_vm_record else 0,
-                vm_cluster_name=cluster_name_map[access_vm_record.vm_cluster_id] if access_vm_record else "",
+                vm_cluster_id=access_vm_record.vm_cluster_id
+                if access_vm_record and access_vm_record.vm_cluster_id
+                else 0,
+                vm_cluster_name=vm_cluster_name,
                 enable_blacklist=rt_options[table_id].get(ResultTableOption.OPTION_ENABLE_FIELD_BLACK_LIST, False),
                 is_split_measurement=rt_options[table_id].get(ResultTableOption.OPTION_IS_SPLIT_MEASUREMENT, False),
             )
