@@ -92,6 +92,7 @@ export default defineComponent({
         .then(res => {
           if (res.result) {
             showMessage(t('删除成功'));
+            handleItem(baseItem.value[0]);
             getListData();
           }
         })
@@ -100,19 +101,32 @@ export default defineComponent({
         });
     };
 
+    const handleRenameItem = () => {
+      getIndexGroupList((data: { list: IListItemData[]; total: number }) => {
+        listData.value = data.list;
+        total.value = data.total;
+        initActionPop();
+        const updatedItem = data.list.find(item => item.index_set_id === activeKey.value);
+        if (updatedItem) {
+          emit('choose', updatedItem);
+        }
+      });
+    };
+
     const renderBaseItem = (item: IListItemData) => (
       <ListItem
         activeKey={activeKey.value}
         data={item}
         on-choose={handleItem}
         on-delete={handelDelItem}
+        on-rename={handleRenameItem}
       />
     );
     /**
      * 获取列表数据
      */
     const getListData = () => {
-      getIndexGroupList((data: {list: IListItemData[], total: number}) => {
+      getIndexGroupList((data: { list: IListItemData[]; total: number }) => {
         listData.value = data.list;
         total.value = data.total;
         initActionPop();
