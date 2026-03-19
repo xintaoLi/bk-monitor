@@ -70,22 +70,6 @@ class StrategyIssueConfigService:
 
     VALID_CONDITION_METHODS = {"eq", "neq", "include", "exclude", "reg", "nreg"}
 
-    @staticmethod
-    def _get_strategy_public_dimensions(strategy: dict) -> set:
-        """
-        计算策略公共维度（跨 item / query_config 取交集）。
-        维度语义与 CompositeProcessor.cal_public_dimensions 一致。
-        """
-        public_dimensions = None
-        for item in strategy.get("items", []):
-            for query_config in item.get("query_configs", []):
-                dimensions = {dim for dim in query_config.get("agg_dimension", []) if dim}
-                if public_dimensions is None:
-                    public_dimensions = dimensions
-                else:
-                    public_dimensions &= dimensions
-        return public_dimensions or set()
-
     @classmethod
     def validate_aggregate_dimensions(cls, aggregate_dimensions: list, strategy_dimensions: set):
         if not aggregate_dimensions:
@@ -112,21 +96,23 @@ class StrategyIssueConfigService:
         创建或更新配置。
         校验顺序：跨模型子集校验 → Model.clean() 格式校验 → 全部通过后才落库。
         """
+        from bkmonitor.models.strategy import StrategyModel
+        from bkmonitor.strategy.new_strategy import Strategy
+
+        strategies = Strategy.from_models(StrategyModel.objects.filter(id=strategy_id))
+        if not strategies:
+            raise ValueError(f"strategy_id={strategy_id} 不存在")
+        strategy_obj = strategies[0]
+
         aggregate_dimensions = config_data.get("aggregate_dimensions", [])
         conditions = config_data.get("conditions", [])
 
-        from alarm_backends.core.cache.strategy import StrategyCacheManager
-
-        strategy = StrategyCacheManager.get_strategy_by_id(strategy_id)
-        if not strategy:
-            raise ValueError(f"strategy_id={strategy_id} 不存在或未缓存")
-
-        strategy_dimensions = cls._get_strategy_public_dimensions(strategy)
+        strategy_dimensions = set(strategy_obj.public_dimensions)
         cls.validate_aggregate_dimensions(aggregate_dimensions, strategy_dimensions)
         effective_dimensions = set(aggregate_dimensions) if aggregate_dimensions else strategy_dimensions
         if conditions:
             cls.validate_conditions(conditions, effective_dimensions)
-        config_data["bk_biz_id"] = strategy.get("bk_biz_id", 0)
+        config_data["bk_biz_id"] = strategy_obj.bk_biz_id
 
         temp = StrategyIssueConfig(strategy_id=strategy_id, **config_data)
         temp.full_clean()
@@ -138,8 +124,17 @@ class StrategyIssueConfigService:
         return config
 
 
+def _has_cache_role() -> bool:
+    """仅 api / worker 进程具备缓存写入能力；web 进程无缓存配置，跳过。"""
+    from django.conf import settings
+
+    return settings.ROLE in ("api", "worker")
+
+
 @receiver(post_save, sender=StrategyIssueConfig)
 def upsert_strategy_issue_config_cache(sender, instance, **kwargs):
+    if not _has_cache_role():
+        return
     try:
         from alarm_backends.core.cache.issue import StrategyIssueConfigCache
 
@@ -150,6 +145,8 @@ def upsert_strategy_issue_config_cache(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=StrategyIssueConfig)
 def invalidate_strategy_issue_config_cache(sender, instance, **kwargs):
+    if not _has_cache_role():
+        return
     try:
         from alarm_backends.core.cache.issue import StrategyIssueConfigCache
 
