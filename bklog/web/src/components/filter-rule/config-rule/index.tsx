@@ -24,7 +24,7 @@
  * IN THE SOFTWARE.
  */
 
-import { defineComponent, ref, computed, watch, onMounted } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 
 import { getRegExp } from '@/common/util';
 import useFieldEgges from '@/hooks/use-field-egges';
@@ -59,6 +59,7 @@ export default defineComponent({
     const { isRequesting, isValidateItem, requestFieldEgges, setIsRequesting, isValidateEgges } = useFieldEgges();
 
     const fieldListMainRef = ref(null);
+    const valueInputWraperRef = ref(null);
     const popoverRef = ref(null);
     const formRef = ref(null);
     const controlOperateRef = ref(null);
@@ -76,6 +77,7 @@ export default defineComponent({
     const searchValue = ref('');
     const activeIndex = ref(0);
     const hoverIndex = ref(0);
+    const isMatchListVisible = ref(false);
 
     const indexFieldInfo = computed(() => store.state.indexFieldInfo);
     const fieldTypeMap = computed(() => store.state.globals.fieldTypeMap);
@@ -172,7 +174,9 @@ export default defineComponent({
     };
 
     const checkAndRequestEgges = () => {
+      isMatchListVisible.value = false;
       if (isValidateEgges(currentFieldInfo.value)) {
+        isMatchListVisible.value = true;
         setIsRequesting(true);
         requestFieldEgges(currentFieldInfo.value);
       }
@@ -213,6 +217,22 @@ export default defineComponent({
       formData.value.values.push(item);
     };
 
+    const showMatchList = () => {
+      if (isValidateEgges(currentFieldInfo.value)) {
+        isMatchListVisible.value = true;
+      }
+    };
+
+    const handleValueInputFocus = () => {
+      showMatchList();
+    };
+
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (!valueInputWraperRef.value?.contains(e.target as Node)) {
+        isMatchListVisible.value = false;
+      }
+    };
+
     const handleClickKeyUp = () => {
       if (hoverIndex.value > 0) {
         hoverIndex.value -= 1;
@@ -248,6 +268,7 @@ export default defineComponent({
     const handlePopoverShow = () => {
       formRef.value?.clearError();
       controlOperateRef.value.bindKeyEvent();
+      document.addEventListener('click', handleDocumentClick, true);
       initData();
       setTimeout(() => {
         const selectItemDom = fieldListMainRef.value.querySelector('.is-active');
@@ -258,8 +279,14 @@ export default defineComponent({
     };
 
     const handlePopoverHide = () => {
+      isMatchListVisible.value = false;
+      document.removeEventListener('click', handleDocumentClick, true);
       controlOperateRef.value.unbindKeyEvent();
     };
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    });
 
     onMounted(() => {
       handleFieldItemClick(activeIndex.value);
@@ -399,7 +426,10 @@ export default defineComponent({
                     property='values'
                     required
                   >
-                    <div class='content-input-wraper'>
+                    <div
+                      ref={valueInputWraperRef}
+                      class='content-input-wraper'
+                    >
                       <bk-tag-input
                         clearable={false}
                         content-width={232}
@@ -413,8 +443,9 @@ export default defineComponent({
                         on-change={(value) => {
                           formData.value.values = value;
                         }}
+                        on-focus={handleValueInputFocus}
                       />
-                      {isValidateItem.value && (
+                      {isValidateItem.value && isMatchListVisible.value && (
                         <div
                           class='match-list-main'
                           v-bkloading={{
