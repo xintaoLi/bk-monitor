@@ -6,10 +6,10 @@
   "keywords": [],
   "license": "ISC",
   "scripts": {
-    "dev": "nodemon --exec \"cross-env MONITOR_APP=log bkmonitor-cli dev --log\"",
+    "dev": "cross-env MONITOR_APP=log vite --mode development",
     "dev:apm": "nodemon --exec \"cross-env MONITOR_APP=apm bkmonitor-cli dev --log\"",
     "dev:trace": "nodemon --exec \"cross-env MONITOR_APP=trace  bkmonitor-cli dev --log\"",
-    "build": "cross-env MONITOR_APP=log bkmonitor-cli build --log",
+    "build": "cross-env MONITOR_APP=log NODE_ENV=production vite build --mode production",
     "build:apm": "cross-env MONITOR_APP=apm bkmonitor-cli build --log && node ./scripts/update-version.js monitor-apm-retrieve",
     "build:trace": "cross-env MONITOR_APP=trace bkmonitor-cli build --log && node ./scripts/prefix-css.js && node ./scripts/update-version.js monitor-trace-retrieve",
     "analyze:apm": "cross-env MONITOR_APP=apm bkmonitor-cli build --log -a",
@@ -22,7 +22,9 @@
     "oxlint": "npx oxlint && npx eslint",
     "aafe:doctor": "aafe doctor",
     "aafe:sync": "aafe sync --yes",
-    "aafe:run": "aafe run"
+    "aafe:run": "aafe run",
+    "dev:webpack": "nodemon --exec \"cross-env MONITOR_APP=log bkmonitor-cli dev --log\"",
+    "build:webpack": "cross-env MONITOR_APP=log bkmonitor-cli build --log"
   },
   "dependencies": {
     "@babel/helper-module-imports": "7.24.7",
@@ -145,7 +147,12 @@
     "typescript": "5.4.2",
     "vue-eslint-parser": "9.4.2",
     "vue-tsx-support": "3.1.0",
-    "webpackbar": "^7.0.0"
+    "webpackbar": "^7.0.0",
+    "@vitejs/plugin-vue2": "^2.3.3",
+    "vite": "^5.4.20",
+    "vite-plugin-monaco-editor": "^1.1.0",
+    "vite-plugin-vue2": "^2.0.3",
+    "vue-template-compiler": "2.7.16"
   },
   "nodemonConfig": {
     "watch": [
