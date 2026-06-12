@@ -412,6 +412,7 @@ export default defineConfig(({ mode }): UserConfig => {
       alias: [
         { find: /^@\//, replacement: path.resolve(__dirname, 'src') + '/' },
         { find: /^vue$/, replacement: 'vue/dist/vue.esm.js' },
+        { find: /^path$/, replacement: path.resolve(__dirname, 'src/vite-shims/path.ts') },
         { find: /^scrollparent$/, replacement: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts') },
         { find: /^bk-magic-vue$/, replacement: path.resolve(__dirname, 'src/vite-shims/bk-magic-vue.ts') },
         { find: /^vue-tsx-support$/, replacement: path.resolve(__dirname, 'src/vite-shims/vue-tsx-support.ts') },
