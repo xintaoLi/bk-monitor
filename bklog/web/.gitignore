@@ -93,3 +93,7 @@ src/views/playground/*
 src/local.**
 local.cookie
 .cookie
+
+# Vite cache
+.vite-cache/
+node_modules/.vite/

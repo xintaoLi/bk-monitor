@@ -147,6 +147,36 @@ function bklogAssetsPlugin(): Plugin {
   };
 }
 
+
+const DEV_TEMPLATE_DEFAULTS: Record<string, string> = {
+  FEATURE_TOGGLE: '{}',
+  FEATURE_TOGGLE_WHITE_LIST: '{}',
+  FEATURE_TOGGLE_BLACK_LIST: '{}',
+  SPACE_UID_WHITE_LIST: '{}',
+  FIELD_ANALYSIS_CONFIG: '{}',
+  DEMO_BIZ_ID: '0',
+  BK_ASSESSMEN_HOST_COUNT: '0',
+  ENABLE_CHECK_COLLECTOR: 'false',
+  IS_EXTERNAL: 'false',
+};
+
+function devHtmlTemplatePlugin(): Plugin {
+  return {
+    name: 'bklog-dev-html-template',
+    transformIndexHtml(html) {
+      if (!isProduction) {
+        return html.replace(/\$\{\s*([A-Z0-9_]+)(?:\s*\|\s*n)?\s*\}/g, (matched, key) => {
+          if (Object.prototype.hasOwnProperty.call(DEV_TEMPLATE_DEFAULTS, key)) {
+            return DEV_TEMPLATE_DEFAULTS[key];
+          }
+          return '';
+        });
+      }
+      return html;
+    },
+  };
+}
+
 export default defineConfig(({ mode }): UserConfig => {
   const devConfig = getDevConfig();
   const isDev = mode === 'development';
@@ -180,6 +210,7 @@ export default defineConfig(({ mode }): UserConfig => {
       alias: {
         '@': path.resolve(__dirname, 'src'),
         vue$: 'vue/dist/vue.esm.js',
+        scrollparent: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts'),
       },
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue'],
     },
@@ -210,6 +241,7 @@ export default defineConfig(({ mode }): UserConfig => {
       },
     },
     plugins: [
+      devHtmlTemplatePlugin(),
       ifdefPlugin(),
       jsJsxPlugin(),
       createVuePlugin({
@@ -234,6 +266,7 @@ export default defineConfig(({ mode }): UserConfig => {
     ],
     optimizeDeps: {
       noDiscovery: true,
+      include: ['vue-virtual-scroller'],
       exclude: ['monaco-editor', 'monaco-yaml'],
       esbuildOptions: {
         loader: {
