@@ -16,6 +16,40 @@ const monitorApp = process.env.MONITOR_APP || 'log';
 const isProduction = process.env.NODE_ENV === 'production';
 const distDir = path.resolve(__dirname, '../static/dist');
 
+const cjsInteropDeps = [
+  'bk-magic-vue',
+  '@blueking/bk-user-display-name',
+  '@blueking/log-web',
+  '@blueking/login-modal',
+  '@blueking/platform-config',
+  'dayjs',
+  'dayjs/locale/en',
+  'dayjs/locale/zh-cn',
+  'dayjs/plugin/customParseFormat',
+  'dayjs/plugin/duration',
+  'dayjs/plugin/isLeapYear',
+  'dayjs/plugin/isSameOrAfter',
+  'dayjs/plugin/localizedFormat',
+  'dayjs/plugin/relativeTime',
+  'dayjs/plugin/timezone',
+  'dayjs/plugin/utc',
+  'dayjs/plugin/weekOfYear',
+  'deepmerge',
+  'dompurify',
+  'interactjs',
+  'json-bigint',
+  'konva',
+  'lodash',
+  'mark.js',
+  'screenfull',
+  'tiny-pinyin',
+  'tiny-pinyin/dist/patchers/56l.js',
+  'vue-json-pretty',
+  'vue-tsx-support',
+  'vue-virtual-scroller',
+  'scrollparent',
+];
+
 const defaultDevConfig = {
   port: 8001,
   host: '0.0.0.0',
@@ -266,8 +300,9 @@ export default defineConfig(({ mode }): UserConfig => {
     ],
     optimizeDeps: {
       noDiscovery: true,
-      include: ['vue-virtual-scroller'],
+      include: cjsInteropDeps,
       exclude: ['monaco-editor', 'monaco-yaml'],
+      needsInterop: cjsInteropDeps,
       esbuildOptions: {
         loader: {
           '.js': 'jsx',
