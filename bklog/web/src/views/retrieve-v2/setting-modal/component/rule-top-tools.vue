@@ -271,6 +271,18 @@
   import FromAddInput from './from-input';
   import TemplateOption from './template-option';
   import dayjs from 'dayjs';
+
+  const logClusterDebug = (stage, payload = {}) => {
+    const log = {
+      stage,
+      payload,
+      time: new Date().toISOString(),
+    };
+    window.__BKLOG_CLUSTER_DEBUG__ = window.__BKLOG_CLUSTER_DEBUG__ || [];
+    window.__BKLOG_CLUSTER_DEBUG__.push(log);
+    console.log(`[LogCluster][rule-top-tools][${stage}]`, payload);
+  };
+
   export default {
     components: {
       FromAddInput,
@@ -349,6 +361,8 @@
         templateList: [],
         ruleType: 'template',
         initTemplateID: -1,
+        /** 模板列表初始化 Promise，用于父级等待 regex_template 和 clustering_config 均返回后再回填规则 */
+        templateListReady: null,
       };
     },
     computed: {
@@ -374,7 +388,7 @@
     },
     mounted() {
       this.initInputType();
-      this.initTemplateList();
+      this.templateListReady = this.initTemplateList();
     },
     methods: {
       /**
@@ -610,23 +624,47 @@
       },
       /** 初始化模板列表 */
       async initTemplateList() {
+        const request = (async () => {
+          try {
+            const res = await this.$http.request('logClustering/ruleTemplate', {
+              params: {
+                space_uid: this.spaceUid,
+              },
+            });
+            const templateRawList = Array.isArray(res.data) ? res.data : res.data?.results || [];
+            this.templateList = templateRawList.map((item, index) => ({
+              ...item,
+              id: Number(item.id),
+              isShowEdit: false,
+              name: item.template_name,
+              editStr: item.template_name,
+              index,
+            }));
+            logClusterDebug('initTemplateList', {
+              spaceUid: this.spaceUid,
+              count: this.templateList.length,
+              ids: this.templateList.map(item => item.id),
+              predefined_varibles_lens: this.templateList.map(item => item.predefined_varibles?.length || 0),
+            });
+            return res;
+          } catch (err) {
+            console.error(err);
+            throw err;
+          }
+        })();
+        this.templateListReady = request;
+        return request;
+      },
+      /** 等待模板列表初始化完成，父级聚类设置会用它和 clustering_config 并发等待后统一回填 */
+      async waitTemplateListReady() {
+        if (!this.templateListReady) {
+          this.templateListReady = this.initTemplateList();
+        }
         try {
-          const res = await this.$http.request('logClustering/ruleTemplate', {
-            params: {
-              space_uid: this.spaceUid,
-            },
-          });
-          this.templateList = res.data.map((item, index) => ({
-            ...item,
-            isShowEdit: false,
-            name: item.template_name,
-            editStr: item.template_name,
-            index,
-          }));
-          return Promise.resolve(res);
+          await this.templateListReady;
         } catch (err) {
-          console.error(err);
-          return Promise.reject(err);
+          // 模板接口失败时仍允许父级使用 clustering_config 中的自定义规则渲染，避免聚类规则空白。
+          console.warn(err);
         }
       },
       /** 创建模板 */
@@ -721,9 +759,24 @@
         }
       },
       handleSelectTemplate(value) {
-        this.templateRule = value;
-        const selectTemplateStr = this.templateList.find(item => item.id === value).predefined_varibles;
-        this.rulesList = this.base64ToRuleArr(selectTemplateStr);
+        const templateId = Number(value);
+        this.templateRule = templateId;
+        const matchedTemplate = this.templateList.find(item => Number(item.id) === templateId);
+        const selectTemplateStr = matchedTemplate?.predefined_varibles || '';
+        const nextRules = this.base64ToRuleArr(selectTemplateStr);
+        logClusterDebug('handleSelectTemplate', {
+          value,
+          templateId,
+          matched: Boolean(matchedTemplate),
+          templateListCount: this.templateList.length,
+          predefined_varibles_len: selectTemplateStr.length,
+          nextRules_len: nextRules.length,
+        });
+        if (!matchedTemplate) {
+          // 模板接口为空或模板 ID 不匹配时，不覆盖现有规则，避免 clustering_config 已回填的自定义规则被清空。
+          return;
+        }
+        this.rulesList = nextRules;
         this.$emit('show-table-loading');
       },
       handleEditTemplateName(index) {
@@ -783,14 +836,38 @@
       },
       handleClickTemplateBtn(val) {
         this.ruleType = val;
-        const btnShowID = this.initTemplateID === 0 ? this.templateList[0].id : this.initTemplateID;
+        const firstTemplateId = this.templateList[0]?.id ?? 0;
+        const btnShowID = Number(this.initTemplateID) === 0 ? firstTemplateId : Number(this.initTemplateID);
         this.templateRule = val === 'customize' ? 0 : btnShowID;
-        if (val !== 'customize') this.handleSelectTemplate(btnShowID);
+        if (val !== 'customize' && btnShowID) this.handleSelectTemplate(btnShowID);
       },
       initTemplateSelect(v) {
-        this.templateRule = v.regex_template_id;
-        this.ruleType = v.regex_rule_type;
-        this.initTemplateID = v.regex_template_id;
+        const templateId = Number(v.regex_template_id || 0);
+        this.ruleType = v.regex_rule_type || 'customize';
+        this.initTemplateID = templateId;
+        this.templateRule = this.ruleType === 'template' ? templateId : 0;
+        logClusterDebug('initTemplateSelect', {
+          ruleType: this.ruleType,
+          templateId,
+          templateListCount: this.templateList.length,
+          templateIds: this.templateList.map(item => item.id),
+        });
+        if (this.ruleType === 'template' && templateId > 0) {
+          const matchedTemplate = this.templateList.find(item => Number(item.id) === templateId);
+          if (matchedTemplate) {
+            this.handleSelectTemplate(templateId);
+          } else {
+            // 配置声明使用模板，但模板列表未返回对应模板时，保留父级根据 clustering_config.predefined_varibles 回填的规则。
+            // 同时降级成自定义，避免 UI 展示模板已选中但规则为空。
+            this.ruleType = 'customize';
+            this.templateRule = 0;
+            logClusterDebug('initTemplateSelectFallbackToCustomize', {
+              templateId,
+              templateListCount: this.templateList.length,
+              currentRulesLen: this.rulesList.length,
+            });
+          }
+        }
       },
     },
     beforeDestroy() {

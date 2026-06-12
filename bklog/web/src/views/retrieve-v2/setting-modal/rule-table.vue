@@ -257,6 +257,17 @@
   import VueDraggable from 'vuedraggable';
   import RuleTopTools from './component/rule-top-tools.vue';
 
+  const logClusterDebug = (stage, payload = {}) => {
+    const log = {
+      stage,
+      payload,
+      time: new Date().toISOString(),
+    };
+    window.__BKLOG_CLUSTER_DEBUG__ = window.__BKLOG_CLUSTER_DEBUG__ || [];
+    window.__BKLOG_CLUSTER_DEBUG__.push(log);
+    console.log(`[LogCluster][rule-table][${stage}]`, payload);
+  };
+
   export default {
     components: {
       VueDraggable,
@@ -318,7 +329,12 @@
     watch: {
       tableStr: {
         handler(val) {
-          this.rulesList = this.$refs.ruleTopToolsRef.base64ToRuleArr(val);
+          const nextRules = this.$refs.ruleTopToolsRef.base64ToRuleArr(val);
+          logClusterDebug('tableStr watcher', {
+            tableStr_len: val?.length || 0,
+            nextRules_len: nextRules.length,
+          });
+          this.rulesList = nextRules;
         },
       },
       debugRequest(val) {
@@ -435,7 +451,12 @@
         return this.$refs.ruleTopToolsRef.templateRule;
       },
       initSelect(v) {
+        logClusterDebug('initSelect', v);
         this.$refs.ruleTopToolsRef.initTemplateSelect(v);
+      },
+      /** 等待规则模板列表完成初始化，供聚类设置父组件与 clustering_config 并发等待后再统一回填 */
+      waitTemplateListReady() {
+        return this.$refs.ruleTopToolsRef.waitTemplateListReady();
       },
     },
   };

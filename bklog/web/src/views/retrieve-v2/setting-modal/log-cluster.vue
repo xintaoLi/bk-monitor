@@ -197,6 +197,17 @@
   import FilterRule from '../search-result-panel/log-clustering/components/quick-open-cluster-step/filter-rule.tsx';
   import RuleTable from './rule-table';
 
+  const logClusterDebug = (stage, payload = {}) => {
+    const log = {
+      stage,
+      payload,
+      time: new Date().toISOString(),
+    };
+    window.__BKLOG_CLUSTER_DEBUG__ = window.__BKLOG_CLUSTER_DEBUG__ || [];
+    window.__BKLOG_CLUSTER_DEBUG__.push(log);
+    console.log(`[LogCluster][${stage}]`, payload);
+  };
+
   export default {
     components: {
       RuleTable,
@@ -290,7 +301,11 @@
           const baseUrl = '/logClustering';
           const requestBehindUrl = isDefault ? '/getDefaultConfig' : '/getConfig';
           const requestUrl = `${baseUrl}${requestBehindUrl}`;
-          const res = await this.$http.request(requestUrl, !isDefault && { params, data });
+          const configRequest = this.$http.request(requestUrl, !isDefault && { params, data });
+          const templateReadyRequest = isInit
+            ? this.$refs.ruleTableRef?.waitTemplateListReady?.() ?? Promise.resolve()
+            : Promise.resolve();
+          const [res] = await Promise.all([configRequest, templateReadyRequest]);
           const {
             max_dist_list,
             predefined_varibles,
@@ -317,7 +332,20 @@
           };
           Object.assign(this.formData, assignObj);
           Object.assign(this.defaultData, assignObj);
-          if (isInit) this.$refs.ruleTableRef.initSelect(assignObj);
+          logClusterDebug('requestCluster config/template ready', {
+            isDefault,
+            isInit,
+            regex_rule_type,
+            regex_template_id,
+            predefined_varibles_len: predefined_varibles?.length || 0,
+            filter_rules_len: newFilterRules?.length || 0,
+          });
+          if (isInit) {
+            // defaultData.predefined_varibles 会触发 rule-table 的 tableStr watcher。
+            // 这里等待子组件先完成 prop watcher 的自定义规则回填，再执行模板选择回填，避免模板规则被 watcher 覆盖为空。
+            await this.$nextTick();
+            this.$refs.ruleTableRef.initSelect(assignObj);
+          }
           // 当前回填的字段如果在聚类字段列表里找不到则赋值为空需要用户重新赋值
           const isHaveFieldsItem = this.clusterField.find(item => item.id === res.data.clustering_fields);
           if (!isHaveFieldsItem) this.formData.clustering_fields = '';
