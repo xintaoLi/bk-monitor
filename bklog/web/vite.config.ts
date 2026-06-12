@@ -222,6 +222,11 @@ function getViteDependencyInteropConfig() {
   // vue-virtual-scroller imports scrollparent as ESM default; force prebundle keeps its dependency graph stable.
   include.add('vue-virtual-scroller');
 
+  // bk-magic-vue package entry is a UMD bundle. The application imports its named exports
+  // through src/vite-shims/bk-magic-vue.ts, which consumes the real UMD file as default.
+  include.add('bk-magic-vue/dist/bk-magic-vue.min.js');
+  needsInterop.add('bk-magic-vue/dist/bk-magic-vue.min.js');
+
   return {
     include: [...include].sort(),
     needsInterop: [...needsInterop].sort(),
@@ -386,11 +391,12 @@ export default defineConfig(({ mode }): UserConfig => {
       }),
     },
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, 'src'),
-        vue$: 'vue/dist/vue.esm.js',
-        scrollparent: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts'),
-      },
+      alias: [
+        { find: /^@\//, replacement: path.resolve(__dirname, 'src') + '/' },
+        { find: /^vue$/, replacement: 'vue/dist/vue.esm.js' },
+        { find: /^scrollparent$/, replacement: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts') },
+        { find: /^bk-magic-vue$/, replacement: path.resolve(__dirname, 'src/vite-shims/bk-magic-vue.ts') },
+      ],
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue'],
     },
     esbuild: {
