@@ -157,14 +157,17 @@ const prebundlePackageAllowList = new Set([
   'screenfull',
   'tiny-pinyin',
   'vue-json-pretty',
-  'vue-tsx-support',
   'vue-virtual-scroller',
 ]);
 
-function isKnownSafeBlueKingEsmPackage(pkgName: string) {
+function isKnownSafeEsmPackage(pkgName: string) {
   // These packages are plain JS utilities with ESM named exports. Prebundle them, but do not force CJS interop.
   // UI component packages are intentionally not included because their optimizeDeps graph pulls CSS/font assets.
-  return ['@blueking/login-modal', '@blueking/platform-config', '@blueking/notice-component-vue2'].includes(pkgName);
+  return [
+    '@blueking/login-modal',
+    '@blueking/platform-config',
+    '@blueking/notice-component-vue2',
+  ].includes(pkgName);
 }
 
 function isInteropRiskPackage(pkgName: string, meta: PackageMeta) {
@@ -174,12 +177,12 @@ function isInteropRiskPackage(pkgName: string, meta: PackageMeta) {
     !module
     || /(?:umd|common|cjs|min\.js|\.cjs|lodash\.js)/.test(main)
     || /(?:umd|min\.js)/.test(module)
-    || ['dayjs', 'deepmerge', 'json-bigint', 'lodash', 'mark.js', 'tiny-pinyin', 'vue-json-pretty', 'vue-tsx-support'].includes(pkgName)
+    || ['dayjs', 'deepmerge', 'json-bigint', 'lodash', 'mark.js', 'tiny-pinyin', 'vue-json-pretty'].includes(pkgName)
   );
 }
 
 function isPrebundleRiskPackage(pkgName: string, meta: PackageMeta) {
-  return prebundlePackageAllowList.has(pkgName) && (isKnownSafeBlueKingEsmPackage(pkgName) || isInteropRiskPackage(pkgName, meta));
+  return prebundlePackageAllowList.has(pkgName) && (isKnownSafeEsmPackage(pkgName) || isInteropRiskPackage(pkgName, meta));
 }
 
 function getViteDependencyInteropConfig() {
@@ -396,6 +399,7 @@ export default defineConfig(({ mode }): UserConfig => {
         { find: /^vue$/, replacement: 'vue/dist/vue.esm.js' },
         { find: /^scrollparent$/, replacement: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts') },
         { find: /^bk-magic-vue$/, replacement: path.resolve(__dirname, 'src/vite-shims/bk-magic-vue.ts') },
+        { find: /^vue-tsx-support$/, replacement: path.resolve(__dirname, 'src/vite-shims/vue-tsx-support.ts') },
       ],
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue'],
     },
