@@ -144,46 +144,61 @@ function isOptimizableImport(importee: string) {
   return /\.(mjs|cjs|js)$/.test(resolved);
 }
 
-const prebundlePackageAllowList = new Set([
+const forcedEsmPrebundlePackages = new Set([
   '@blueking/login-modal',
   '@blueking/platform-config',
   '@blueking/notice-component-vue2',
-  'dayjs',
-  'deepmerge',
-  'dompurify',
-  'json-bigint',
-  'lodash',
-  'mark.js',
-  'screenfull',
-  'tiny-pinyin',
-  'vue-json-pretty',
-  'vue-virtual-scroller',
 ]);
+
+const optimizeDepsDenyList = new Set([
+  // UI component packages / local shims: do not let optimizeDeps crawl their CSS/font/runtime graphs.
+  '@blueking/ai-blueking',
+  '@blueking/bk-user-selector',
+  '@blueking/date-picker',
+  '@blueking/ip-selector',
+  '@blueking/log-web',
+  '@blueking/user-selector',
+  'bk-magic-vue',
+  'monaco-editor',
+  'monaco-yaml',
+  'scrollparent',
+  'vue-tsx-support',
+]);
+
+function hasEsmEntry(meta: PackageMeta) {
+  return meta.type === 'module' || Boolean(meta.module);
+}
 
 function isKnownSafeEsmPackage(pkgName: string) {
   // These packages are plain JS utilities with ESM named exports. Prebundle them, but do not force CJS interop.
-  // UI component packages are intentionally not included because their optimizeDeps graph pulls CSS/font assets.
-  return [
-    '@blueking/login-modal',
-    '@blueking/platform-config',
-    '@blueking/notice-component-vue2',
-  ].includes(pkgName);
+  // UI component packages are intentionally denied above because their optimizeDeps graph pulls CSS/font assets.
+  return forcedEsmPrebundlePackages.has(pkgName);
 }
 
 function isInteropRiskPackage(pkgName: string, meta: PackageMeta) {
   const main = meta.main || '';
   const module = meta.module || '';
   return (
-    !module
+    !hasEsmEntry(meta)
     || /(?:umd|common|cjs|min\.js|\.cjs|lodash\.js)/.test(main)
     || /(?:umd|min\.js)/.test(module)
-    || ['dayjs', 'deepmerge', 'json-bigint', 'lodash', 'mark.js', 'tiny-pinyin', 'vue-json-pretty'].includes(pkgName)
   );
 }
 
-function isPrebundleRiskPackage(pkgName: string, meta: PackageMeta) {
-  return prebundlePackageAllowList.has(pkgName) && (isKnownSafeEsmPackage(pkgName) || isInteropRiskPackage(pkgName, meta));
+function shouldPrebundleImport(importee: string, pkgName: string, meta: PackageMeta) {
+  if (!pkgName || optimizeDepsDenyList.has(pkgName)) {
+    return false;
+  }
+  if (isKnownSafeEsmPackage(pkgName)) {
+    return true;
+  }
+
+  // Generic rule based on actual source imports + node_modules package metadata:
+  // when a browser would otherwise request a CommonJS/UMD JS entry directly from node_modules,
+  // force Vite to prebundle it and synthesize the expected ESM facade.
+  return isInteropRiskPackage(pkgName, meta);
 }
+
 
 function getViteDependencyInteropConfig() {
   const sourceImports = collectSourceImports();
@@ -196,11 +211,11 @@ function getViteDependencyInteropConfig() {
     }
     const pkgName = resolvePackageName(importee);
     const meta = readPackageMeta(pkgName);
-    if (!isPrebundleRiskPackage(pkgName, meta)) {
+    if (!shouldPrebundleImport(importee, pkgName, meta)) {
       continue;
     }
     include.add(importee);
-    if (isInteropRiskPackage(pkgName, meta) && meta.type !== 'module') {
+    if (isInteropRiskPackage(pkgName, meta) && !hasEsmEntry(meta)) {
       needsInterop.add(importee);
     }
   }
