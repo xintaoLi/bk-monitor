@@ -3,9 +3,14 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
-    "src/**/*.js"
+    "src/**/*.js",
+    "vite.config.ts"
   ],
-  "exclude": ["node_modules", "dist", "local.settings.js"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "local.settings.js"
+  ],
   "vueCompilerOptions": {
     "target": 2.7
   },
@@ -25,11 +30,19 @@
     "sourceMap": true,
     "pretty": true,
     "jsx": "preserve",
-    "lib": ["es2018", "esnext", "dom", "dom.iterable", "scripthost"],
+    "lib": [
+      "es2018",
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "scripthost"
+    ],
     "removeComments": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     }
   }
 }

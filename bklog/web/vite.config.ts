@@ -31,7 +31,7 @@ function getDevConfig() {
     return defaultDevConfig;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+
   return { ...defaultDevConfig, ...require(localSettingsPath) };
 }
 
@@ -63,7 +63,7 @@ type PackageMeta = {
 function readPackageMeta(pkgName: string): PackageMeta {
   try {
     return JSON.parse(readFileSync(path.resolve(__dirname, 'node_modules', ...pkgName.split('/'), 'package.json'), 'utf-8'));
-  } catch (_) {
+  } catch {
     return {};
   }
 }
@@ -78,7 +78,8 @@ function resolvePackageName(importee: string) {
     return '';
   }
   if (importee.startsWith('@')) {
-    return importee.split('/').slice(0, 2).join('/');
+    return importee.split('/').slice(0, 2)
+      .join('/');
   }
   return importee.split('/')[0];
 }
@@ -123,7 +124,7 @@ function collectSourceImports() {
 function resolveImportPath(importee: string) {
   try {
     return require.resolve(importee, { paths: [__dirname] });
-  } catch (_) {
+  } catch {
     return '';
   }
 }
@@ -234,7 +235,9 @@ function getViteDependencyInteropConfig() {
       require.resolve(dep, { paths: [__dirname] });
       include.add(dep);
       needsInterop.add(dep);
-    } catch (_) {}
+    } catch {
+      // Optional dayjs subpath may be absent depending on dependency resolution.
+    }
   }
 
   // vue-virtual-scroller imports scrollparent as ESM default; force prebundle keeps its dependency graph stable.
@@ -263,7 +266,7 @@ function ifdefPlugin(): Plugin {
       .replace(/\bMONITOR_APP\b/g, JSON.stringify(monitorApp))
       .replace(/\bAPP\b/g, JSON.stringify(monitorApp));
     // eslint-disable-next-line no-new-func
-    return Boolean(new Function('return (' + normalized + ');')());
+    return Boolean(new Function(`return (${normalized});`)());
   };
 
   return {
@@ -391,10 +394,10 @@ export default defineConfig(({ mode }): UserConfig => {
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
       'process.env.proxyUrl': JSON.stringify(devConfig.devProxyUrl),
-      'process.env.devUrl': JSON.stringify(devConfig.host + ':' + devConfig.port),
+      'process.env.devUrl': JSON.stringify(`${devConfig.host}:${devConfig.port}`),
       'process.env.devHost': JSON.stringify(devConfig.host),
       'process.env.loginHost': JSON.stringify(devConfig.loginHost),
-      'process.env.loginUrl': JSON.stringify(devConfig.loginHost + '/login/'),
+      'process.env.loginUrl': JSON.stringify(`${devConfig.loginHost}/login/`),
       'process.env.APP': JSON.stringify(monitorApp),
       'process.env.MONITOR_APP': JSON.stringify(monitorApp),
       'process.env': JSON.stringify({
@@ -402,15 +405,15 @@ export default defineConfig(({ mode }): UserConfig => {
         APP: monitorApp,
         MONITOR_APP: monitorApp,
         proxyUrl: devConfig.devProxyUrl,
-        devUrl: devConfig.host + ':' + devConfig.port,
+        devUrl: `${devConfig.host}:${devConfig.port}`,
         devHost: devConfig.host,
         loginHost: devConfig.loginHost,
-        loginUrl: devConfig.loginHost + '/login/',
+        loginUrl: `${devConfig.loginHost}/login/`,
       }),
     },
     resolve: {
       alias: [
-        { find: /^@\//, replacement: path.resolve(__dirname, 'src') + '/' },
+        { find: /^@\//, replacement: `${path.resolve(__dirname, 'src')}/` },
         { find: /^vue$/, replacement: 'vue/dist/vue.esm.js' },
         { find: /^path$/, replacement: path.resolve(__dirname, 'src/vite-shims/path.ts') },
         { find: /^scrollparent$/, replacement: path.resolve(__dirname, 'src/vite-shims/scrollparent.ts') },

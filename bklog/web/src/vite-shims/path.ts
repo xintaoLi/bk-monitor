@@ -2,6 +2,7 @@
 
 const sep = '/';
 const delimiter = ':';
+const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 const normalizeArray = (parts: string[], allowAboveRoot: boolean) => {
   const res: string[] = [];
@@ -50,7 +51,8 @@ const dirname = (inputPath = '') => {
 };
 
 const basename = (inputPath = '', ext = '') => {
-  const base = inputPath.split('/').filter(Boolean).pop() || '';
+  const base = inputPath.split('/').filter(Boolean)
+    .pop() || '';
   return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
 };
 
@@ -60,11 +62,12 @@ const extname = (inputPath = '') => {
   return index > 0 ? base.slice(index) : '';
 };
 
-const resolve = (...paths: string[]) => normalize('/' + paths.filter(Boolean).join('/'));
+const resolve = (...paths: string[]) => normalize(`/${paths.filter(Boolean).join('/')}`);
 
 const pathShim = {
   sep,
   delimiter,
+  hasOwnProperty,
   normalize,
   join,
   dirname,
@@ -78,5 +81,5 @@ const pathShim = {
 pathShim.posix = pathShim;
 pathShim.win32 = pathShim;
 
-export { basename, delimiter, dirname, extname, join, normalize, resolve, sep };
+export { basename, delimiter, dirname, extname, hasOwnProperty, join, normalize, resolve, sep };
 export default pathShim;
