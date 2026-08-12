@@ -1,0 +1,357 @@
+.fuzzy-match-mode {
+  width: 100%;
+}
+
+.fuzzy-match-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #4d4f56;
+}
+
+.fuzzy-match-actions,
+.fuzzy-match-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fuzzy-match-label,
+.fuzzy-match-title {
+  font-weight: 600;
+}
+
+.fuzzy-match-clear-btn {
+  margin-left: 2px;
+  font-size: 12px;
+}
+
+.fuzzy-match-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: #979ba5;
+  cursor: pointer;
+  background: #f0f1f5;
+  border-radius: 50%;
+}
+
+.fuzzy-match-help:hover {
+  color: #3a84ff;
+  background: #e1ecff;
+}
+
+.fuzzy-match-buttons {
+  display: flex;
+  width: 100%;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dcdee5;
+  border-radius: 4px;
+}
+
+.fuzzy-match-button {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 32px;
+  color: #63656e;
+  cursor: pointer;
+  background: #ffffff;
+  border: 0;
+  border-right: 1px solid #dcdee5;
+  outline: none;
+}
+
+.fuzzy-match-button:last-child {
+  border-right: 0;
+}
+
+.fuzzy-match-button:hover {
+  color: #3a84ff;
+  background: #f5f7fa;
+}
+
+.fuzzy-match-button.active {
+  color: #3a84ff;
+  background: #e1ecff;
+}
+
+.fuzzy-match-button.active .mode-label {
+  font-weight: 700;
+}
+
+.mode-sample {
+  margin-left: 4px;
+  color: #c4c6cc;
+  white-space: nowrap;
+}
+
+.fuzzy-match-button.active .mode-sample {
+  color: #3a84ff;
+}
+
+.fuzzy-match-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 72px;
+  max-height: 160px;
+  padding: 6px;
+  margin-bottom: 12px;
+  overflow: auto;
+  cursor: text;
+  background: #fff;
+  border: 1px solid #c4c6cc;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.fuzzy-match-tag-input:focus-within {
+  border-color: #3a84ff;
+}
+
+.fuzzy-match-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 24px;
+  padding: 0 6px;
+  line-height: 22px;
+  color: #63656e;
+  background: #f0f1f5;
+  border: 1px solid #dcdee5;
+  border-radius: 2px;
+}
+
+.fuzzy-match-tag-text {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fuzzy-match-tag-del {
+  margin-left: 4px;
+  font-size: 14px;
+  color: #979ba5;
+  cursor: pointer;
+}
+
+.fuzzy-match-tag-del:hover {
+  color: #ea3636;
+}
+
+.fuzzy-match-tag-edit,
+.fuzzy-match-input {
+  min-width: 120px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+  color: #313238;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.fuzzy-match-input {
+  flex: 1;
+}
+
+.fuzzy-match-relation {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #63656e;
+}
+
+.fuzzy-match-relation-label {
+  flex: 0 0 auto;
+  margin-right: 16px;
+  font-weight: 600;
+  color: #4d4f56;
+}
+
+.fuzzy-match-preview-card {
+  padding: 12px 16px;
+  background: #fafbfd;
+  border: 1px dashed #dcdee5;
+  border-radius: 4px;
+}
+
+.fuzzy-match-preview {
+  display: flex;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 22px;
+  color: #979ba5;
+}
+
+.preview-label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.preview-value {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: Menlo, Monaco, Consolas, Courier, monospace;
+  color: #3a84ff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fuzzy-match-custom-tip,
+.fuzzy-match-desc {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #979ba5;
+}
+
+/* batch dialog */
+.bklog-sib-batch-trigger {
+  color: #3a84ff;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.bklog-sib-batch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.bklog-sib-batch-dialog {
+  width: 860px;
+  max-width: calc(100vw - 48px);
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.bklog-sib-batch-dialog__title {
+  height: 48px;
+  padding: 0 24px;
+  font-size: 16px;
+  line-height: 48px;
+  color: #313238;
+  border-bottom: 1px solid #dcdee5;
+}
+
+.bklog-sib-batch-dialog__body {
+  display: flex;
+  padding: 16px 24px;
+  gap: 16px;
+}
+
+.bklog-sib-batch-left {
+  width: 400px;
+  flex-shrink: 0;
+}
+
+.bklog-sib-batch-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.bklog-sib-batch-label {
+  padding-bottom: 6px;
+  font-size: 12px;
+  color: #63656e;
+}
+
+.bklog-sib-batch-label .req {
+  color: #ea3636;
+  padding-left: 2px;
+}
+
+.bklog-sib-batch-textarea {
+  width: 100%;
+  height: 280px;
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid #c4c6cc;
+  border-radius: 2px;
+  resize: none;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.bklog-sib-batch-left-btns {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.bklog-sib-batch-parse {
+  flex: 1;
+}
+
+.bklog-sib-batch-result {
+  max-height: 316px;
+  overflow: auto;
+  border: 1px solid #dcdee5;
+  border-radius: 2px;
+}
+
+.bklog-sib-batch-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: #979ba5;
+  font-size: 12px;
+}
+
+.bklog-sib-batch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: #63656e;
+  cursor: pointer;
+}
+
+.bklog-sib-batch-row:hover {
+  background: #f5f7fa;
+}
+
+.bklog-sib-batch-row.is-all {
+  border-bottom: 1px solid #dcdee5;
+  font-weight: 600;
+}
+
+.bklog-sib-batch-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid #dcdee5;
+}

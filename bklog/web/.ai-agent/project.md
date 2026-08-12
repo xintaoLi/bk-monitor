@@ -16,7 +16,7 @@ The legacy shared AI directory has been removed to avoid duplicate AI entry poin
 ## Scope
 
 - Primary editable frontend scope: `bklog/web/src/`
-- Ignore by default: `bklog/web/packages/*`
+- Ignore by default: `bklog/web/packages/*`（例外：`packages/search-input-bar` 为可发布原生搜索公共组件）
 - Avoid repo-wide search unless explicitly required; prefer scoped search under `src/`.
 
 ## Quick Map
@@ -25,6 +25,7 @@ The legacy shared AI directory has been removed to avoid duplicate AI entry poin
 | --- | --- |
 | 日志检索 / retrieve | `src/store/url-resolver.ts` + `src/store/default-values.ts` + `src/views/retrieve-v3/` |
 | retrieve v2 result panel | `src/views/retrieve-v2/search-result-panel/` |
+| 搜索公共组件（原生 WC） | `packages/search-input-bar`（`@blueking/bklog-search-input-bar`）；行为参考 `src/views/retrieve-v2/search-bar/` + `src/views/retrieve-v3/search-bar/`；日志侧暂未切换消费 |
 | 收藏 / favorite | `src/views/retrieve-v3/favorite/` |
 | 管理 / manage | `src/views/manage/`, `src/views/manage-v2/` |
 | 采集 / collection | `src/views/manage/manage-access/`, `src/views/manage-v2/log-collection/` |

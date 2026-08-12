@@ -1,0 +1,59 @@
+# search-input-bar 缺失 font-icon 清单
+# 用途：icons.css / iconcool 字体子集后续补充；类名已在 DOM/CSS 中预留
+# 状态：pending = 待从主站 iconcool 补入 src/styles/fonts + icons.css
+
+## UI 模式字段类型（field-type-icon）
+- bklog-number-2        # pending — number/integer/double/float/long
+- bklog-str-2           # pending — keyword/string
+- bklog-text-2          # pending — text
+- bklog-time-2          # pending — date/date_nanos
+- bklog-buer-2          # pending — boolean
+- bklog-ext-2           # pending — __virtual__
+- bklog-object-2        # pending — object
+- bklog-fllatend        # pending — flattened
+- bklog-unkown          # pending — 未知类型 fallback
+
+## UI 模式交互（ui-input / ui-input-option）
+- bklog-arrow-down-filled  # pending — footer ↑↓、操作符箭头
+- bklog-enter-3            # pending — footer Enter 快捷键
+- bklog-command            # pending — mac ⌘ 快捷键
+- bklog-ctrl               # pending — win Ctrl 快捷键
+- bklog-plus               # pending — ⌘+Enter 组合提示
+
+## SQL 模式联想列表（sql-query-options）
+- bklog-field           # pending — 字段项 icon
+- bklog-value           # pending — 值项 icon
+- bklog-equal           # pending — : / :* / 比较运算符
+- bklog-and             # pending — AND / OR / AND NOT
+- bklog-jump            # pending — 查询语法外链
+
+## SQL 模式 Header 快捷键（与 UI footer 共用 glyph）
+- bklog-enter-3            # pending — 直接检索 / AI Enter
+- bklog-arrow-down-filled  # pending — ↑↓ 移动光标（.up 旋转为上）
+- bklog-command            # pending — mac AI 快捷键
+- bklog-ctrl               # pending — win AI 快捷键
+- bklog-plus               # pending — AI 组合键中间 +
+
+## SQL 模式 tippy 底部联想收藏列表（≠ 工具栏 favorites slot）
+- bklog-table-2         # pending — 收藏项左侧表格图标
+
+## 已内置（勿重复）
+- bklog-eye
+- bklog-eye-slash
+- bklog-shoudongchaxun
+- bklog-star-line
+- bklog-zanting
+- bklog-circle-alert-filled
+- bklog-setting
+- bklog-qingkong
+- bklog-qiehuan-2
+- bklog-shanchu
+- bklog-copy-4
+- bklog-yuju1
+- bklog-ui1
+
+## 补充步骤（完成后把对应行改为 done）
+1. 从 bklog/web 主站 iconcool 字体导出上述 glyph unicode
+2. 更新 src/styles/fonts/iconcool.{woff,ttf}
+3. 在 src/styles/icons.css 写入 .xxx:before { content: '\eXXX'; }
+4. 去掉临时字母/色块 fallback（如有）

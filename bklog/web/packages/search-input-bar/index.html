@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bklog-search-input-bar demo</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+        background: #f5f7fa;
+        color: #313238;
+      }
+      .demo-page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .demo-page h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      .demo-page p {
+        margin: 0 0 16px;
+        color: #63656e;
+        font-size: 13px;
+      }
+      .demo-panel {
+        background: #fff;
+        border: 1px solid #dcdee5;
+        border-radius: 4px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .demo-log {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 4px;
+        padding: 12px;
+        min-height: 160px;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .demo-slot-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        height: 28px;
+        border: 1px dashed #c4c6cc;
+        border-radius: 2px;
+        font-size: 12px;
+        color: #63656e;
+        cursor: pointer;
+        background: #fafbfd;
+      }
+      .demo-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .demo-controls button {
+        height: 28px;
+        padding: 0 12px;
+        border: 1px solid #c4c6cc;
+        border-radius: 2px;
+        background: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-page">
+      <h1>@blueking/bklog-search-input-bar</h1>
+      <p>原生 Web Component Demo：样式对齐日志检索（log-platform）。对照：Toggle 模式切换 / icon 工具栏 / 外置查询钮 / 双行 Tag / AI 渐变整壳。</p>
+      <div class="demo-panel">
+        <div class="demo-controls" id="demo-controls"></div>
+        <div id="search-bar-host"></div>
+      </div>
+      <div class="demo-panel">
+        <strong>Event Log</strong>
+        <div class="demo-log" id="event-log"></div>
+      </div>
+    </div>
+    <script type="module" src="/demo/main.ts"></script>
+  </body>
+</html>

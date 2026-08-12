@@ -1,0 +1,469 @@
+.bklog-sib-sql.search-sql-query {
+  position: relative;
+  display: inline-flex;
+  /* 对齐 Vue .search-sql-query */
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  min-height: var(--bklog-sib-input-min-height, 48px);
+  max-height: var(--bklog-sib-input-max-height, 135px);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.bklog-sib-sql .empty-placeholder-text {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  font-family: 'Roboto Mono', Consolas, Menlo, Courier, monospace;
+  font-size: 12px;
+  line-height: 30px;
+  color: #c4c6cc;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.bklog-sib-sql .empty-placeholder-text .custom-placeholder {
+  pointer-events: all;
+  cursor: pointer;
+  padding-left: 4px;
+}
+
+.bklog-sib-sql__editor.search-sql-editor {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--bklog-sib-input-min-height, 48px);
+  max-height: var(--bklog-sib-input-max-height, 135px);
+  padding-left: 8px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.bklog-sib-sql__editor .cm-editor {
+  outline: none;
+  width: 100%;
+  /* 不设 min-height/height:100%，由外壳 flex 垂直居中光标与内容（对齐 Vue） */
+  max-height: var(--bklog-sib-input-max-height, 135px);
+}
+
+.bklog-sib-sql__editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.bklog-sib-sql__editor .cm-activeLine {
+  background-color: transparent;
+}
+
+.bklog-sib-sql__editor .cm-scroller {
+  font-family: Menlo, Monaco, Consolas, Courier, 'PingFang SC', 'Microsoft Yahei', monospace;
+  font-size: 12px;
+  max-height: var(--bklog-sib-input-max-height, 135px);
+  overflow: auto !important;
+}
+
+.bklog-sib-sql__editor .cm-content {
+  font-family: Menlo, Monaco, Consolas, Courier, 'PingFang SC', 'Microsoft Yahei', monospace;
+  font-size: 12px;
+  color: #313238;
+  /* Vue：仅上下 padding，内容随行高自然增高，由父级 align-items:center 居中 */
+  padding: 10px 0;
+  box-sizing: border-box;
+}
+
+.bklog-sib-sql__editor .cm-line {
+  width: fit-content;
+  color: #b17313;
+}
+
+/* 对齐 Vue：CM 语法 token + NOT 装饰 */
+.bklog-sib-sql__editor .cm-keyword,
+.bklog-sib-sql__editor .cm-operator,
+.bklog-sib-sql__editor .cm-line .ͼb {
+  font-weight: bold;
+  color: #7c609e;
+  font-style: italic;
+}
+
+.bklog-sib-sql__editor .cm-not-keyword,
+.bklog-sib-sql__editor .cm-not-keyword .ͼb {
+  color: #ea3636;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.bklog-sib-sql__editor .cm-line .ͼi,
+.bklog-sib-sql__editor .cm-line .ͼf,
+.bklog-sib-sql__editor .cm-string,
+.bklog-sib-sql__editor .cm-string2 {
+  color: #02776e;
+}
+
+.bklog-sib-sql__editor .cm-gutters {
+  display: none;
+  background-color: transparent;
+}
+
+/* tippy content: sql-query-options.vue */
+.sql-query-container {
+  position: relative;
+  display: flex;
+  line-height: 1;
+  border: 1px solid #dcdee5;
+  border-radius: 2px;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sql-query-container .sql-field-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100px;
+  max-height: 400px;
+}
+
+.sql-query-container .sql-query-header {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding-left: 16px;
+  padding-right: 16px;
+  background-color: #fafbfd;
+  border-bottom: 1px solid #dcdee5;
+  border-radius: 2px 2px 0 0;
+  gap: 16px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-key {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-item {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 24px;
+  font-size: 12px;
+  line-height: 16px;
+  min-width: fit-content;
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-item:last-child {
+  margin-right: 0;
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-item .label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a3b1cc;
+  background-color: #a3b1cc29;
+  border: 1px solid #a3b1cc4d;
+  border-radius: 2px;
+}
+
+/* 对齐 Vue：Enter / ↑↓ 实心灰底白字 */
+.sql-query-container .sql-query-header .ui-shortcut-item .label.bklog-arrow-down-filled,
+.sql-query-container .sql-query-header .ui-shortcut-item .label.bklog-enter-3 {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: #a3b1cc;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 12px;
+  border: none;
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-item .label.up {
+  margin-right: 2px;
+  transform: rotate(-180deg);
+}
+
+.sql-query-container .sql-query-header .ui-shortcut-item .value {
+  margin-left: 4px;
+  color: #4d4f56;
+}
+
+.sql-query-container .sql-query-header .direct-retrieve-item {
+  cursor: pointer;
+}
+
+.sql-query-container .sql-query-header .direct-retrieve-item .label {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: #a3b1cc;
+  border-radius: 2px;
+  font-size: 14px;
+  color: #fff;
+  border: none;
+}
+
+.sql-query-container .sql-query-header .direct-retrieve-item .value {
+  color: #63656e;
+}
+
+/* 对齐 Vue：AI 快捷键紫色胶囊 */
+.sql-query-container .sql-query-header .ai-shortcut-item .label {
+  height: 16px;
+  padding: 0 4px;
+  background: #8474f3;
+  border-radius: 2px;
+  color: #fff;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  gap: 0;
+}
+
+.sql-query-container .sql-query-header .ai-shortcut-item .label .bklog-icon,
+.sql-query-container .sql-query-header .ai-shortcut-item .label i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 12px;
+  height: 100%;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.sql-query-container .sql-query-header .ai-shortcut-item .value {
+  font-size: 12px;
+  color: #8474f3;
+}
+
+.sql-query-container .sql-syntax-link {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 100%;
+  margin-left: auto;
+  font-size: 12px;
+  color: #3a84ff;
+  cursor: pointer;
+}
+
+.sql-query-container .sql-syntax-link .fold-title-icon {
+  margin-left: 5px;
+  font-size: 16px;
+}
+
+.sql-query-options {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  /* 对齐 Vue 容器内覆盖：flex 子项可收缩；外层 .sql-field-list 保底 100px */
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  background: #fff;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-sizing: border-box;
+}
+
+.sql-query-options.is-loading {
+  min-height: 40px;
+}
+
+.sql-query-options .list-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  line-height: 32px;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.sql-query-options .list-item .item-type-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.sql-query-options .list-item .item-type-letter,
+.sql-query-options .list-item .item-type-icon .bklog-icon {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sql-query-options .list-item .item-text {
+  flex: 1;
+  min-width: 150px;
+  padding: 0 8px;
+  color: #63656e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-query-options .list-item .item-description {
+  flex: 2;
+  margin-left: 24px;
+  color: #979ba5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-query-options .list-item .item-callout {
+  padding: 0 4px;
+  color: #313238;
+  background-color: #f4f6fa;
+}
+
+.sql-query-options .list-item.active,
+.sql-query-options .list-item:hover,
+.sql-query-options .list-item.is-hover {
+  background: #f5f7fa;
+}
+
+.sql-query-options .list-item.active .item-text {
+  color: #313238;
+}
+
+.sql-query-options .list-item.active .item-callout {
+  background-color: #fff;
+}
+
+.sql-query-options .field-list-item .item-type-icon {
+  color: #b17313;
+  background: #fff6e6;
+}
+
+.sql-query-options .field-list-item:hover .item-type-icon,
+.sql-query-options .field-list-item.active .item-type-icon {
+  color: #313238;
+  background: #fce5c0;
+}
+
+.sql-query-options .value-list-item .item-type-icon {
+  color: #02776e;
+  background: #e6f2f1;
+}
+
+.sql-query-options .value-list-item:hover .item-type-icon,
+.sql-query-options .value-list-item.active .item-type-icon {
+  color: #010101;
+  background-color: #cce5e3;
+}
+
+.sql-query-options .continue-list-item .item-type-icon {
+  color: #7c609e;
+  background: #f3f1f8;
+}
+
+.sql-query-options .continue-list-item:hover .item-type-icon,
+.sql-query-options .continue-list-item.active .item-type-icon {
+  color: #000;
+  background-color: #e4cced;
+}
+
+.sql-query-options .colon-list-item .item-type-icon {
+  color: #016bb4;
+  background: #e6f0f8;
+}
+
+.sql-query-options .colon-list-item:hover .item-type-icon,
+.sql-query-options .colon-list-item.active .item-type-icon {
+  color: #000;
+  background-color: #cce1f0;
+}
+
+/* tippy 底部联想收藏（与工具栏 favorites 无关） */
+.sql-query-container .favorite-footer .favorite-query-list {
+  position: relative;
+  min-height: 95px;
+  max-height: 200px;
+  overflow: auto;
+  border-top: 1px solid #ecedf2;
+}
+
+.sql-query-container .favorite-footer .query-list-title {
+  padding: 0 12px;
+  margin-top: 7px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 22px;
+  color: #313238;
+}
+
+.sql-query-container .favorite-footer .query-list-title .count {
+  font-weight: bold;
+  color: #3a84ff;
+}
+
+.sql-query-container .favorite-footer .favorite-list {
+  margin-bottom: 8px;
+}
+
+.sql-query-container .favorite-footer .favorite-query-list.no-data .favorite-list {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 95px;
+  margin-bottom: 0;
+}
+
+.sql-query-container .favorite-footer .favorite-empty {
+  font-size: 12px;
+  color: #979ba5;
+}
+
+.sql-query-container .favorite-footer .list-item {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  line-height: 26px;
+  cursor: pointer;
+}
+
+.sql-query-container .favorite-footer .list-item .active {
+  font-size: 14px;
+  color: #ffb848;
+}
+
+.sql-query-container .favorite-footer .list-item-type {
+  min-width: 64px;
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #313238;
+  text-align: center;
+}
+
+.sql-query-container .favorite-footer .list-item-information {
+  margin: 0 8px;
+  font-family: 'Roboto Mono', Consolas, Menlo, Courier, monospace;
+  font-size: 12px;
+  color: #4d4f56;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-query-container .favorite-footer .list-item:hover {
+  background-color: #eaf3ff;
+}

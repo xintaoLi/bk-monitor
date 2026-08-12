@@ -1,0 +1,431 @@
+.ui-query-options {
+  background: #ffffff;
+  border-radius: 2px;
+}
+
+.ui-query-options .ui-query-option-content {
+  display: flex;
+  width: 800px;
+}
+
+.ui-query-options .field-list {
+  width: 359px;
+  border-right: solid 1px #dcdee5;
+  flex-shrink: 0;
+}
+
+.ui-query-options .ui-search-input {
+  width: 100%;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.ui-query-options .ui-search-input__native {
+  width: 100%;
+  height: 32px;
+  border: 0;
+  border-bottom: 1px solid #eaebf0;
+  outline: none;
+  font-size: 12px;
+  padding: 0 8px 0 28px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23979ba5' viewBox='0 0 16 16'%3E%3Cpath d='M11.5 10.5l3 3-1 1-3-3a5.5 5.5 0 111-1zm-4.5.5a4 4 0 100-8 4 4 0 000 8z'/%3E%3C/svg%3E")
+    8px center no-repeat;
+  box-sizing: border-box;
+}
+
+.ui-query-options .ui-search-result {
+  height: 315px;
+  overflow: auto;
+  overflow-x: hidden;
+}
+
+.ui-query-options .ui-search-result-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 300px;
+  max-width: 358px;
+  height: 32px;
+  padding: 0 8px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.ui-query-options .ui-search-result {
+  scrollbar-width: thin;
+  scrollbar-color: #c4c6cc transparent;
+}
+
+.ui-query-options .ui-search-result-row:hover:not(.active) {
+  background-color: #f0f5ff;
+}
+
+.ui-query-options .ui-search-result-row.active {
+  background-color: #f5f7fa;
+}
+
+.ui-query-options .ui-search-result-row:hover .field-alias,
+.ui-query-options .ui-search-result-row.active .field-alias {
+  color: #3a84ff;
+}
+
+.ui-query-options .field-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: #e8eaf0;
+  border-radius: 2px;
+  flex-shrink: 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.ui-query-options .field-type-icon.full-text {
+  position: relative;
+  background: #e8eaf0;
+}
+
+.ui-query-options .field-type-icon.full-text::before {
+  content: none;
+}
+
+.ui-query-options .field-type-icon.full-text::after {
+  content: '*';
+  font-size: 12px;
+  line-height: 14px;
+  color: #63656e;
+}
+
+.ui-query-options .ui-shortcut-item .bklog-arrow-down-filled.label {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: #a3b1cc;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 12px;
+  border: none;
+}
+
+.ui-query-options .ui-shortcut-item .bklog-arrow-down-filled.label.up {
+  margin-right: 2px;
+  transform: rotate(-180deg);
+}
+
+.ui-query-options .op-arrow {
+  margin-left: 4px;
+  font-size: 12px;
+  color: #979ba5;
+}
+
+.ui-value-select .ui-value-option.is-hover {
+  background: #f5f7fa;
+}
+
+.ui-query-options .display-container {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-query-options .field-alias {
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #313238;
+}
+
+.ui-query-options .field-name {
+  font-size: 12px;
+  line-height: 20px;
+  color: #757880;
+}
+
+.ui-query-options .ui-search-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: #979ba5;
+  font-size: 12px;
+}
+
+.ui-query-options .value-list {
+  width: calc(100% - 360px);
+  padding: 16px 24px 0 22px;
+  border-bottom: solid 1px #dcdee5;
+  box-sizing: border-box;
+  min-height: 331px;
+}
+
+.ui-query-options .value-list.is-full-text {
+  background: #fff;
+}
+
+.ui-query-options .full-text-title {
+  width: 100%;
+  height: 22px;
+  font-size: 14px;
+  line-height: 22px;
+  color: #313238;
+}
+
+.ui-query-options .full-text-content {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #63656e;
+}
+
+.ui-query-options .ui-value-search-textarea {
+  width: 100%;
+  height: 220px;
+  margin-top: 12px;
+  border: 1px solid #c4c6cc;
+  border-radius: 2px;
+  padding: 8px;
+  font-size: 12px;
+  resize: none;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.ui-query-options .ui-value-row {
+  margin-bottom: 20px;
+}
+
+.ui-query-options .ui-value-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 20px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #4d4f56;
+}
+
+.ui-query-options .ui-value-clear-btn {
+  border: 0;
+  background: transparent;
+  color: #ea3636;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ui-query-options .ui-value-operator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #63656e;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #c4c6cc;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.ui-query-options .operator-content {
+  max-width: 300px;
+  overflow: hidden;
+  color: #f59500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-query-options .op-arrow {
+  color: #979ba5;
+  font-size: 12px;
+}
+
+.condition-value-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  background: #ffffff;
+  border: 1px solid #c4c6cc;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.condition-value-container.is-focus {
+  border-color: #2c77f4;
+}
+
+.condition-value-input .tag-item.tag-validate-error {
+  border: 1px dashed #ea3636;
+  background: #fff5f5;
+}
+
+.condition-value-input .tag-item-edit {
+  min-width: 80px;
+  height: 20px;
+  border: 0;
+  outline: none;
+  font-size: 12px;
+  resize: none;
+  background: transparent;
+}
+
+.ui-value-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-value-error {
+  margin: -8px 0 12px;
+  font-size: 12px;
+  color: #ea3636;
+}
+
+.ui-query-options .op-arrow.is-up {
+  transform: rotate(-180deg);
+}
+
+.ui-btn-opts .save-btn.is-disabled,
+.ui-btn-opts .save-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-query-options.is-fuzzy-match .ui-query-option-content {
+  width: 1000px;
+  max-width: calc(100vw - 48px);
+}
+
+.condition-value-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  max-height: 90px;
+  margin: 0;
+  padding: 2px 4px;
+  overflow: auto;
+  list-style: none;
+  box-sizing: border-box;
+}
+
+.condition-value-container.is-focus .condition-value-input {
+  max-height: 300px;
+}
+
+.condition-value-input .tag-item {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  margin: 2px;
+  padding: 0 4px 0 8px;
+  background: #f0f1f5;
+  border-radius: 2px;
+  font-size: 12px;
+  color: #63656e;
+}
+
+.condition-value-input .tag-item-del {
+  margin-left: 4px;
+  cursor: pointer;
+  color: #979ba5;
+}
+
+.condition-value-input .no-selected-tag-item {
+  background: transparent;
+  padding: 0;
+  height: 24px;
+}
+
+.condition-value-input .tag-option-focus-input {
+  min-width: 0;
+  height: 22px;
+  border: 0;
+  outline: none;
+  font-size: 12px;
+  background: transparent;
+}
+
+.ui-value-relation {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #63656e;
+}
+
+.ui-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.ui-query-option-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding-right: 24px;
+  padding-left: 8px;
+  background: #fafbfd;
+  box-shadow: 0 -1px 0 0 #dcdee5;
+  border-radius: 0 0 2px 2px;
+  box-sizing: border-box;
+}
+
+.ui-shortcut-key {
+  display: flex;
+  align-items: center;
+}
+
+.ui-shortcut-item {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 16px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.ui-shortcut-item .label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a3b1cc;
+  background-color: #a3b1cc29;
+  border: 1px solid #a3b1cc4d;
+  border-radius: 2px;
+}
+
+.ui-shortcut-item .value {
+  margin-left: 4px;
+  color: #7a8599;
+}
+
+.ui-btn-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-btn-opts .save-btn {
+  min-width: 142px;
+}
+
+.ui-btn-opts .cancel-btn {
+  min-width: 64px;
+}
+
+/* legacy simple list unused but keep fuzzy helpers */
+.bklog-sib-fuzzy {
+  border-top: 1px solid #dcdee5;
+  padding: 8px 12px;
+}

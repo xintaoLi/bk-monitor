@@ -1,0 +1,61 @@
+@font-face {
+  font-family: 'bklog';
+  src:
+    url('./fonts/iconcool.woff') format('woff'),
+    url('./fonts/iconcool.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.bklog-icon {
+  font-family: 'bklog' !important;
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.bklog-eye:before { content: '\e197'; }
+.bklog-eye-slash:before { content: '\e198'; }
+.bklog-shoudongchaxun:before { content: '\e149'; }
+.bklog-star-line:before { content: '\e194'; }
+.bklog-zanting:before { content: '\e17a'; }
+.bklog-circle-alert-filled:before { content: '\e1d8'; }
+.bklog-setting:before { content: '\e196'; }
+.bklog-qingkong:before { content: '\e1ba'; }
+.bklog-qiehuan-2:before { content: '\e1bd'; }
+.bklog-shanchu:before { content: '\e1e5'; }
+.bklog-copy-4:before { content: '\e1e6'; }
+.bklog-yuju1:before { content: '\e1ed'; }
+.bklog-ui1:before { content: '\e1ee'; }
+
+/*
+ * 以下类名 DOM 已预留，glyph 待补充（见包根目录 font-icons.todo）
+ * 临时用 ASCII fallback，避免空白占位塌陷
+ */
+.bklog-arrow-down-filled:before { content: '▾'; font-family: inherit; }
+.bklog-enter-3:before { content: '↵'; font-family: inherit; }
+.bklog-command:before { content: '⌘'; font-family: inherit; }
+.bklog-ctrl:before { content: '⌃'; font-family: inherit; }
+.bklog-plus:before { content: '+'; font-family: inherit; }
+.bklog-unkown:before { content: '?'; font-family: inherit; font-size: 10px; }
+.bklog-number-2:before { content: 'N'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-str-2:before { content: 'S'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-text-2:before { content: 'T'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-time-2:before { content: 'D'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-buer-2:before { content: 'B'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-ext-2:before { content: 'E'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-object-2:before { content: 'O'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-fllatend:before { content: 'F'; font-family: inherit; font-size: 9px; font-weight: 700; }
+.bklog-field:before { content: 'F'; font-family: inherit; font-size: 10px; font-weight: 700; }
+.bklog-value:before { content: 'V'; font-family: inherit; font-size: 10px; font-weight: 700; }
+.bklog-equal:before { content: '='; font-family: inherit; font-size: 10px; font-weight: 700; }
+.bklog-and:before { content: '&'; font-family: inherit; font-size: 10px; font-weight: 700; }
+.bklog-jump:before { content: '↗'; font-family: inherit; }
+.bklog-table-2:before { content: '▤'; font-family: inherit; }

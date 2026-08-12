@@ -1,0 +1,111 @@
+/* 对齐 Vue sql-query.vue / ui-input tippy：外层无边框，边框由内容容器承担 */
+[data-tippy-root] .tippy-box[data-theme~='log-light'] {
+  color: #63656e;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-light'] .tippy-content {
+  padding: 0;
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-light'] .tippy-arrow {
+  color: #fff;
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-light'] .ui-query-options {
+  border-radius: 2px;
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-light'] .ui-query-options .ui-query-option-footer {
+  border-radius: 0 0 2px 2px;
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-dark'] {
+  color: #fff;
+  background-color: #4d4f56;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.2);
+}
+
+[data-tippy-root] .tippy-box[data-theme~='log-dark'] .tippy-content {
+  padding: 4px 8px;
+}
+
+.ui-value-select {
+  width: 100%;
+  min-width: 100%;
+  max-height: 200px;
+  overflow: auto;
+  font-size: 12px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* 条件下拉挂 body：取消默认 max-width，保证与触发器同宽左对齐 */
+[data-tippy-root] .tippy-box[data-theme~='log-light']:has(.ui-value-select) {
+  max-width: none !important;
+}
+
+/* SQL 联想面板随编辑器宽度 */
+[data-tippy-root] .tippy-box[data-theme~='log-light']:has(.sql-query-container) {
+  max-width: none !important;
+}
+
+.ui-value-select .ui-value-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.ui-value-select .ui-value-option:not(.active):hover {
+  background: #f5f7fa;
+}
+
+.ui-value-select .ui-value-option.active {
+  color: #3a84ff;
+  background: #e1ecff;
+}
+
+.condition-value-options {
+  display: inline-flex;
+  flex-direction: column;
+  width: 314px;
+  min-height: 20px;
+  max-height: 300px;
+  overflow: auto;
+  font-size: 12px;
+  background: #fff;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.condition-value-options li {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.condition-value-options li:hover,
+.condition-value-options li.is-hover {
+  background: #f0f5ff;
+}
+
+.condition-value-options li.active {
+  color: #3a84ff;
+}
+
+.condition-value-options li.is-custom-tag {
+  color: #3a84ff;
+}

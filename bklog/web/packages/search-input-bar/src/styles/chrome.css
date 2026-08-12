@@ -1,0 +1,327 @@
+:root {
+  --bklog-v3-row-lbl-font: 'Roboto', 'PingFang SC', 'Microsoft Yahei', sans-serif;
+  --bklog-v3-row-ctx-font: 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+  --bklog-v3-row-tag-font: 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+  /*
+   * 三种模式统一高度（对齐 Vue retrieve-v2/search-bar）：
+   * - min 48px：.search-bar-container / .search-input / .search-options
+   * - max 135px：UI ul.search-items max-height（语句/AI 内容区同步，超高内部滚动）
+   */
+  --bklog-sib-input-min-height: 48px;
+  --bklog-sib-input-max-height: 135px;
+}
+
+.bklog-sib-host {
+  display: block;
+  width: 100%;
+  /* 对齐 Vue src/scss/reset.scss：全局 border-box，否则 UI tag height:40 + padding 会变成 48，整栏 56≠SQL 48 */
+  box-sizing: border-box;
+}
+
+.bklog-sib-host *,
+.bklog-sib-host *::before,
+.bklog-sib-host *::after {
+  box-sizing: border-box;
+}
+
+.bklog-sib-root {
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 2px 4px 0 rgba(25, 25, 41, 0.078);
+}
+
+.bklog-sib-root--log-platform {
+  box-shadow: none;
+}
+
+.bklog-sib-root--log-platform .bklog-sib-container {
+  border: 1px solid #c1cde5;
+  border-radius: 4px;
+}
+
+.bklog-sib-root--log-platform .bklog-sib-mode-toggle {
+  border-right: 1px solid #c1cde5;
+  border-radius: 4px 0 0 4px;
+}
+
+.bklog-sib-root--log-platform .bklog-sib-input {
+  border-radius: 0 4px 4px 0;
+}
+
+.bklog-sib-root--log-platform .bklog-sib-query {
+  width: 74px;
+  max-width: 74px;
+  border-radius: 4px;
+  margin-left: 12px;
+  overflow: hidden;
+}
+
+.bklog-sib-root--trace {
+  box-shadow: none;
+}
+
+.bklog-sib-root--trace .bklog-sib-container {
+  border: 1px solid #dcdee5;
+  border-right: none;
+}
+
+.bklog-sib-root.is-ai-mode {
+  box-shadow: none;
+}
+
+.bklog-sib-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.bklog-sib-container {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-width: 0;
+  min-height: var(--bklog-sib-input-min-height);
+  max-height: var(--bklog-sib-input-max-height);
+  background-color: #fff;
+  border-radius: 2px;
+}
+
+.bklog-sib-container.set-border {
+  border-bottom: 1px solid #dcdee5;
+}
+
+.bklog-sib-mode-toggle {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 82px;
+  min-height: var(--bklog-sib-input-min-height);
+  cursor: pointer;
+  border: 0;
+  border-right: solid 1px #dcdee5;
+  background: #fff;
+  /* 对齐 Vue .search-options：无左右 padding，避免「语句模式」+ 图标被挤换行 */
+  padding: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.bklog-sib-mode-toggle .mode-text {
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #313238;
+  white-space: nowrap;
+}
+
+.bklog-sib-mode-toggle .mode-icon {
+  display: none;
+}
+
+.bklog-sib-mode-toggle .bklog-qiehuan-2 {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: #4d4f56;
+  font-size: 14px;
+}
+
+.bklog-sib-mode-toggle:hover .mode-text,
+.bklog-sib-mode-toggle:hover .bklog-qiehuan-2 {
+  color: #3a84ff;
+}
+
+.bklog-sib-mode-toggle.is-hidden {
+  display: none;
+}
+
+.bklog-sib-input {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  width: 100%;
+  min-height: var(--bklog-sib-input-min-height);
+  max-height: var(--bklog-sib-input-max-height);
+  min-width: 0;
+  background: #ffffff;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bklog-sib-input.disabled::after {
+  position: absolute;
+  inset: 0;
+  cursor: not-allowed;
+  content: '';
+}
+
+.bklog-sib-input-section {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-width: 0;
+  min-height: var(--bklog-sib-input-min-height);
+  max-height: var(--bklog-sib-input-max-height);
+  overflow: hidden;
+}
+
+.bklog-sib-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  align-self: center;
+  color: #4d4f56;
+  flex-shrink: 0;
+  padding-right: 4px;
+}
+
+.bklog-sib-tools > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  font-size: 18px;
+  color: #4d4f56;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.bklog-sib-tools > div:hover {
+  background: #eaebf0;
+}
+
+.bklog-sib-tools > div.is-focused {
+  color: #3a84ff;
+  background: #e1ecff;
+}
+
+.bklog-sib-tools > div.disabled {
+  color: #dcdee5;
+  cursor: not-allowed;
+}
+
+.bklog-sib-tools .bklog-star-line {
+  font-size: 20px;
+}
+
+.bklog-sib-query {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  align-self: stretch;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  min-height: var(--bklog-sib-input-min-height);
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  background-color: #3a84ff;
+  border-radius: 0 2px 2px 0;
+  overflow: hidden;
+}
+
+.bklog-sib-query-btn {
+  width: 100%;
+  height: 100%;
+  min-height: var(--bklog-sib-input-min-height);
+  border: 0;
+  border-radius: inherit;
+  background: #3a84ff;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bklog-sib-query-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bklog-sib-query-btn > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.bklog-sib-query-btn .bklog-icon {
+  font-size: 14px;
+}
+
+.bklog-sib-query-btn span {
+  font-size: 14px;
+}
+
+.bklog-sib-ai-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background-image: linear-gradient(90deg, #ffffff 0%, #deb2f3 63%, #7c90e1 100%);
+  border-radius: 2px;
+  animation: bklog-sib-ai-progress 2s linear infinite;
+  display: none;
+}
+
+.bklog-sib-ai-progress.is-show {
+  display: block;
+}
+
+@keyframes bklog-sib-ai-progress {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.bklog-sib-below {
+  width: 100%;
+}
+
+.bklog-sib-below:empty {
+  display: none;
+}
+
+.bklog-sib-slot:empty {
+  display: none;
+}
+
+.bklog-sib-slot--toolbar-extra:not(:empty),
+.bklog-sib-slot--favorites:not(:empty) {
+  display: inline-flex;
+  align-items: center;
+}
+
+.bklog-sib-popover {
+  min-width: 240px;
+  max-width: 820px;
+  max-height: 420px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #dcdee5;
+  border-radius: 2px;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.16);
+  padding: 0;
+  z-index: 5000;
+}
+
+@media (max-width: 1366px) {
+  .bklog-sib-mode-toggle .mode-text {
+    display: none;
+  }
+
+  .bklog-sib-mode-toggle .mode-icon {
+    display: inline-block;
+    font-size: 16px;
+    color: #4d4f56;
+  }
+
+  .bklog-sib-mode-toggle:hover .mode-icon {
+    color: #3a84ff;
+  }
+}
