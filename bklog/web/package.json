@@ -25,6 +25,7 @@
     "aafe:run": "aafe run"
   },
   "dependencies": {
+    "@aafe/ai-test": "^0.0.1",
     "@babel/helper-module-imports": "7.24.7",
     "@babel/runtime": "7.26.10",
     "@blueking/ai-blueking": "1.3.0-beta.2",

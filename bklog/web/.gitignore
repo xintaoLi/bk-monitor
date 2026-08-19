@@ -97,3 +97,10 @@ local.cookie
 test
 output
 .session_tmps
+.ui-ai/
+.AITestEnv
+.AITestEnv.*
+.playwright
+.agents/
+tests/*
+skills-*
