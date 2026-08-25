@@ -59,6 +59,7 @@ import ConfigurationItemList from '../business-comp/step2/container-collection/c
 import { HOST_COLLECTION_CONFIG, initContainerConfig } from './defaultConfig'; // 默认配置
 import IndexConfigImportDialog from '../business-comp/step2/index-config-import-dialog';
 import $http from '@/api'; // API请求封装
+import { isCollectionEditRoute } from './route-utils';
 
 import './step2-configuration.scss'; // 样式文件
 
@@ -226,9 +227,9 @@ export default defineComponent({
      */
     const isUpdate = computed(
       () =>
-        !isClone.value &&
-        ((route.name === 'collectEdit' && props.isEdit) ||
-          (route.name === 'collectAdd' && !!formData.value?.collector_config_id)),
+        !isClone.value
+        && ((isCollectionEditRoute(route.name) && props.isEdit)
+          || (route.name === 'collectAdd' && !!formData.value?.collector_config_id)),
     );
     /**
      * 是否为采集主机日志
@@ -1048,22 +1049,36 @@ export default defineComponent({
             </div>
             <div class='label-form-box'>
               <span class='label-title'>{t('采集范围')}</span>
-              <bk-radio-group
-                class='form-box'
-                value={formData.value.params.tail_files}
-                on-change={val => {
-                  isConfigChange.value = true;
-                  formData.value.params.tail_files = val;
+              <span
+                class='form-box tail-files-radio-wrap'
+                v-bk-tooltips={{
+                  content: t('仅新创建采集项支持选择采集范围'),
+                  placement: 'top',
+                  disabled: !isUpdate.value,
                 }}
               >
-                <bk-radio
-                  class='mr-24'
-                  value={true}
+                <bk-radio-group
+                  value={formData.value.params.tail_files}
+                  on-change={val => {
+                    isConfigChange.value = true;
+                    formData.value.params.tail_files = val;
+                  }}
                 >
-                  {t('仅采集下发后的日志')}
-                </bk-radio>
-                <bk-radio value={false}>{t('采集全量日志')}</bk-radio>
-              </bk-radio-group>
+                  <bk-radio
+                    class='mr-24'
+                    value={true}
+                    disabled={isUpdate.value}
+                  >
+                    {t('仅采集下发后的日志')}
+                  </bk-radio>
+                  <bk-radio
+                    value={false}
+                    disabled={isUpdate.value}
+                  >
+                    {t('采集全量日志')}
+                  </bk-radio>
+                </bk-radio-group>
+              </span>
             </div>
             <div class='label-form-box large-width'>
               <span class='label-title no-require'>{t('日志过滤')}</span>
@@ -1088,6 +1103,7 @@ export default defineComponent({
                   data={formData.value.configs}
                   scenarioId={props.scenarioId}
                   logType={logType.value}
+                  isEdit={isUpdate.value}
                   on-change={(data: IContainerConfigItem[]) => {
                     isConfigChange.value = true;
                     formData.value.configs = data;
@@ -1598,6 +1614,7 @@ export default defineComponent({
             showDialog={showMultilineRegDialog.value}
             on-cancel={handleCancelMultilineReg}
             on-update={(val: string) => {
+              isConfigChange.value = true;
               formData.value.params.multiline_pattern = val;
             }}
           />
