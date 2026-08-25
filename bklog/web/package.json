@@ -25,6 +25,7 @@
     "aafe:run": "aafe run"
   },
   "dependencies": {
+    "@aafe/ai-test": "^0.0.1",
     "@babel/helper-module-imports": "7.24.7",
     "@babel/runtime": "7.26.10",
     "@blueking/ai-blueking": "1.3.0-beta.2",
@@ -115,7 +116,7 @@
     "webpack-sources": "3.2.3"
   },
   "devDependencies": {
-    "@aafe/agent-runtime": "^0.1.16",
+    "@aafe/agent-runtime": "^0.2.11",
     "@biomejs/biome": "^2.1.4",
     "@blueking/bkui-lint": "0.0.3",
     "@commitlint/cli": "19.2.1",
