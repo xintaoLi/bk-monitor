@@ -127,6 +127,11 @@ export default defineComponent({
       type: Array as PropType<string[]>,
       default: () => [],
     },
+    /** 列宽缓存（key -> 像素宽度），覆盖列配置默认宽度 */
+    columnWidths: {
+      type: Object as PropType<Record<string, number>>,
+      default: () => ({}),
+    },
     readonly: {
       type: Boolean,
       default: false,
@@ -190,6 +195,7 @@ export default defineComponent({
     headerSelect: (_type: SelectTypeEnum) => true,
     rowCheck: (_id: string, _checked: boolean) => true,
     columnsChange: (_cols: string[]) => true,
+    columnResize: (_widths: Record<string, number>) => true,
     selectIpCell: (_row: IHostListRow) => true,
     ipMark: (_row: IHostListRow) => true,
     processClick: (_row: IHostListRow, _processId: string) => true,
@@ -494,6 +500,9 @@ export default defineComponent({
       if (props.metricLoading && !row.alarm_count) {
         return <div class='host-table-skeleton' />;
       }
+      if (row.alarm_count == null) {
+        return <span>--</span>;
+      }
       const hasAlarm = !!row.totalAlarmCount;
       return (
         <span
@@ -503,7 +512,7 @@ export default defineComponent({
           onMouseenter={props.readonly ? undefined : e => hasAlarm && handleUnresolveEnter(row, e)}
           onMouseleave={props.readonly ? undefined : () => hasAlarm && handleUnresolveLeave()}
         >
-          {row.totalAlarmCount >= 0 ? row.totalAlarmCount : '--'}
+          {row.totalAlarmCount ?? '--'}
         </span>
       );
     };
@@ -530,6 +539,9 @@ export default defineComponent({
     };
 
     const renderProcessCell = (row: IHostListRow) => {
+      if (row.component == null) {
+        return <span class='host-table-process__empty'>--</span>;
+      }
       const components = row.component || [];
       return (
         <TagOverflow
@@ -611,7 +623,7 @@ export default defineComponent({
         colKey: config.id,
         title,
         minWidth: config.minWidth,
-        width: config.width,
+        width: props.columnWidths[config.id] || config.width,
         sorter: config.sortable,
         ellipsis: false,
         fixed: config.fixed,
@@ -721,6 +733,9 @@ export default defineComponent({
             size='small'
             sort={tableSort.value}
             tableLayout='fixed'
+            onColumnResizeChange={(ctx: { columnsWidth: Record<string, number> }) =>
+              emit('columnResize', ctx.columnsWidth)
+            }
             // @ts-expect-error
             onDisplayColumnsChange={(cols: string[]) => emit('columnsChange', cols)}
             onSortChange={handleSortChange}

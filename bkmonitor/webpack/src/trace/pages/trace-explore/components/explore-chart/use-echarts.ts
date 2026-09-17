@@ -30,7 +30,7 @@ import dayjs from 'dayjs';
 import { CancelToken } from 'monitor-api/cancel';
 import { random } from 'monitor-common/utils';
 import { arraysEqual } from 'monitor-common/utils/equal';
-import { COLOR_LIST_BAR } from 'monitor-ui/chart-plugins/constants/charts';
+import { COLOR_LIST, COLOR_LIST_BAR } from 'monitor-ui/chart-plugins/constants/charts';
 import { getValueFormat } from 'monitor-ui/monitor-echarts/valueFormats/valueFormats';
 
 import { DEFAULT_TIME_RANGE, handleTransformToTimestamp } from '../../../../components/time-range/utils';
@@ -45,6 +45,7 @@ import {
   mergeOverlappingArrays,
   processLineSymbols,
 } from './utils';
+import { withEmbedQuery } from '@/common/embed-context';
 import { resolveVariables } from '@/pages/host/components/dashbords/variables/resolve';
 
 import type { EchartSeriesItem, FormatterFunc, SeriesItem } from './types';
@@ -358,6 +359,7 @@ export const createYAxis = (yData: EchartSeriesItem[], type?: string) => {
 };
 export const createOptions = (xAxis, yAxis, series, customOptions?: CustomOptions['options']) => {
   const hasShowSymbol = series.some(item => item.showSymbol);
+  const hasBarChart = series.some(item => item.type === 'bar');
   const options = {
     useUTC: false,
     animation: hasShowSymbol,
@@ -369,7 +371,7 @@ export const createOptions = (xAxis, yAxis, series, customOptions?: CustomOption
       text: '',
       show: false,
     },
-    color: COLOR_LIST_BAR,
+    color: hasBarChart ? COLOR_LIST_BAR : COLOR_LIST,
     legend: {
       show: false,
     },
@@ -464,6 +466,7 @@ export const useEcharts = ({
   /** 图表id，每次重新请求会修改该值 */
   const chartId = shallowRef(random(8));
   const timeRange = inject('timeRange', DEFAULT_TIME_RANGE);
+  const timezone = inject('timezone', '');
   const timeOffset = inject('timeOffset', []);
   const refreshImmediate = inject('refreshImmediate');
   const { applyPeakMarkPoint, watchHighlightPeak } = useChartViewOption();
@@ -626,20 +629,10 @@ export const useEcharts = ({
       if (downSampleRangeComputed) {
         resultParams.down_sample_range = downSampleRangeComputed([resultParams.start_time, resultParams.end_time]);
       }
-      // #if IS_APM_MONITOR
+      // 告警趋势图与告警中心服务层同一查询口径：被宿主嵌入时收敛到宿主的业务与过滤范围
       if (target.apiFunc === 'alertDateHistogram') {
-        if (resultParams.bk_biz_ids) {
-          resultParams.bk_biz_ids = [window.bk_biz_id];
-        }
-        if (resultParams.query_string) {
-          // 语句模式
-          resultParams.query_string = `(${resultParams.query_string}) AND ${window.APM_QUERY_STRING || ''}`;
-        } else {
-          // ui 模式
-          resultParams.query_string = window.APM_QUERY_STRING || '';
-        }
+        Object.assign(resultParams, withEmbedQuery(resultParams));
       }
-      // #endif
       return $api[target.apiModule]
         [target.apiFunc](resultParams, {
           cancelToken: new CancelToken((cb: () => void) => cancelTokens.push(cb)),
@@ -735,6 +728,7 @@ export const useEcharts = ({
   watch(
     [
       () => toValue(timeRange),
+      () => toValue(timezone),
       () => toValue(refreshImmediate),
       () => toValue(panel),
       () => toValue(params),

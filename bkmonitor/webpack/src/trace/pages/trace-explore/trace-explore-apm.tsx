@@ -43,13 +43,14 @@
  *   4. 同时 provide handleExploreChartZoomChange 供图表子组件使用
  *   5. 管理 window.APM_QUERY_STRING 的生命周期
  */
-import { defineComponent, inject, provide, watch } from 'vue';
-
-import type { IWhereItem, EMode } from '../../components/retrieval-filter/typing';
-import type { TimeRangeType } from '../../components/time-range/utils';
-import { useTraceExploreStore } from '@/store/modules/explore';
+import { defineComponent, inject, onBeforeUnmount, provide, watch } from 'vue';
 
 import TraceExplore from './trace-explore';
+import { clearEmbedContext, setEmbedContext } from '@/common/embed-context';
+import { useTraceExploreStore } from '@/store/modules/explore';
+
+import type { EMode, IWhereItem } from '../../components/retrieval-filter/typing';
+import type { TimeRangeType } from '../../components/time-range/utils';
 
 /**
  * TraceExplore 消费的 APM 专属回调接口。
@@ -61,10 +62,10 @@ import TraceExplore from './trace-explore';
 export interface TraceExploreApmHooks {
   /** UI 检索条件（where）变更时回调，将新的条件列表通知宿主 */
   onConditionChange?: (condition: IWhereItem[]) => void;
-  /** 查询语句变更时回调，将新的查询字符串通知宿主 */
-  onQueryStringChange?: (queryString: string) => void;
   /** 筛选模式（UI / 语句）变更时回调，将新的模式通知宿主 */
   onFilterModeChange?: (mode: EMode) => void;
+  /** 查询语句变更时回调，将新的查询字符串通知宿主 */
+  onQueryStringChange?: (queryString: string) => void;
   /** Trace / Span 详情侧边窗关闭时回调，通知宿主清空 slideDetail */
   onSliderClose?: () => void;
 }
@@ -85,6 +86,10 @@ export default defineComponent({
     const bridgeProps = inject(BRIDGE_PROPS_KEY, {} as Record<string, any>);
     const bridgeEmit = inject(BRIDGE_EMIT_KEY, (() => {}) as (event: string, ...args: unknown[]) => void);
 
+    /** 声明「已被宿主嵌入」：详情链接前缀、查询口径等差异据此在运行时判定 */
+    setEmbedContext({ bizId: Number(window.bk_biz_id) });
+    onBeforeUnmount(clearEmbedContext);
+
     const handleExploreChartZoomChange = (v: [number, number]) => {
       bridgeEmit('exploreChartZoomChange', v);
     };
@@ -98,6 +103,9 @@ export default defineComponent({
         exploreStore.updateRefreshImmediate(bridgeProps.refreshImmediate as string);
         exploreStore.updateRefreshInterval(Number(bridgeProps.refreshInterval));
         exploreStore.updateTimeRange(bridgeProps.timeRange as TimeRangeType);
+        if (bridgeProps.timezone) {
+          exploreStore.updateTimezone(bridgeProps.timezone as string);
+        }
       },
       {
         immediate: true,

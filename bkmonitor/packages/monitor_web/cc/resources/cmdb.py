@@ -36,9 +36,13 @@ def topo_tree(bk_biz_id):
     return to_dict(result)
 
 
-def _build_host_target_filter(bk_biz_id: int, hosts: list[Host]) -> dict:
-    """按主机身份构造 UQ 目标过滤条件。"""
-    if not hosts:
+def _build_host_target_filter(bk_biz_id: int, hosts: list[Host], push_host_target: bool = True) -> dict:
+    """按主机身份构造 UQ 目标过滤条件。
+
+    全量业务路径传 push_host_target=False，返回空 target，避免把上万 host 编进 statement。
+    hosts 仍由调用方用于身份映射和白名单，不能靠传空 hosts 来跳过 target。
+    """
+    if not push_host_target or not hosts:
         return {}
     if is_ipv6_biz(bk_biz_id):
         return {"targets": [{"bk_host_id": sorted(str(host.bk_host_id) for host in hosts)}]}
@@ -65,6 +69,7 @@ def get_agent_status(
     start_time: int = None,
     end_time: int = None,
     fail_on_incomplete: bool = False,
+    push_host_target: bool = True,
 ) -> dict[int, int]:
     """
     :summary 获取主机Agent状态及数据状态
@@ -74,6 +79,7 @@ def get_agent_status(
                       是否有数据上报来判定 Agent 状态，跳过 node_man 实时查询（历史场景无意义）。
     :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）。不传或仅传一个时退化为默认"最近三分钟"实时查询。
     :param fail_on_incomplete: UQ 返回部分结果时是否抛出异常。默认保持历史降级行为。
+    :param push_host_target: 是否把 hosts 下推为 UQ target。全量业务路径传 False。
     :return {bk_host_id: AGENT_STATUS}
     """
     if not hosts:
@@ -95,7 +101,7 @@ def get_agent_status(
         metrics=[{"field": "usage", "method": "AVG", "alias": "A"}],
         table="system.cpu_summary",
         group_by=["bk_host_id", "bk_target_ip", "bk_target_cloud_id"],
-        filter_dict=_build_host_target_filter(bk_biz_id, hosts),
+        filter_dict=_build_host_target_filter(bk_biz_id, hosts, push_host_target=push_host_target),
     )
     query = UnifyQuery(data_sources=[data_source], bk_biz_id=bk_biz_id, expression="a")
     if is_historical:
@@ -108,6 +114,8 @@ def get_agent_status(
     records = query.query_data(start_time=query_start, end_time=query_end, instant=True)
     if fail_on_incomplete and query.is_partial:
         raise RuntimeError("unify query returned partial data for agent status")
+    if query.is_partial:
+        logger.warning("unify query returned partial data for agent status, keep available records")
 
     # 统计已经存在数据的主机并设置状态为正常
     ip_to_host_id: dict[tuple, int] = {
@@ -132,10 +140,11 @@ def get_agent_status(
 
     if is_historical:
         # 历史查询：node_man 只提供实时 Agent 存活状态，对历史时间段无意义；
-        # 改为依赖 TSDB 数据上报推断：历史窗口内有数据 → ON；无数据 → NO_DATA
+        # 改为依赖 TSDB 数据上报推断：历史窗口内有数据 → ON；完整结果无数据 → NO_DATA。
+        # UQ partial 时无法证明缺失主机确实无数据，因此保留 UNKNOWN。
         for host in hosts:
             if host.bk_host_id not in status:
-                status[host.bk_host_id] = AGENT_STATUS.NO_DATA
+                status[host.bk_host_id] = AGENT_STATUS.UNKNOWN if query.is_partial else AGENT_STATUS.NO_DATA
         return status
 
     # 后续只查询没数据的主机
@@ -145,33 +154,44 @@ def get_agent_status(
     pool = ThreadPool()
     futures = []
     for index in range(0, len(host_list), 1000):
+        batch = host_list[index : index + 1000]
         futures.append(
-            pool.apply_async(
-                api.node_man.ipchooser_host_detail,
-                kwds={
-                    "host_list": host_list[index : index + 1000],
-                    "scope_list": scope_list,
-                    "agent_realtime_state": True,
-                },
+            (
+                pool.apply_async(
+                    api.node_man.ipchooser_host_detail,
+                    kwds={
+                        "host_list": batch,
+                        "scope_list": scope_list,
+                        "agent_realtime_state": True,
+                    },
+                ),
+                {item["host_id"] for item in batch},
             )
         )
     pool.close()
     pool.join()
     result = []
-    for future in futures:
+    failed_host_ids = set()
+    for future, batch_host_ids in futures:
         try:
             result.extend(future.get())
         except Exception as e:
             logger.error("get_agent_status error: %s", e)
+            failed_host_ids.update(batch_host_ids)
 
     for info in result:
         host_id = info["host_id"]
         if info["alive"] == 1:
-            status[host_id] = AGENT_STATUS.NO_DATA
+            # UQ partial 时只能确认 Agent 存活，不能据此断言该主机没有数据上报。
+            status[host_id] = AGENT_STATUS.UNKNOWN if query.is_partial else AGENT_STATUS.NO_DATA
+        else:
+            status[host_id] = AGENT_STATUS.NOT_EXIST
 
     for host in hosts:
         if host.bk_host_id not in status:
-            status[host.bk_host_id] = AGENT_STATUS.NOT_EXIST
+            status[host.bk_host_id] = (
+                AGENT_STATUS.UNKNOWN if host.bk_host_id in failed_host_ids else AGENT_STATUS.NOT_EXIST
+            )
 
     return status
 
@@ -202,6 +222,7 @@ def get_process_info(
     start_time: int = None,
     end_time: int = None,
     fail_on_incomplete: bool = False,
+    push_host_target: bool = True,
 ) -> dict[int, list[dict]]:
     """
     :summary 通过主机ID列表获取主机进程信息
@@ -211,6 +232,7 @@ def get_process_info(
     :param start_time: 查询起始时间（秒级 Unix 时间戳，可选），用于限定进程存活状态的判定窗口
     :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）。不传时退化为默认"最近三分钟"。
     :param fail_on_incomplete: UQ 返回部分结果时是否抛出异常。默认保持历史降级行为。
+    :param push_host_target: 是否把 hosts 下推为 UQ target。全量业务路径传 False。
     :return: 以 bk_host_id 为 key 的进程信息字典，value 为该主机下的进程实例列表
         e.g.:
             {
@@ -231,6 +253,9 @@ def get_process_info(
             }
 
     """
+    if not hosts:
+        return {}
+
     pp_info = defaultdict(list)
 
     # 如果只有一台机器，可以直接使用bk_host_id参数进行检索
@@ -243,7 +268,12 @@ def get_process_info(
 
     # 查询进程状态数据
     statuses: dict[int, dict[str, int]] = get_process_status(
-        bk_biz_id, hosts, start_time, end_time, fail_on_incomplete=fail_on_incomplete
+        bk_biz_id,
+        hosts,
+        start_time,
+        end_time,
+        fail_on_incomplete=fail_on_incomplete,
+        push_host_target=push_host_target,
     )
 
     bk_host_ids = {host.bk_host_id for host in hosts}
@@ -286,6 +316,7 @@ def get_process_status(
     start_time: int = None,
     end_time: int = None,
     fail_on_incomplete: bool = False,
+    push_host_target: bool = True,
 ) -> dict[int, dict[str, int]]:
     """
     查询进程状态，1为存活
@@ -295,6 +326,7 @@ def get_process_status(
     :param start_time: 查询起始时间（秒级 Unix 时间戳，可选）
     :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）。不传时退化为默认"最近三分钟"。
     :param fail_on_incomplete: UQ 返回部分结果时是否抛出异常。默认保持历史降级行为。
+    :param push_host_target: 是否把 hosts 下推为 UQ target。全量业务路径传 False。
     """
     result = defaultdict(dict)
     for bk_host_id, display_name, value in _query_proc_metrics(
@@ -306,6 +338,7 @@ def get_process_status(
         start_time,
         end_time,
         fail_on_incomplete=fail_on_incomplete,
+        push_host_target=push_host_target,
     ):
         result[bk_host_id][display_name] = AGENT_STATUS.ON if value else AGENT_STATUS.OFF
     return result
@@ -320,6 +353,7 @@ def _query_proc_metrics(
     start_time: int = None,
     end_time: int = None,
     fail_on_incomplete: bool = False,
+    push_host_target: bool = True,
 ):
     """
     查询 system.proc / system.proc_port 指标的公共生成器。
@@ -335,6 +369,7 @@ def _query_proc_metrics(
     :param start_time: 查询起始时间（秒级 Unix 时间戳，可选）
     :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）
     :param fail_on_incomplete: UQ 返回部分结果时是否抛出异常
+    :param push_host_target: 是否把 hosts 下推为 UQ target。全量业务路径传 False。
     :return: 生成 (bk_host_id, display_name, value) 元组，仅包含成功匹配的记录
     """
     ip_to_host_id = {(host.bk_host_innerip, int(host.bk_cloud_id or 0)): host.bk_host_id for host in hosts}
@@ -347,7 +382,7 @@ def _query_proc_metrics(
         metrics=[{"field": field, "method": method, "alias": "A"}],
         table=table,
         group_by=["bk_host_id", "bk_target_ip", "bk_target_cloud_id", "display_name"],
-        filter_dict=_build_host_target_filter(bk_biz_id, hosts),
+        filter_dict=_build_host_target_filter(bk_biz_id, hosts, push_host_target=push_host_target),
     )
     query = UnifyQuery(data_sources=[data_source], bk_biz_id=bk_biz_id, expression="a")
     if start_time is not None and end_time is not None:
@@ -359,6 +394,8 @@ def _query_proc_metrics(
     records = query.query_data(start_time=query_start, end_time=query_end, instant=True)
     if fail_on_incomplete and query.is_partial:
         raise RuntimeError(f"unify query returned partial data for {table}.{field}")
+    if query.is_partial:
+        logger.warning("unify query returned partial data for %s.%s, keep available records", table, field)
     for record in records:
         if record.get("_result_") is None:
             continue
@@ -562,6 +599,7 @@ def get_host_performance_data(
     start_time: int = None,
     end_time: int = None,
     fail_on_incomplete: bool = False,
+    push_host_target: bool = True,
 ) -> dict[int, dict] | dict[tuple, dict]:
     """
     :summary 按主机查询主机性能信息(五分钟负载/CPU使用率/磁盘空间使用率/磁盘IO使用率/应用内存使用率)
@@ -571,6 +609,7 @@ def get_host_performance_data(
     :param start_time: 查询起始时间（秒级 Unix 时间戳，可选）。与 end_time 同时传入时约束查询区间。
     :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）。不传或仅传一个时退化为默认"最近三分钟"。
     :param fail_on_incomplete: 查询异常或 UQ 返回部分结果时是否抛出异常。默认保持历史降级行为。
+    :param push_host_target: 是否把 hosts 下推为 UQ target。全量业务路径传 False。
     """
     if not hosts:
         return {}
@@ -592,7 +631,7 @@ def get_host_performance_data(
 
     # 与主机图表保持相同的目标维度：IPv4 使用 IP+云区域，IPv6 使用主机 ID。
     # IPv4 身份不完整时保留全量查询，避免过滤掉只能通过 bk_host_id 回填的兼容数据。
-    target_filter = _build_host_target_filter(bk_biz_id, hosts)
+    target_filter = _build_host_target_filter(bk_biz_id, hosts, push_host_target=push_host_target)
 
     def get_metric_data(metric):
         # 每个线程写入独立的临时 dict，避免多线程并发写同一 data 的竞态
@@ -616,6 +655,8 @@ def get_host_performance_data(
         records = query.query_data(start_time=query_start, end_time=query_end, instant=True)
         if fail_on_incomplete and query.is_partial:
             raise RuntimeError(f"unify query returned partial data for metric {metric['field']}")
+        if query.is_partial:
+            logger.warning("unify query returned partial data for metric %s, keep available records", metric["field"])
         for record in records:
             if record["_result_"] is None:
                 continue
@@ -826,7 +867,7 @@ def get_host_strategy_count(bk_biz_id: int, host: Host = None) -> tuple[int, int
 
 # 获取主机告警事件
 def get_host_alarm_count(
-    bk_biz_id: int, hosts: list[Host], days: int = 7, start_time: int = None, end_time: int = None
+    bk_biz_id: int, hosts: list[Host], days: int = 7, end_time: int = None
 ) -> dict[int, dict[int, int]]:
     """
     获取主机关联告警数量，当不传主机时，统计所有主机数据
@@ -836,12 +877,19 @@ def get_host_alarm_count(
     2. dimensions 中提取 ip + bk_cloud_id 匹配（K8s告警）
     优化：传入主机时按 event.ip 做 terms 过滤，避免全索引扫描；
          无 event.ip 的 K8s 告警（仅 dimensions 匹配）可能被遗漏，属已知权衡。
+
+    统计口径：「未恢复」是存量状态语义——只统计 begin_time 不晚于 end_time（缺省为当前时刻）且当前
+    仍未恢复（status=ABNORMAL）的告警，不限制告警的触发起点，避免更早触发的存量告警随查询窗口
+    起点收缩而被误显示为 0。
+
+    索引选择：不向 search 传 end_time，索引窗口恒为 [now-days, now]。ABNORMAL 文档每日被 rollover
+    reindex 搬运到当天索引（见 AlertDocument.REINDEX_QUERY 与 alert.get/mget 注释），上界必须延伸到
+    now 才能命中；end_time 仅做 begin_time lte 的文档级过滤，不参与索引选择。
+
     :param bk_biz_id: 业务ID
     :param hosts: 主机列表
-    :param days: 查询范围（天），仅在未传 start_time/end_time 时生效
-    :param start_time: 查询起始时间（秒级 Unix 时间戳，可选）。与 end_time 同时传入时，按精确时间范围
-                      构建 ES 索引，覆盖 days 参数。
-    :param end_time: 查询结束时间（秒级 Unix 时间戳，可选）。
+    :param days: 索引回溯天数（天）
+    :param end_time: 统计截止时间（秒级 Unix 时间戳，可选），只统计 begin_time ≤ end_time 的未恢复告警
     :return: Dict[bk_host_id, Dict[severity, count]]
     """
     if not hosts:
@@ -854,32 +902,54 @@ def get_host_alarm_count(
         if inner_ip:
             host_ips.update(ip.strip() for ip in inner_ip.split(",") if ip.strip())
 
-    is_historical = start_time is not None and end_time is not None
+    # 索引上界固定 now：ABNORMAL 文档每天被 reindex 搬运到当天索引，不能把 end_time 传给 search
+    # 收窄索引窗口，否则历史截止时间会因漏掉当天索引而把未恢复计数误判为 0
     search_object = (
-        AlertDocument.search(
-            start_time=start_time if is_historical else None,
-            end_time=end_time if is_historical else None,
-            days=None if is_historical else days,
-        )
+        AlertDocument.search(days=days)
         .filter("term", status=EventStatus.ABNORMAL)
         .filter("term", **{"event.bk_biz_id": bk_biz_id})
         .source(["event.ip", "event.bk_cloud_id", "severity", "dimensions"])
     )
-    if is_historical:
-        # 补充 ES range 过滤，按告警开始时间精确约束，避免索引按天选择带来的边界数据
-        search_object = search_object.filter("range", begin_time={"gte": start_time, "lte": end_time})
+    if end_time is not None:
+        # 「未恢复」是存量状态语义：只约束告警触发时间不晚于 end_time，不限制触发起点
+        search_object = search_object.filter("range", begin_time={"lte": end_time})
 
     if host_ips:
         search_object = search_object.filter("terms", **{"event.ip": list(host_ips)})
 
-    ip_to_host_id = {(host.bk_host_innerip, int(host.bk_cloud_id or 0)): host.bk_host_id for host in hosts}
+    ip_to_host_id = {}
+    for host in hosts:
+        bk_cloud_id = int(host.bk_cloud_id or 0)
+        inner_ip = host.bk_host_innerip or ""
+        # innerip 可能为逗号分隔多 IP：拆分后逐个建索引，另保留原始串兼容 event.ip 存完整串的历史数据
+        for ip in [inner_ip] + [item.strip() for item in inner_ip.split(",")]:
+            ip = ip.strip()
+            if ip:
+                ip_to_host_id[(ip, bk_cloud_id)] = host.bk_host_id
 
     alarm_count_info = {host.bk_host_id: {1: 0, 2: 0, 3: 0} for host in hosts}
+    # reindex 过渡期同一告警可能在新旧索引各存一份（同 _id），按 id 去重防重复计数（同 AlertDocument.mget）
+    counted_alert_ids = set()
     for alert in search_object.scan():
+        alert_id = getattr(getattr(alert, "meta", None), "id", None)
+        if alert_id is not None:
+            if alert_id in counted_alert_ids:
+                continue
+            counted_alert_ids.add(alert_id)
         host_id = _resolve_host_id_from_alert(alert, ip_to_host_id)
         if host_id is None:
             continue
-        alarm_count_info[host_id][int(alert.severity)] += 1
+        try:
+            severity = int(alert.severity)
+        except (TypeError, ValueError):
+            logger.warning(
+                "alert(%s) has invalid severity %r, skip counting", getattr(alert, "id", None), alert.severity
+            )
+            continue
+        if severity not in alarm_count_info[host_id]:
+            # severity 越界（不在 1-3 值域）时跳过，避免脏数据炸掉整个告警统计分区
+            continue
+        alarm_count_info[host_id][severity] += 1
     return alarm_count_info
 
 

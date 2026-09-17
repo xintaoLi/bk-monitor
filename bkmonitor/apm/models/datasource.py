@@ -495,6 +495,7 @@ class LogDataSource(ApmDataSourceConfigBase):
     @atomic(using=DATABASE_CONNECTION_NAME)
     def apply_datasource(cls, bk_biz_id, app_name, **options):
         option = options["option"]
+        owners = [str(user).strip() for user in (options.get("owners") or []) if str(user).strip()]
         obj = cls.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).first()
 
         if not obj:
@@ -527,6 +528,7 @@ class LogDataSource(ApmDataSourceConfigBase):
                         # 兼容集群不支持冷热配置
                         "allocation_min_days": 0,
                         "description": f"APM({app_name})",
+                        "owners": owners,
                         **storage_params,
                     }
                 )
@@ -1451,58 +1453,6 @@ class TraceDataSource(ApmDataSourceConfigBase):
                 event["trace_id"] = span.get(OtlpKey.TRACE_ID, "")
                 events.append(event)
         return events
-
-    def fields(self):
-        mapping = self.es_client.indices.get_mapping(index=self.index_name)
-        properties = self._get_properties(mapping)
-        fields = {}
-        for propertie in properties:
-            fields = self._get_fields(propertie, fields)
-        return fields
-
-    @classmethod
-    def _get_fields(cls, propertie: dict, fields: dict):
-        for field_name, field_attr in propertie.items():
-            if not isinstance(field_attr, dict):
-                continue
-            if "properties" in field_attr:
-                field_attr["name"] = field_name
-                cls._get_field(field_attr, fields)
-                continue
-            if "type" not in field_attr:
-                continue
-            fields[field_name] = field_attr["type"]
-        return fields
-
-    @classmethod
-    def _get_field(cls, obj: dict, fields: dict):
-        for field_name, field_attr in obj["properties"].items():
-            if not isinstance(field_attr, dict):
-                continue
-            if "properties" in field_attr:
-                field_attr["name"] = f"{obj['name']}.{field_name}"
-                cls._get_field(field_attr, fields)
-                continue
-            fields[f"{obj['name']}.{field_name}"] = field_attr["type"]
-        return fields
-
-    @classmethod
-    def _get_properties(cls, mapping: dict):
-        properties = []
-        for value in mapping.values():
-            cur = value.get("mappings", {})
-            cls._mappings_properties(cur, properties)
-        return properties
-
-    @classmethod
-    def _mappings_properties(cls, mappings: dict, properties: list):
-        if not isinstance(mappings, dict):
-            return
-        if "properties" in mappings:
-            properties.append(mappings["properties"])
-            return
-        for v in mappings.values():
-            cls._mappings_properties(v, properties)
 
     @classmethod
     def stop(cls, bk_biz_id, app_name):

@@ -25,9 +25,9 @@
  */
 import { type PropType, computed, defineComponent, toRef, toValue, useTemplateRef } from 'vue';
 
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
-import { useTableScrollOptimize } from '../../composables/use-table-scroll-optimize';
+import { useTableScrollOptimize } from '../../../../hooks/use-table-scroll-optimize';
 import { ALERT_STORAGE_KEY } from '../../services/alert-services';
 import AlertSelectionToolbar from './components/alert-selection-toolbar/alert-selection-toolbar';
 import CommonTable from './components/common-table/common-table';
@@ -139,6 +139,7 @@ export default defineComponent({
   setup(props, { emit }) {
     // const alarmStore = useAlarmCenterStore();
     const router = useRouter();
+    const route = useRoute();
     const tableRef = useTemplateRef<InstanceType<typeof CommonTable>>('tableRef');
 
     /** hover 场景使用的popover工具函数 */
@@ -156,7 +157,7 @@ export default defineComponent({
     /** 表格滚动优化：滚动时禁用 pointerEvents 并隐藏 popover */
     useTableScrollOptimize({
       targetElement: tableRef,
-      scrollContainerSelector: props.scrollContainerSelector,
+      scrollContainerElement: props.scrollContainerSelector,
       onScroll: () => {
         hoverPopoverTools.hidePopover();
         clickPopoverTools.hidePopover();
@@ -187,6 +188,7 @@ export default defineComponent({
     /** 创建场景表格渲染器上下文 */
     const scenarioContext: ActionScenario['context'] & AlertScenario['context'] & IncidentScenario['context'] = {
       router,
+      route,
       handleAlertSliderShowDetail,
       hoverPopoverTools,
       clickPopoverTools,

@@ -58,6 +58,7 @@ from apm_web.db.db_utils import build_filter_params, get_service_from_params
 from apm_web.handlers.application_handler import ApplicationHandler
 from apm_web.handlers.backend_data_handler import telemetry_handler_registry
 from apm_web.handlers.component_handler import ComponentHandler
+from apm_web.handlers.query import get_query
 from apm_web.handlers.config_handler.code import CodeRemarkHandler
 from apm_web.handlers.db_handler import DbComponentHandler
 from apm_web.handlers.endpoint_handler import EndpointHandler
@@ -114,7 +115,7 @@ from bkmonitor.data_source.utils.apm import TraceDatasourceTarget, TraceQueryGua
 from bkmonitor.share.api_auth_resource import ApiAuthResource
 from bkmonitor.utils import group_by
 from bkmonitor.utils.ip import is_v6
-from bkmonitor.utils.request import get_request_tenant_id
+from bkmonitor.utils.request import get_request, get_request_tenant_id
 from bkmonitor.utils.thread_backend import InheritParentThread, run_threads
 from bkmonitor.utils.user import (
     get_backend_username,
@@ -501,8 +502,12 @@ class ApplicationInfoResource(Resource):
             return data
 
     def perform_request(self, validated_request_data):
+        queryset = Application.objects.filter(application_id=validated_request_data["application_id"])
+        request = get_request(peaceful=True)
+        if request and getattr(request, "biz_id", None):
+            queryset = queryset.filter(bk_biz_id=request.biz_id)
         try:
-            return Application.objects.get(application_id=validated_request_data["application_id"])
+            return queryset.get()
         except Application.DoesNotExist:
             raise ValueError(_("应用不存在"))
 
@@ -633,20 +638,57 @@ class StopResource(Resource):
 class SamplingOptionsResource(Resource):
     """获取采样配置常量"""
 
+    class RequestSerializer(serializers.Serializer):
+        # 不传时只返回标准字段，保持旧调用方可用
+        application_id = serializers.IntegerField(label="应用id", required=False)
+
     def perform_request(self, validated_request_data):
         sampling_types = [SamplerTypeChoices.RANDOM, SamplerTypeChoices.EMPTY]
         res = {}
         if settings.IS_ACCESS_BK_DATA:
-            # 标准字段常量 + 耗时字段
             sampling_types.append(SamplerTypeChoices.TAIL)
-            standard_fields = SpanStandardField.flat_list()
-            standard_fields = [{"name": _("Span耗时"), "key": "elapsed_time", "type": "time"}] + standard_fields
-            res["tail_sampling_options"] = standard_fields
+            res["tail_sampling_options"] = self.list_tail_sampling_options(validated_request_data.get("application_id"))
 
         return {
             "sampler_types": sampling_types,
             **res,
         }
+
+    @classmethod
+    def list_tail_sampling_options(cls, application_id: int | None) -> list[dict[str, str]]:
+        """耗时字段 + 标准字段 + 应用实际上报的 attributes/resource/status 字段"""
+        options = [{"name": _("Span耗时"), "key": "elapsed_time", "type": "time"}] + SpanStandardField.flat_list()
+        if not application_id:
+            return options
+
+        exists_keys = {option["key"] for option in options}
+        for field_name, field_alias in cls.list_reported_fields(application_id):
+            if field_name in exists_keys:
+                continue
+            exists_keys.add(field_name)
+            name = f"{field_alias}({field_name})" if field_alias and field_alias != field_name else field_name
+            options.append({"name": name, "key": field_name, "type": "string"})
+
+        return options
+
+    @classmethod
+    def list_reported_fields(cls, application_id: int) -> list[tuple[str, str]]:
+        """从 Trace 存储中获取应用上报过的、尾部采样可寻址的字段"""
+        try:
+            app = Application.objects.get(application_id=application_id)
+            fields_info = get_query(app.build_data_sources()).query_fields(None, None)
+        except Exception as e:  # pylint: disable=broad-except
+            # 字段发现失败时退化为仅展示标准字段，不影响采样配置本身
+            logger.warning(_("获取app: {app_id} 上报字段失败, 详情: {detail}").format(app_id=application_id, detail=e))
+            return []
+
+        # Flink 侧按「顶层 / 一级对象 + 剩余 key」取值，仅 attributes/resource/status 可稳定寻址
+        return [
+            (field_name, field_info["field_alias"])
+            for field_name, field_info in fields_info.items()
+            if field_info["is_searchable"]
+            and field_info["origin_field"] in (OtlpKey.ATTRIBUTES, OtlpKey.RESOURCE, OtlpKey.STATUS)
+        ]
 
 
 class SetupResource(Resource):
@@ -2420,7 +2462,7 @@ class QueryEndpointStatisticsResource(PageListResource):
                     LinkTableFormat(
                         id="trace",
                         name=_("调用链"),
-                        url_format="/?bizId={bk_biz_id}/#/trace/home/?app_name={app_name}"
+                        url_format="/?bizId={bk_biz_id}#/trace/home/?app_name={app_name}"
                         + "&search_type=scope"
                         + "&start_time={start_time}&end_time={end_time}"
                         + "&sceneMode=span&filterMode=ui",
@@ -3030,7 +3072,13 @@ class CustomServiceConfigResource(Resource):
             # 更新
             _id = validated_data.pop("id")
             self.validate_name(validated_data, _id)
-            ApplicationCustomService.objects.filter(id=_id).update(**validated_data)
+            # 必须带上业务与应用过滤，否则仅凭主键即可改写其他业务的自定义服务，
+            # 甚至把该记录的 bk_biz_id 改到自己名下
+            updated = ApplicationCustomService.objects.filter(
+                id=_id, bk_biz_id=validated_data["bk_biz_id"], app_name=validated_data["app_name"]
+            ).update(**validated_data)
+            if not updated:
+                raise ValueError(_("自定义服务({}) 不存在").format(_id))
 
         from apm_web.tasks import update_application_config
 
@@ -3080,11 +3128,15 @@ class CustomServiceConfigResource(Resource):
 
 class DeleteCustomSeriviceResource(Resource):
     class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField(label="业务id")
         id = serializers.IntegerField()
 
     def perform_request(self, validated_data):
-        query = ApplicationCustomService.objects.filter(id=validated_data["id"])
+        # 必须带上业务过滤，否则仅凭主键即可删除其他业务的自定义服务
+        query = ApplicationCustomService.objects.filter(id=validated_data["id"], bk_biz_id=validated_data["bk_biz_id"])
         instance = query.first()
+        if not instance:
+            raise ValueError(_("自定义服务({}) 不存在").format(validated_data["id"]))
         query.delete()
 
         from apm_web.tasks import update_application_config

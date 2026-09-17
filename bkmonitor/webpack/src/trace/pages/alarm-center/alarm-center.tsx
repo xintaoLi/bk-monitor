@@ -1334,6 +1334,7 @@ export default defineComponent({
             residentCondition={this.alarmStore.residentCondition}
             residentSettingOnlyId={this.residentSettingOnlyId}
             selectFavorite={this.retrievalSelectFavorite}
+            showSpaceSelector={!this.apmHooks}
             onBizIdsChange={this.handleBizIdsChange}
             onConditionChange={this.handleConditionChange}
             onCopyWhere={this.handleCopyWhereQueryString}
@@ -1565,9 +1566,9 @@ export default defineComponent({
                 onMergeSuccess={() => {
                   this.alarmStore.refreshImmediate += 1;
                 }}
-                onSplitSuccess={(memberIssueId: string) => {
+                onSplitSuccess={(memberIssueIds: string[]) => {
                   this.alarmStore.refreshImmediate += 1;
-                  this.addSplitHighlight(memberIssueId);
+                  this.addSplitHighlight(memberIssueIds);
                 }}
                 onUpdate:show={this.handleMergeSplitShowChange}
               />,

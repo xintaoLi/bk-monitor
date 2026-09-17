@@ -36,6 +36,7 @@ import { useRoute } from 'vue-router';
 import { type SelectTypeEnum, SelectType } from '../../../components/across-page-selection/across-page-selection';
 import { EMode } from '../../../components/retrieval-filter/typing';
 import { handleTransformToTimestamp } from '../../../components/time-range/utils';
+import { useTableColumnsCache } from '../../../hooks/use-table-columns-cache';
 import useUserConfig from '../../../hooks/useUserConfig';
 import { useHostStore } from '../../../store/modules/host';
 import { HostSelectAllModeEnum } from '../constants/enum';
@@ -112,8 +113,12 @@ export const useHostList = (options: IUseHostListOptions) => {
   const selectAllMode = shallowRef<HostSelectAllModeType>(HostSelectAllModeEnum.NONE);
   /** 跨页全选模式下被用户手动排除的行 key（筛选/分页/置顶变化时保持排除语义） */
   const excludedRowKeys = shallowRef<Set<string>>(new Set());
-  /** 当前展示列 */
-  const visibleColumns = shallowRef<string[]>(HOST_LIST_COLUMNS.filter(c => c.checked).map(c => c.id));
+  /** 当前展示列与列宽（公共 hook，localStorage 持久化） */
+  const { storageColumns: visibleColumns, fieldsWidthConfig } = useTableColumnsCache({
+    storageKey: 'trace_host_list_columns',
+    defaultColumns: HOST_LIST_COLUMNS.filter(c => c.checked).map(c => c.id),
+    validColumnKeys: HOST_LIST_COLUMNS.map(c => c.id),
+  });
   /** 置顶配置映射（rowId -> 1），与旧版 performance-table 数据结构一致 */
   const stickyValue = shallowRef<Record<string, 1>>({});
 
@@ -253,6 +258,18 @@ export const useHostList = (options: IUseHostListOptions) => {
     refreshList(true);
   };
 
+  const getMetricQueryParams = (hostList: Awaited<ReturnType<typeof getHostInfoList>>) => {
+    const [start_time, end_time] = handleTransformToTimestamp(timeRange.value);
+    const scope = getRequestScope();
+    const hasScopedTarget = scope.bk_host_id != null || (Boolean(scope.bk_obj_id) && scope.bk_inst_id != null);
+    return {
+      ...scope,
+      ...(hasScopedTarget ? { bk_host_ids: hostList.map(row => row.bk_host_id) } : {}),
+      start_time,
+      end_time,
+    };
+  };
+
   /** 加载数据：基础数据先渲染，指标数据后补充 */
   const loadData = async () => {
     const requestGeneration = ++dataRequestGeneration;
@@ -319,14 +336,7 @@ export const useHostList = (options: IUseHostListOptions) => {
     }
     const metricGeneration = ++metricRequestGeneration;
     try {
-      const bk_host_ids = requestBaseList.map(row => row.bk_host_id);
-      const [start_time, end_time] = handleTransformToTimestamp(timeRange.value);
-      const metricListMap = await getHostMetricInfoList({
-        ...getRequestScope(),
-        bk_host_ids,
-        start_time,
-        end_time,
-      });
+      const metricListMap = await getHostMetricInfoList(getMetricQueryParams(requestBaseList));
       if (requestGeneration !== dataRequestGeneration || metricGeneration !== metricRequestGeneration) {
         return;
       }
@@ -356,15 +366,7 @@ export const useHostList = (options: IUseHostListOptions) => {
     metricLoading.value = true;
     metricLoadError.value = false;
     try {
-      const requestBaseList = baseList;
-      const bk_host_ids = requestBaseList.map(row => row.bk_host_id);
-      const [start_time, end_time] = handleTransformToTimestamp(timeRange.value);
-      const metricListMap = await getHostMetricInfoList({
-        ...getRequestScope(),
-        bk_host_ids,
-        start_time,
-        end_time,
-      });
+      const metricListMap = await getHostMetricInfoList(getMetricQueryParams(baseList));
       if (requestGeneration !== metricRequestGeneration) {
         return;
       }
@@ -596,6 +598,7 @@ export const useHostList = (options: IUseHostListOptions) => {
     filterFields,
     filterOptionsMap,
     stickyValue,
+    fieldsWidthConfig,
     // 方法
     getValueFn,
     loadData,

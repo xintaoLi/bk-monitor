@@ -86,6 +86,11 @@ export interface BaseTableCellRenderValueType {
 
 /** 不同类型单元格的私有属性映射 */
 export interface BaseTableCellSpecificPropsMap {
+  /** 持续时间类型单元格私有属性 */
+  [ExploreTableColumnTypeEnum.DURATION]: {
+    /** 原始数据单位，默认 'us'（微秒），需与 formatDuration 的 unit 参数对齐（支持 d / h / m / s / ms / μs / us） */
+    durationUnit?: 'ms' | 'us';
+  };
   /** tag 类型单元格私有属性 */
   [ExploreTableColumnTypeEnum.TAGS]: {
     /** 溢出标签提示popover内容渲染 */
@@ -97,14 +102,18 @@ export interface BaseTableCellSpecificPropsMap {
 }
 
 /** trace检索 表格列配置类型 */
-export interface BaseTableColumn<K extends string = string, U extends Record<string, any> = Record<string, any>>
-  extends Omit<PrimaryTableCol, 'ellipsis' | 'ellipsisTitle'> {
+export interface BaseTableColumn<
+  K extends string = string,
+  U extends Record<string, any> = Record<string, any>,
+> extends Omit<PrimaryTableCol, 'ellipsis' | 'ellipsisTitle'> {
   /** 单元格是否开启溢出省略弹出 popover 功能 */
   cellEllipsis?: boolean;
   /** 自定义单元格渲染 */
   cellRenderer?: TableCellRenderer;
   /** 非公共属性，不同单元格类型各自特定属性配置 */
   cellSpecificProps?: GetTableCellSpecificProps<K>;
+  /** 单元格溢出省略号位置（end: 末尾省略；start: 开头省略，保留文本尾部特征，适合长 ID 类字段）。未配置时回退表格全局配置 */
+  ellipsisPosition?: EllipsisPosition;
   /** 列描述(popover形式展现) **/
   headerDescription?: string;
   /** 字段类型 */
@@ -116,6 +125,9 @@ export interface BaseTableColumn<K extends string = string, U extends Record<str
   /** 需要自定义定义 渲染值 时可用 */
   getRenderValue?: (row, column: BaseTableColumn<any, any>) => GetTableCellRenderValue<K, U>;
 }
+
+/** 单元格溢出省略号位置：end 末尾省略（默认）；start 开头省略（保留文本尾部特征，适合长 ID 类字段） */
+export type EllipsisPosition = 'end' | 'start';
 
 /** 表格条件菜单项 */
 export interface ExploreConditionMenuItem {
