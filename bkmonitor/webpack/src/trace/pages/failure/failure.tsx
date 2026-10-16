@@ -114,9 +114,9 @@ export default defineComponent({
     if (props.id && String(props.id).length < 11) {
       idResolving.value = true;
       idResolvePromise = getIncidentDocId({ incident_id: props.id })
-        .then(res => {
+        .then(async res => {
           resolvedId.value = res.id;
-          router.replace({
+          await router.replace({
             name: route.name as string,
             params: { ...route.params, id: res.id },
             query: { ...route.query },
@@ -158,6 +158,22 @@ export default defineComponent({
     const currentAlertList = deepRef({});
     const isCollapsed = deepRef(false);
 
+    // 短 ID 解析期间内容组件尚未挂载，待其可用后再消费外部指定的页签。
+    watch(
+      [refContent, () => route.query.activeTab],
+      ([content, queryTab]) => {
+        const activeTab = Array.isArray(queryTab) ? queryTab[0] : queryTab;
+        if (!content || !activeTab) return;
+        if (activeTab === 'FailureTopo' || activeTab === 'FailureView') {
+          content.handleChangeActive(activeTab);
+        }
+        const restQuery = { ...route.query };
+        delete restQuery.activeTab;
+        router.replace({ query: restQuery });
+      },
+      { flush: 'post' }
+    );
+
     const { updateAlarmDetailShow, alarmDetailShow, alarmDetailData } = useIncidentAlarmDetail();
 
     provide('playLoading', playLoading);
@@ -170,6 +186,17 @@ export default defineComponent({
     provide('operationTypeMap', operationTypeMap);
     provide('incidentResults', incidentResultList);
     provide('isShowDiagnosis', isShowDiagnosis);
+    /**
+     * 本页是否已一键开启故障分析（对齐告警中心：开启后立即视为已接入，隐藏按钮）
+     * 后台 incident_results.reason 可能仍短暂为 feature_disabled
+     */
+    const featureEnabledLocally = shallowRef(false);
+    provide('featureEnabledLocally', featureEnabledLocally);
+    /** 刷新故障分析 panels（拓扑一键开启成功后调用，与告警中心 onEnabled 刷新列表一致） */
+    provide('refreshIncidentResults', () => {
+      featureEnabledLocally.value = true;
+      getIncidentResults();
+    });
     /**
      * @description: 获取告警分析TopN数据
      * @param {*}
@@ -344,13 +371,6 @@ export default defineComponent({
           getIncidentOperations();
           getIncidentOperationTypes();
           handleGetSearchTopNList();
-          /** 判断路由里是否带了activeTab，需要调整到指定tab，由于其他tab的接口请求依赖详情数据，所以要在跳转前确保已经正确获取到详情数据 */
-          if (route.query?.activeTab) {
-            changeTab();
-            nextTick(() => {
-              router.replace({ query: {} });
-            });
-          }
         })
         .catch(err => {
           console.log(err);

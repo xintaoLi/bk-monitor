@@ -327,6 +327,7 @@ export default {
   查看上报数据: 'View Reported Data',
   查看分派规则: 'View',
   查看数据: 'View Data',
+  查看数组列表: 'View Array List',
   查看原始数据: 'View Raw Data',
   查看变更历史: 'View Change History',
   查看告警列表: 'View Alarms',
@@ -336,6 +337,7 @@ export default {
   查看更多相关的日志: 'More Related Log',
   查看更多语法规则: 'More Grammar',
   查看监控目标: 'View Scope',
+  查看全部字段: 'View All Fields',
   查看迁移内容: 'View Migration',
   查看风险点: 'View Risk',
   查看更多文档: 'More Documentations',
@@ -546,6 +548,7 @@ export default {
 
   确认拆分: 'Confirm Split',
   '拆分为新 Issue': 'Split to New Issue',
+  批量拆分: 'Batch Split',
   确认合并: 'Confirm Merge',
   '设为主 Issue': 'Set as Main Issue',
   了解更多: 'Learn More',
@@ -557,4 +560,8 @@ export default {
   去关联: 'Go to Association',
   恢复默认: 'Restore Default',
   删除分组: 'Delete Group',
+
+  // RUM 检索--详情
+  复制完整地址: 'Copy Full Address',
+  查看官方定义: 'Check the official definition',
 };
