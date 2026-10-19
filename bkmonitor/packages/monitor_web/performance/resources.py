@@ -10,7 +10,7 @@ specific language governing permissions and limitations under the License.
 
 import logging
 
-from api.cmdb.define import Host, TopoNode
+from api.cmdb.define import Host, TopoNode, TopoTree
 from bkm_space.validate import validate_bk_biz_id
 from bkmonitor.share.api_auth_resource import ApiAuthResource
 from bkmonitor.utils import time_tools
@@ -23,6 +23,11 @@ from core.drf_resource.contrib.cache import CacheResource
 from core.drf_resource.exceptions import CustomException
 from core.errors.share import InvalidParamsError, ParamsPermissionDeniedError
 from monitor_web.constants import AGENT_STATUS
+from monitor_web.performance.host_metric_stats import (
+    HOST_STATS_METRICS,
+    query_business_host_metric_stats,
+    query_host_metric_stats,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,7 @@ class HostPerformanceResource(CacheResource):
             hosts=hosts,
             start_time=start_time,
             end_time=end_time,
+            push_host_target=False,
         )
         for bk_host_id in result:
             if bk_host_id not in data:
@@ -135,8 +141,18 @@ class HostPerformanceResource(CacheResource):
         }
 
         pool = ThreadPool()
-        pool.apply_async(SearchHostMetricResource.get_agent_status, args=(bk_biz_id, hosts, host_dict))
-        pool.apply_async(SearchHostMetricResource.get_performance_data, args=(bk_biz_id, hosts, host_dict))
+        # 服务端已拿到业务全集 hosts，只并行填 host_dict；UQ 不得再把这批主机编进 target。
+        skip_linear_target = {"push_host_target": False}
+        pool.apply_async(
+            SearchHostMetricResource.get_agent_status,
+            args=(bk_biz_id, hosts, host_dict),
+            kwds=skip_linear_target,
+        )
+        pool.apply_async(
+            SearchHostMetricResource.get_performance_data,
+            args=(bk_biz_id, hosts, host_dict),
+            kwds=skip_linear_target,
+        )
         pool.apply_async(self.get_process_status, args=(bk_biz_id, hosts, host_dict))
         pool.apply_async(self.get_alarm_count, args=(bk_biz_id, hosts, host_dict))
         pool.close()
@@ -308,22 +324,33 @@ class SearchHostInfoResource(ApiAuthResource):
         bk_host_id = serializers.IntegerField(required=False, label="主机ID")
         bk_obj_id = serializers.CharField(required=False, label="拓扑对象ID")
         bk_inst_id = serializers.IntegerField(required=False, label="拓扑实例ID")
+        page = serializers.IntegerField(required=False, min_value=1)
+        page_size = serializers.IntegerField(required=False, min_value=1, max_value=500)
 
         def validate(self, attrs):
             if bool(attrs.get("bk_obj_id")) != (attrs.get("bk_inst_id") is not None):
                 raise InvalidParamsError({"key": "bk_obj_id,bk_inst_id"})
+            if ("page" in attrs) != ("page_size" in attrs):
+                raise InvalidParamsError({"key": "page,page_size"})
+            if "page" in attrs and attrs.get("bk_obj_id") == "biz" and attrs["bk_inst_id"] != attrs["bk_biz_id"]:
+                raise InvalidParamsError({"key": "bk_inst_id"})
             return attrs
 
         def validate_bk_biz_id(self, value):
             return validate_bk_biz_id(value)
 
     @staticmethod
-    def get_module_info(bk_module_ids: list[int], topo_links: dict[str, list[TopoNode]]) -> list[dict]:
+    def get_module_info(
+        bk_module_ids: list[int], topo_links: dict[str, list[TopoNode]], module_cache: dict | None = None
+    ) -> list[dict]:
         """
         获取模块详情
         """
         modules = []
         for bk_module_id in bk_module_ids:
+            if module_cache is not None and bk_module_id in module_cache:
+                modules.append(module_cache[bk_module_id])
+                continue
             key = f"module|{bk_module_id}"
             if key not in topo_links:
                 continue
@@ -339,10 +366,23 @@ class SearchHostInfoResource(ApiAuthResource):
                     "bk_obj_name_map": {node.bk_obj_id: node.bk_obj_name for node in reversed(topo_link)},
                 }
             )
+            if module_cache is not None:
+                module_cache[bk_module_id] = modules[-1]
         return modules
 
     def perform_request(self, params):
-        def get_hosts() -> list[Host]:
+        def get_hosts() -> list[Host] | dict:
+            if "page" in params:
+                page_params = {
+                    "bk_biz_id": params["bk_biz_id"],
+                    "page": params["page"],
+                    "page_size": params["page_size"],
+                }
+                if params.get("bk_host_id") is not None:
+                    page_params["bk_host_id"] = params["bk_host_id"]
+                elif params.get("bk_obj_id") and params.get("bk_inst_id") is not None:
+                    page_params["topo_nodes"] = {params["bk_obj_id"]: [params["bk_inst_id"]]}
+                return api.cmdb.get_host_page(**page_params)
             if params.get("bk_host_id") is not None:
                 return api.cmdb.get_host_by_id(bk_biz_id=params["bk_biz_id"], bk_host_ids=[params["bk_host_id"]])
             if params.get("bk_obj_id") and params.get("bk_inst_id") is not None:
@@ -354,15 +394,27 @@ class SearchHostInfoResource(ApiAuthResource):
 
         pool = ThreadPool(2)
         hosts_future = pool.apply_async(get_hosts)
-        topo_future = pool.apply_async(api.cmdb.get_topo_tree, kwds={"bk_biz_id": params["bk_biz_id"]})
+        topo_params = {"bk_biz_id": params["bk_biz_id"]}
+        if "page" in params:
+            topo_params["raw"] = True
+        topo_future = pool.apply_async(api.cmdb.get_topo_tree, kwds=topo_params)
         pool.close()
         try:
             hosts = hosts_future.get()
-            topo_links: dict[str, list[TopoNode]] = topo_future.get().convert_to_topo_link()
+            topo_tree = topo_future.get()
         finally:
             pool.join()
 
+        total = None
+        if "page" in params:
+            total = hosts["total"]
+            hosts = hosts["items"]
+            module_ids = {module_id for host in hosts for module_id in host.bk_module_ids}
+            topo_links = TopoTree.module_links_from_raw(topo_tree, module_ids)
+        else:
+            topo_links = topo_tree.convert_to_topo_link()
         result = []
+        module_cache = {}
         for host in hosts:
             result.append(
                 {
@@ -379,10 +431,12 @@ class SearchHostInfoResource(ApiAuthResource):
                     "bk_host_name": host.bk_host_name,
                     "ignore_monitoring": host.ignore_monitoring,
                     "is_shielding": host.is_shielding,
-                    "module": self.get_module_info(host.bk_module_ids, topo_links),
+                    "module": self.get_module_info(host.bk_module_ids, topo_links, module_cache),
                 }
             )
 
+        if "page" in params:
+            return {"items": result, "total": total, "page": params["page"], "page_size": params["page_size"]}
         return result
 
 
@@ -392,7 +446,14 @@ class SearchHostMetricResource(ApiAuthResource):
     """
 
     class RequestSerializer(serializers.Serializer):
-        bk_host_ids = serializers.ListField(label="主机ID", child=serializers.IntegerField())
+        bk_host_ids = serializers.ListField(
+            label="主机ID",
+            child=serializers.IntegerField(),
+            required=False,
+            allow_null=True,
+            allow_empty=True,
+            default=None,
+        )
         bk_biz_id = serializers.IntegerField(label="业务ID")
         bk_host_id = serializers.IntegerField(required=False, label="分享主机ID")
         bk_obj_id = serializers.CharField(required=False, label="分享拓扑对象ID")
@@ -408,19 +469,25 @@ class SearchHostMetricResource(ApiAuthResource):
 
     @staticmethod
     def validate_scope_host_ids(params):
-        requested_host_ids = set(params["bk_host_ids"])
+        bk_obj_id = params.get("bk_obj_id")
+        bk_inst_id = params.get("bk_inst_id")
+        if (not bk_obj_id) != (bk_inst_id is None):
+            raise InvalidParamsError({"key": "bk_obj_id,bk_inst_id"})
+
+        requested_host_ids = params.get("bk_host_ids")
+        if not requested_host_ids:
+            return
+        requested_host_ids = set(requested_host_ids)
         if params.get("bk_host_id") is not None:
             allowed_host_ids = {params["bk_host_id"]}
-        elif params.get("bk_obj_id") and params.get("bk_inst_id") is not None:
+        elif bk_obj_id and bk_inst_id is not None:
             allowed_host_ids = {
                 host.bk_host_id
                 for host in api.cmdb.get_host_by_topo_node(
                     bk_biz_id=params["bk_biz_id"],
-                    topo_nodes={params["bk_obj_id"]: [params["bk_inst_id"]]},
+                    topo_nodes={bk_obj_id: [bk_inst_id]},
                 )
             }
-        elif params.get("bk_obj_id") or params.get("bk_inst_id") is not None:
-            raise InvalidParamsError({"key": "bk_obj_id,bk_inst_id"})
         else:
             return
 
@@ -441,6 +508,7 @@ class SearchHostMetricResource(ApiAuthResource):
         start_time: int = None,
         end_time: int = None,
         fail_on_incomplete: bool = False,
+        push_host_target: bool = True,
     ):
         """
         获取Agent状态
@@ -451,6 +519,7 @@ class SearchHostMetricResource(ApiAuthResource):
             start_time=start_time,
             end_time=end_time,
             fail_on_incomplete=fail_on_incomplete,
+            push_host_target=push_host_target,
         )
         for bk_host_id, status in agent_statuses.items():
             if bk_host_id not in data:
@@ -465,6 +534,7 @@ class SearchHostMetricResource(ApiAuthResource):
         start_time: int = None,
         end_time: int = None,
         fail_on_incomplete: bool = False,
+        push_host_target: bool = True,
     ):
         """
         获取指标信息
@@ -475,6 +545,7 @@ class SearchHostMetricResource(ApiAuthResource):
             start_time=start_time,
             end_time=end_time,
             fail_on_incomplete=fail_on_incomplete,
+            push_host_target=push_host_target,
         )
         for bk_host_id, metrics in result.items():
             if bk_host_id not in data:
@@ -489,6 +560,7 @@ class SearchHostMetricResource(ApiAuthResource):
         start_time: int = None,
         end_time: int = None,
         fail_on_incomplete: bool = False,
+        push_host_target: bool = True,
     ):
         """
         获取进程信息
@@ -503,11 +575,12 @@ class SearchHostMetricResource(ApiAuthResource):
             start_time=start_time,
             end_time=end_time,
             fail_on_incomplete=fail_on_incomplete,
+            push_host_target=push_host_target,
         )
-        for bk_host_id in result:
+        for host in hosts:
+            bk_host_id = host.bk_host_id
             if bk_host_id not in data:
                 continue
-
             data[bk_host_id]["component"] = [
                 {
                     "display_name": process["name"],
@@ -518,64 +591,137 @@ class SearchHostMetricResource(ApiAuthResource):
                     "startCommand": process.get("startCommand"),
                     "user": process.get("user"),
                 }
-                for process in result[bk_host_id]
+                for process in result.get(bk_host_id, [])
             ]
 
     @staticmethod
-    def get_alarm_count(
-        bk_biz_id: int, hosts: list[Host], data: dict[int, dict], start_time: int = None, end_time: int = None
-    ):
+    def get_alarm_count(bk_biz_id: int, hosts: list[Host], data: dict[int, dict], end_time: int = None):
         """
-        获取告警信息
+        获取告警信息。
+
+        「未恢复告警」是存量状态语义：统计 begin_time ≤ end_time 且当前仍未恢复的告警，不透传查询窗口
+        起点（start_time）——否则早于窗口起点触发的存量告警会在短窗口下被错误地显示为 0。
         """
-        result = resource.cc.get_host_alarm_count(
-            bk_biz_id=bk_biz_id, hosts=hosts, start_time=start_time, end_time=end_time
-        )
-        for bk_host_id in result:
+        result = resource.cc.get_host_alarm_count(bk_biz_id=bk_biz_id, hosts=hosts, end_time=end_time)
+        for host in hosts:
+            bk_host_id = host.bk_host_id
             if bk_host_id not in data:
                 continue
             data[bk_host_id]["alarm_count"] = sorted(
-                [{"level": level, "count": count} for level, count in result[bk_host_id].items()],
+                [{"level": level, "count": count} for level, count in result.get(bk_host_id, {}).items()],
                 key=lambda x: x["level"],
             )
+
+    @staticmethod
+    def _empty_host_metric() -> dict:
+        return {
+            "status": AGENT_STATUS.UNKNOWN,
+            "cpu_load": None,
+            "cpu_usage": None,
+            "disk_in_use": None,
+            "io_util": None,
+            "mem_usage": None,
+            "psc_mem_usage": None,
+            # None 表示对应分区未成功完成；成功查询且确实无数据时由分区写入 []。
+            "component": None,
+            "alarm_count": None,
+        }
+
+    def _resolve_hosts(self, params) -> tuple[bool, list[Host], list[int]]:
+        """解析查询主机集。返回 (是否下推 host target, CMDB hosts, 输出 host id)。"""
+        bk_biz_id = params["bk_biz_id"]
+        requested_host_ids = params.get("bk_host_ids")
+        if requested_host_ids:
+            hosts = api.cmdb.get_host_by_id(bk_biz_id=bk_biz_id, bk_host_ids=requested_host_ids)
+            return True, hosts, requested_host_ids
+        if params.get("bk_host_id") is not None:
+            hosts = api.cmdb.get_host_by_id(bk_biz_id=bk_biz_id, bk_host_ids=[params["bk_host_id"]])
+            return True, hosts, [host.bk_host_id for host in hosts]
+        if params.get("bk_obj_id") and params.get("bk_inst_id") is not None:
+            hosts = api.cmdb.get_host_by_topo_node(
+                bk_biz_id=bk_biz_id,
+                topo_nodes={params["bk_obj_id"]: [params["bk_inst_id"]]},
+            )
+            return True, hosts, [host.bk_host_id for host in hosts]
+        hosts = api.cmdb.get_host_by_topo_node(bk_biz_id=bk_biz_id)
+        return False, hosts, [host.bk_host_id for host in hosts]
 
     def perform_request(self, params):
         self.validate_scope_host_ids(params)
         bk_biz_id = params["bk_biz_id"]
-        data = {
-            bk_host_id: {
-                "status": AGENT_STATUS.UNKNOWN,
-                "cpu_load": None,
-                "cpu_usage": None,
-                "disk_in_use": None,
-                "io_util": None,
-                "mem_usage": None,
-                "psc_mem_usage": None,
-                "component": [],
-                "alarm_count": [],
-            }
-            for bk_host_id in params["bk_host_ids"]
-        }
+        requested_host_ids = params.get("bk_host_ids")
+        if requested_host_ids is not None and not requested_host_ids:
+            return {}
 
-        hosts = api.cmdb.get_host_by_id(bk_biz_id=bk_biz_id, bk_host_ids=params["bk_host_ids"])
+        push_host_target, hosts, output_host_ids = self._resolve_hosts(params)
+        data = {bk_host_id: self._empty_host_metric() for bk_host_id in output_host_ids}
 
         pool = ThreadPool()
-        task_args = (bk_biz_id, hosts, data, params.get("start_time"), params.get("end_time"))
+        section_kwargs = {
+            "bk_biz_id": bk_biz_id,
+            "hosts": hosts,
+            "data": data,
+            "start_time": params.get("start_time"),
+            "end_time": params.get("end_time"),
+        }
+        # 主机列表优先返回 UQ 已取得的记录；partial 或单指标失败时，未取得的字段保持未知，
+        # 不能因为少量缺失丢弃同一分区内已经可用的数据。
+        metric_kwargs = {**section_kwargs, "fail_on_incomplete": False, "push_host_target": push_host_target}
+        # 「未恢复告警」是存量状态语义，只受截止时间约束，不透传窗口起点（见 get_alarm_count docstring）
+        alarm_kwargs = {"bk_biz_id": bk_biz_id, "hosts": hosts, "data": data, "end_time": params.get("end_time")}
         futures = {
-            "agent_status": pool.apply_async(self.get_agent_status, args=(*task_args, True)),
-            "performance_data": pool.apply_async(self.get_performance_data, args=(*task_args, True)),
-            "process_status": pool.apply_async(self.get_process_status, args=(*task_args, True)),
-            "alarm_count": pool.apply_async(self.get_alarm_count, args=task_args),
+            "agent_status": pool.apply_async(self.get_agent_status, kwds=metric_kwargs),
+            "performance_data": pool.apply_async(self.get_performance_data, kwds=metric_kwargs),
+            "process_status": pool.apply_async(self.get_process_status, kwds=metric_kwargs),
+            "alarm_count": pool.apply_async(self.get_alarm_count, kwds=alarm_kwargs),
         }
         pool.close()
-        failed_sections = []
         for section, future in futures.items():
             try:
                 future.get()
             except Exception:
                 logger.exception("get host metric section %s failed, bk_biz_id=%s", section, bk_biz_id)
-                failed_sections.append(section)
         pool.join()
-        if failed_sections:
-            raise CustomException("get host metric data failed", data={"failed_sections": failed_sections})
         return data
+
+
+class SearchHostMetricStatsResource(ApiAuthResource):
+    """按当前节点范围查询单张主机性能卡片，不接受任意查询表达式。"""
+
+    class RequestSerializer(serializers.Serializer):
+        bk_biz_id = serializers.IntegerField()
+        bk_host_id = serializers.IntegerField(required=False)
+        bk_obj_id = serializers.CharField(required=False)
+        bk_inst_id = serializers.IntegerField(required=False)
+        category = serializers.ChoiceField(choices=tuple(HOST_STATS_METRICS))
+        start_time = serializers.IntegerField(required=False)
+        end_time = serializers.IntegerField(required=False)
+
+        def validate_bk_biz_id(self, value):
+            return validate_bk_biz_id(value)
+
+        def validate(self, attrs):
+            if bool(attrs.get("bk_obj_id")) != (attrs.get("bk_inst_id") is not None):
+                raise InvalidParamsError({"key": "bk_obj_id,bk_inst_id"})
+            if ("start_time" in attrs) != ("end_time" in attrs):
+                raise InvalidParamsError({"key": "start_time,end_time"})
+            if "start_time" in attrs and attrs["start_time"] > attrs["end_time"]:
+                raise InvalidParamsError({"key": "start_time,end_time"})
+            if attrs.get("bk_obj_id") == "biz" and attrs["bk_inst_id"] != attrs["bk_biz_id"]:
+                raise InvalidParamsError({"key": "bk_inst_id"})
+            return attrs
+
+    def perform_request(self, params):
+        if params.get("bk_host_id") is None and params.get("bk_obj_id") in (None, "biz"):
+            return query_business_host_metric_stats(
+                params["bk_biz_id"], params["category"], params.get("start_time"), params.get("end_time")
+            )
+        host_params = {"bk_biz_id": params["bk_biz_id"]}
+        if params.get("bk_host_id") is not None:
+            host_params["bk_host_id"] = params["bk_host_id"]
+        elif params.get("bk_obj_id") and params.get("bk_inst_id") is not None:
+            host_params["topo_nodes"] = {params["bk_obj_id"]: [params["bk_inst_id"]]}
+        hosts = api.cmdb.get_host_identities(**host_params)
+        return query_host_metric_stats(
+            params["bk_biz_id"], params["category"], hosts, params.get("start_time"), params.get("end_time")
+        )

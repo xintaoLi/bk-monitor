@@ -126,7 +126,6 @@ export default defineComponent({
       return `${props.editType}_${itemKeyMap.get(item)}`;
     };
 
-
     // 计算属性：是否为标签编辑
     const isLabelEdit = computed(() => props.editType === 'label_selector');
     const bkBizId = computed(() => store.getters.bkBizId);
@@ -139,6 +138,7 @@ export default defineComponent({
       bcs_cluster_id: props.bcsClusterId,
       type: props.isNode ? 'node' : 'pod',
       namespaceStr: Array.isArray(props.config?.namespaces) ? (props.config.namespaces as string[]).join(',') : '',
+      namespacesExclude: props.config?.noQuestParams?.namespacesExclude,
       labelSelector: props.config?.label_selector || {},
     }));
 

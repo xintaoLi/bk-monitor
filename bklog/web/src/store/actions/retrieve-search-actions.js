@@ -1,7 +1,23 @@
 /*
  * Tencent is pleased to support the open source community by making
  * 蓝鲸智云PaaS平台 (BlueKing PaaS) available.
+ * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
+ * 蓝鲸智云PaaS平台 (BlueKing PaaS) is licensed under the MIT License.
+ * License for 蓝鲸智云PaaS平台 (BlueKing PaaS):
+ * ---------------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
+
 import axios from 'axios';
 
 import http from '@/api';
@@ -28,12 +44,12 @@ let currentRetrieveRowQueryKey = '';
 let currentMainSearchRequestId = '';
 const fieldInfoRequestPromises = new Map();
 
-const getCookie = (name) => {
+const getCookie = name => {
   const matched = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return matched ? decodeURIComponent(matched[1]) : '';
 };
 
-const buildSearchRequestHeaders = (state) => {
+const buildSearchRequestHeaders = state => {
   const headers = {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -42,7 +58,7 @@ const buildSearchRequestHeaders = (state) => {
   if (csrfToken) {
     headers['X-CSRFToken'] = csrfToken;
   }
-  if (window.IS_EXTERNAL && JSON.parse(window.IS_EXTERNAL) && state.spaceUid) {
+  if (state.spaceUid) {
     headers['X-Bk-Space-Uid'] = state.spaceUid;
   }
   if (state.indexItem?.timezone) {
@@ -51,7 +67,8 @@ const buildSearchRequestHeaders = (state) => {
   return headers;
 };
 
-const isSearchRequestCanceled = error => error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.message === 'Search request canceled';
+const isSearchRequestCanceled = error =>
+  error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.message === 'Search request canceled';
 
 // 检索接口 total 只用于结果集自身，不覆盖 requestSearchTotal 写入的总趋势总数
 const normalizeResultTotal = total => normalizeSearchTotal(total);
@@ -84,14 +101,14 @@ const applySearchStreamProgress = ({ commit, payload, progress, requestCurrentRo
 
   if (progress.stage === 'row' && progress.rowKeys?.length) {
     if (!payload?.isPagination && progress.rowCount === 1) {
-      retrieveRowCacheService.getRows(progress.rowKeys.slice(0, 1)).then((layoutRows) => {
+      retrieveRowCacheService.getRows(progress.rowKeys.slice(0, 1)).then(layoutRows => {
         commit('updateIsSetDefaultTableColumn', { list: layoutRows });
       });
     }
   }
 };
 
-const getRenderFieldMetadata = (state) => {
+const getRenderFieldMetadata = state => {
   const fieldScope = state.indexFieldInfo.field_scope || state.indexId || 'default';
   const fieldNameIndex = retrieveFieldCacheService.getFieldNameIndex(fieldScope);
 
@@ -114,7 +131,7 @@ const getRenderFieldMetadata = (state) => {
   }, {});
 };
 
-const getProjectionFieldNames = (state) => {
+const getProjectionFieldNames = state => {
   const fieldScope = state.indexFieldInfo.field_scope || state.indexId || 'default';
   const cachedFields = retrieveFieldCacheService.getFieldList(fieldScope, false);
   const fields = [
@@ -125,7 +142,7 @@ const getProjectionFieldNames = (state) => {
   return Array.from(
     new Set(
       fields
-        .flatMap((field) => {
+        .flatMap(field => {
           if (!field) return [];
           return [field.field_name, field.alias_mapping_field?.field_name, ...(field.source_field_names || [])];
         })
@@ -189,10 +206,10 @@ function requestIndexSetFieldInfoActionImpl({ commit, state, getters }) {
     end_time,
     scene: isScene
       ? {
-        space_uid: queryData.space_uid,
-        table_id_conditions: queryData.table_id_conditions,
-        scene_filter_values: queryData.scene_filter_values,
-      }
+          space_uid: queryData.space_uid,
+          table_id_conditions: queryData.table_id_conditions,
+          scene_filter_values: queryData.scene_filter_values,
+        }
       : undefined,
   });
 
@@ -209,7 +226,7 @@ function requestIndexSetFieldInfoActionImpl({ commit, state, getters }) {
         ? { cancelToken: requestCancelToken }
         : { catchIsShowMessage: false, cancelToken: requestCancelToken },
     )
-    .then(async (res) => {
+    .then(res => {
       const normalizedFields = normalizeRetrieveFields(res.data ?? {});
       if (res.data) {
         res.data.fields = normalizedFields;
@@ -219,7 +236,7 @@ function requestIndexSetFieldInfoActionImpl({ commit, state, getters }) {
         ([fieldName]) => [fieldName, undefined],
       );
 
-      normalizedFields.forEach((field) => {
+      normalizedFields.forEach(field => {
         if (!field || typeof field !== 'object') return;
         Object.assign(field, {
           filterVisible: field.filterVisible ?? true,
@@ -236,9 +253,7 @@ function requestIndexSetFieldInfoActionImpl({ commit, state, getters }) {
           default_sort_list: defaultSortList,
         }),
       );
-      // updateIndexFieldInfo 已同步写入内存缓存；继续等待 IndexedDB 持久化，
-      // 保证 fields action resolve 后 search/worker 看到的是完整字段语义。
-      await retrieveFieldCacheService.waitForMetaPersistence(fieldScope);
+      // updateIndexFieldInfo 已同步写入内存 meta；IndexedDB 后台落盘，不挡住后续 search。
       commit('updataOperatorDictionary', res.data ?? {});
       commit('updateNotTextTypeFields', res.data ?? {});
       commit('updateIndexSetFieldConfig', res.data ?? {});
@@ -251,12 +266,12 @@ function requestIndexSetFieldInfoActionImpl({ commit, state, getters }) {
         // API 缓存 key 沿用后端字段名 start_time / end_time
         // eslint-disable-next-line camelcase
         .setApiCache(urlStr, `${ids.join(',')}:${start_time}:${end_time}`, res.data || {})
-        .catch((error) => {
+        .catch(error => {
           console.warn('[store-cache] cache field info failed', error);
         });
       return res;
     })
-    .catch((err) => {
+    .catch(err => {
       if (axios.isCancel(err)) return;
       !isUnionIndex && commit('updateApiError', { apiName: urlStr, errorMessage: err });
       commit('updateIndexFieldInfo', { is_loading: false });
@@ -278,7 +293,8 @@ export function requestIndexSetFieldInfoAction(context) {
   const existing = fieldInfoRequestPromises.get(key);
   if (existing) return existing;
 
-  const request = Promise.resolve(requestIndexSetFieldInfoActionImpl(context)).finally(() => fieldInfoRequestPromises.delete(key),
+  const request = Promise.resolve(requestIndexSetFieldInfoActionImpl(context)).finally(() =>
+    fieldInfoRequestPromises.delete(key),
   );
   fieldInfoRequestPromises.set(key, request);
   return request;
@@ -316,8 +332,8 @@ export async function requestIndexSetQueryAction(
   }
 
   if (
-    (!state.indexItem.isUnionIndex && !state.indexId)
-    || (state.indexItem.isUnionIndex && !state.unionIndexList.length)
+    (!state.indexItem.isUnionIndex && !state.indexId) ||
+    (state.indexItem.isUnionIndex && !state.unionIndexList.length)
   ) {
     state.searchTotal = 0;
     commit('updateSqlQueryFieldList', []);
@@ -329,8 +345,8 @@ export async function requestIndexSetQueryAction(
     return;
   }
 
-  // /search 写入 IndexedDB 前必须拿到 fields 元数据。字段元数据决定 analyzed、
-  // tokenize_on_chars 以及最终点击粒度，不能在检索返回后再补齐。
+  // /search 只依赖内存里的 fields 元数据（analyzed / tokenize_on_chars）。
+  // IndexedDB 落盘与检索并行，避免千级字段时 persistence 把首屏 search 挡住。
   const fieldScope = state.indexFieldInfo.field_scope || state.indexId || 'default';
   const hasFieldMetadata = retrieveFieldCacheService.getFieldList(fieldScope, false).length > 0;
   if (!hasFieldMetadata) {
@@ -339,13 +355,10 @@ export async function requestIndexSetQueryAction(
       return { result: false, ignored: true, reason: 'index-set-field-not-found' };
     }
   }
-  // fields 可能已由初始化入口写入内存但仍在持久化；search 也必须等待该阶段完成。
-  await retrieveFieldCacheService.waitForMetaPersistence(
-    state.indexFieldInfo.field_scope || state.indexId || 'default',
-  );
 
   const retrieveParams = getters.retrieveParams;
-  const shouldSkipEmptySceneSearch =    isSceneRetrieve(state) && (getters.isSceneFilterEmpty || !retrieveParams.table_id_conditions?.length);
+  const shouldSkipEmptySceneSearch =
+    isSceneRetrieve(state) && (getters.isSceneFilterEmpty || !retrieveParams.table_id_conditions?.length);
   if (shouldSkipEmptySceneSearch) {
     commit('updateIndexSetQueryResult', {
       is_error: false,
@@ -363,9 +376,9 @@ export async function requestIndexSetQueryAction(
   // 首屏流式检索未完成时，row_keys 只是部分缓存结果；此时分页请求会先取消当前 active search，
   // 导致 replace 流被 append 误杀，最终表现为只解析了部分行但页面无结果。
   if (
-    payload?.isPagination
-    && state.indexSetQueryResult.is_loading
-    && !state.indexSetQueryResult.is_pagination_loading
+    payload?.isPagination &&
+    state.indexSetQueryResult.is_loading &&
+    !state.indexSetQueryResult.is_pagination_loading
   ) {
     return Promise.resolve({ result: false, ignored: true, reason: 'initial-search-loading' });
   }
@@ -426,7 +439,7 @@ export async function requestIndexSetQueryAction(
     if (previousRowQueryKey) {
       storageHealthService.clearActiveQuery(previousRowQueryKey);
       retrieveRowCacheService.releaseQuery(previousRowQueryKey);
-      retrieveRowCacheService.clearQuery(previousRowQueryKey).catch((error) => {
+      retrieveRowCacheService.clearQuery(previousRowQueryKey).catch(error => {
         console.warn('[retrieve-search] clear previous query rows failed', error);
       });
     }
@@ -457,11 +470,11 @@ export async function requestIndexSetQueryAction(
     baseData,
     !state.indexItem.isUnionIndex
       ? {
-        begin: queryBegin,
-      }
+          begin: queryBegin,
+        }
       : {
-        union_configs: unionConfigs,
-      },
+          union_configs: unionConfigs,
+        },
   );
 
   const requestRowQueryKey = payload.isPagination
@@ -470,10 +483,11 @@ export async function requestIndexSetQueryAction(
   const requestCurrentRowKeys = payload.isPagination ? state.indexSetQueryResult.row_keys || [] : [];
   const requestStartSeq = payload.isPagination ? requestCurrentRowKeys.length : 0;
   let isStaleSearchResponse = false;
-  const isCurrentSearchRequest = () => (payload.isPagination
-    ? requestRowQueryKey === state.indexSetQueryResult.row_query_key
-        && requestStartSeq === (state.indexSetQueryResult.row_keys || []).length
-    : requestRowQueryKey === currentRetrieveRowQueryKey);
+  const isCurrentSearchRequest = () =>
+    payload.isPagination
+      ? requestRowQueryKey === state.indexSetQueryResult.row_query_key &&
+        requestStartSeq === (state.indexSetQueryResult.row_keys || []).length
+      : requestRowQueryKey === currentRetrieveRowQueryKey;
 
   const searchHeaders = buildSearchRequestHeaders(state);
   let thisMainSearchRequestId = '';
@@ -485,11 +499,11 @@ export async function requestIndexSetQueryAction(
       fieldMetadata: getRenderFieldMetadata(state),
       fieldNames: getProjectionFieldNames(state),
       headers: searchHeaders,
-      onRequestId: (requestId) => {
+      onRequestId: requestId => {
         thisMainSearchRequestId = requestId;
         currentMainSearchRequestId = requestId;
       },
-      onProgress: (progress) => {
+      onProgress: progress => {
         if (!isCurrentSearchRequest()) return;
         applySearchStreamProgress({
           commit,
@@ -505,12 +519,12 @@ export async function requestIndexSetQueryAction(
       startSeq: requestStartSeq,
       writeMode: payload.isPagination ? 'append' : 'replace',
     })
-    .then(async (workerResult) => {
+    .then(async workerResult => {
       const { code, data, result, message, permission, rowKeys, size, source } = workerResult;
       if (!isCurrentSearchRequest()) {
         isStaleSearchResponse = true;
         if (!payload.isPagination || requestRowQueryKey !== state.indexSetQueryResult.row_query_key) {
-          retrieveRowCacheService.clearQuery(requestRowQueryKey).catch((error) => {
+          retrieveRowCacheService.clearQuery(requestRowQueryKey).catch(error => {
             console.warn('[retrieve-search] clear stale query rows failed', error);
           });
         }
@@ -558,7 +572,7 @@ export async function requestIndexSetQueryAction(
             row_query_key: requestRowQueryKey,
             cached_count: rsolvedData.cached_count,
           })
-          .catch((error) => {
+          .catch(error => {
             console.warn('[store-cache] cache search meta failed', error);
           });
         const activeQueryKeys = await storageHealthService.getActiveQueryKeys();
@@ -566,7 +580,7 @@ export async function requestIndexSetQueryAction(
           .gc({
             excludeQueryKeys: Array.from(new Set([requestRowQueryKey, ...activeQueryKeys])),
           })
-          .catch((error) => {
+          .catch(error => {
             console.warn('[retrieve-search] gc rows failed', error);
           });
 
@@ -615,7 +629,7 @@ export async function requestIndexSetQueryAction(
         size: 0,
       };
     })
-    .catch((e) => {
+    .catch(e => {
       if (!isCurrentSearchRequest()) {
         isStaleSearchResponse = true;
         return;

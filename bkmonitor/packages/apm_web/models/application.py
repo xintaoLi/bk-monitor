@@ -9,6 +9,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
+from typing import cast
 
 from celery import shared_task
 from django.conf import settings
@@ -45,6 +46,7 @@ from apm_web.meta.plugin.log_trace_plugin_config import LogTracePluginConfig
 from apm_web.meta.plugin.plugin import LOG_TRACE
 from apm_web.metric_handler import RequestCountInstance
 from bkm_space.api import SpaceApi
+from bkmonitor.data_source.utils.apm import TraceDatasourceTarget
 from bkmonitor.iam import Permission, ResourceEnum
 from bkmonitor.middlewares.source import get_source_app_code
 from bkmonitor.utils import group_by
@@ -481,6 +483,7 @@ class Application(AbstractRecordModel):
             "enabled_metric": enabled_metric,
             "enabled_log": enabled_log,
             "es_storage_config": storage_options,
+            "owners": cls._normalize_owners(owners),
         }
 
         application_info = api.apm_api.create_application(create_params)
@@ -651,6 +654,18 @@ class Application(AbstractRecordModel):
             TelemetryDataType.LOG.value: self.is_enabled_log,
         }
 
+    def build_data_sources(self) -> list[TraceDatasourceTarget]:
+        """构造当前应用的 Trace 数据源查询目标。"""
+
+        return [
+            TraceDatasourceTarget.build(
+                bk_biz_id=cast(int, self.bk_biz_id),
+                app_name=cast(str, self.app_name),
+                table_id=cast(str, self.trace_result_table_id),
+                retention=cast(int, self.es_retention),
+            )
+        ]
+
     def set_init_dimensions_config(self):
         dimensions_value = {self.DimensionConfig.DIMENSIONS: DefaultDimensionConfig.DEFAULT_DIMENSIONS}
         ApmMetaConfig.application_config_setup(self.application_id, self.DIMENSION_CONFIG_KEY, dimensions_value)
@@ -699,8 +714,9 @@ class Application(AbstractRecordModel):
             logger.warning(f"application->({self.application_id}) grant creator action failed, reason: {e}")
 
         # 给应用负责人授权（创建阶段的 owners 就是全量新增，等价于 grant_owners）
+        # 日志采集授权已在创建数据源时通过 create_custom_report(owners) 完成，这里不再重复
         if self.owners:
-            self.grant_owners(self.owners, previous_owners=[])
+            self.grant_owners(self.owners, previous_owners=[], grant_log=False)
 
     @staticmethod
     def _normalize_owners(owners):
@@ -719,7 +735,7 @@ class Application(AbstractRecordModel):
             result.append(user)
         return result
 
-    def grant_owners(self, new_owners, previous_owners=None):
+    def grant_owners(self, new_owners, previous_owners=None, grant_log=True):
         """
         给新增的负责人授权 APM_APPLICATION 权限，并同步授权所属业务查看权限。
 
@@ -727,9 +743,11 @@ class Application(AbstractRecordModel):
         - 仅对 new_owners 相对于 previous_owners 新增的用户调用 IAM `grant_creator_action`；
         - 先授 APM 应用实例权限，再授所属业务（space）创建者权限，保证负责人能进入业务页面；
         - 被移除的用户不做 IAM 权限回收（bk-monitor 侧无回收能力，IAM 侧默认 6 个月有效期到期后自然失效）。
+        - 更新应用且已开启日志时，再给新增负责人授日志采集项/索引集权限；创建场景由 create_custom_report 负责，不再走这里。
 
         :param new_owners: 目标负责人列表（数据库将被更新为该列表）
         :param previous_owners: 更新前的负责人列表；不传则默认取 self.owners
+        :param grant_log: 是否同步给日志采集授权；创建应用传 False，避免与创建数据源重复授权
         """
         normalized_new = self._normalize_owners(new_owners)
         if previous_owners is None:
@@ -765,7 +783,28 @@ class Application(AbstractRecordModel):
                     f"application->({self.application_id}) grant owner({user}) "
                     f"view_business(bk_biz_id={self.bk_biz_id}) failed, reason: {e}"
                 )
+
+        if grant_log and self.is_enabled_log:
+            self._grant_log_owners(to_grant)
         return normalized_new
+
+    def _grant_log_owners(self, owners):
+        """应用已有日志数据源时，把新增负责人传给日志平台做采集项/索引集授权。"""
+        if not owners:
+            return
+        try:
+            detail = api.apm_api.detail_application(bk_biz_id=self.bk_biz_id, app_name=self.app_name)
+            collector_config_id = (detail.get("log_config") or {}).get("collector_config_id")
+            if not collector_config_id:
+                return
+            api.log_search.update_custom_report(
+                bk_tenant_id=self.bk_tenant_id,
+                collector_config_id=collector_config_id,
+                collector_config_name=self.app_name,
+                owners=owners,
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning(f"application->({self.application_id}) grant log owners({owners}) failed, reason: {e}")
 
     @property
     def is_create_finished(self):

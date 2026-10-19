@@ -31,6 +31,7 @@ from .custom_report import (
 from .data_link import (  # noqa
     BasereportSinkConfig,
     ConditionalSinkConfig,
+    ChannelBindingConfig,
     DataBusConfig,
     DataIdConfig,
     DataLink,
@@ -41,6 +42,7 @@ from .data_link import (  # noqa
     ResultTableConfig,
     SurrealDBBindingConfig,
     VMStorageBindingConfig,
+    VmQueryClusterConfig,
     DorisStorageBindingConfig,
 )
 from .data_source import DataSource, DataSourceOption, DataSourceResultTable
@@ -174,6 +176,7 @@ __all__ = [
     "BkBaseResultTable",
     "GraphRelationBindingConfig",
     "SurrealDBBindingConfig",
+    "VmQueryClusterConfig",
     # resource relation
     "EntityMeta",
     "CustomRelationStatus",

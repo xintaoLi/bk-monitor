@@ -16,6 +16,7 @@ class DataLinkKind(Enum):
 
     DATAID = "DataId"
     RESULTTABLE = "ResultTable"
+    CHANNELBINDING = "ChannelBinding"
     VMSTORAGEBINDING = "VmStorageBinding"
     GRAPHRELATIONBINDING = "GraphRelationBinding"
     ESSTORAGEBINDING = "ElasticSearchBinding"
@@ -26,6 +27,7 @@ class DataLinkKind(Enum):
     BASEREPORTSINK = "BasereportSink"
     SINK = "Sink"
     VMSTORAGE = "VmStorage"
+    VMQUERYCLUSTER = "VmQueryCluster"
     ELASTICSEARCH = "ElasticSearch"
     DORIS = "Doris"
     SURREALDB = "SurrealDB"
@@ -34,6 +36,7 @@ class DataLinkKind(Enum):
     choices_labels = (
         (DATAID, "dataids"),
         (RESULTTABLE, "resulttables"),
+        (CHANNELBINDING, "channelbindings"),
         (VMSTORAGEBINDING, "vmstoragebindings"),
         (ESSTORAGEBINDING, "elasticsearchbindings"),
         (DORISBINDING, "dorisbindings"),
@@ -42,6 +45,7 @@ class DataLinkKind(Enum):
         (BASEREPORTSINK, "basereportsinks"),
         (SINK, "sinks"),
         (VMSTORAGE, "vmstorages"),
+        (VMQUERYCLUSTER, "vmqueryclusters"),
         (ELASTICSEARCH, "elasticsearchs"),
         (DORIS, "dorises"),
         (KAFKACHANNEL, "kafkachannels"),

@@ -166,6 +166,10 @@ MIDDLEWARE = (
     "apps.middleware.tenant_middleware.TenantValidationMiddleware",
 )
 
+# Resource Call owns an explicit, discoverable params schema. Avoid recursively
+# adding space fields to its opaque ``params`` envelope before schema validation.
+BKM_SPACE_INJECT_REQUEST_EXCLUDED_PATHS = ("/api/v1/admin/resource/call/",)
+
 # 所有环境的日志级别可以在这里配置
 # LOG_LEVEL = 'INFO'
 
@@ -238,6 +242,9 @@ CELERY_IMPORTS = (
     "apps.log_databus.tasks.itsm",
     "apps.log_databus.tasks.bkdata",
     "apps.log_databus.tasks.archive",
+    "apps.log_databus.tasks.scene",
+    "apps.log_admin_resource.tasks",
+    "apps.log_admin_resource.k8s_tasks",
     "apps.log_measure.tasks.report",
     "apps.log_extract.tasks",
     "apps.log_clustering.tasks.msg",
@@ -444,7 +451,12 @@ BK_HOT_WARM_CONFIG_URL = (
 BK_COMPONENT_API_URL = os.environ.get("BK_COMPONENT_API_URL")
 DEPLOY_MODE = os.environ.get("DEPLOY_MODE", "")
 
-BK_IAM_APIGATEWAY_URL = os.getenv("BKAPP_IAM_API_BASE_URL") or f"{BK_COMPONENT_API_URL}/api/bk-iam/prod/"
+from iam_engine.settings import load_iam_settings, resolve_iam_gateway_url
+
+BK_IAM_APIGATEWAY_URL = resolve_iam_gateway_url(BK_COMPONENT_API_URL, os.getenv("BKAPP_IAM_API_BASE_URL"), version="v3")
+
+# Both products share the BKLog environment contract (including string defaults).
+globals().update(load_iam_settings(component_api_url=BK_COMPONENT_API_URL))
 
 BK_USER_HOST = os.getenv("BKAPP_BKUSER_HOST", BK_BKLOG_HOST.replace("bklog", "bkuser"))
 SHOW_PERSONAL_SETTINGS = os.getenv("BKAPP_SHOW_PERSONAL_SETTINGS", "on") == "on"
@@ -887,6 +899,12 @@ MENUS = [
 # TAM
 TAM_AEGIS_KEY = os.environ.get("BKAPP_TAM_AEGIS_KEY", "")
 
+# RUM 接入配置
+BKLOG_RUM_SDK = os.getenv("BKLOG_RUM_SDK", "otlp")
+BKLOG_RUM_ENDPOINT = os.getenv("BKLOG_RUM_ENDPOINT", "")
+BKLOG_RUM_TOKEN = os.getenv("BKLOG_RUM_TOKEN", "")
+BKLOG_RUM_ENABLED = str(os.getenv("BKLOG_RUM_ENABLED", False)).lower() == "true"
+
 # 任务过期天数
 EXTRACT_EXPIRED_DAYS = int(os.getenv("BKAPP_EXTRACT_EXPIRED_DAYS", 1))
 # windows系统名称列表
@@ -946,10 +964,8 @@ FEATURE_EXPORT_SCROLL = os.environ.get("BKAPP_FEATURE_EXPORT_SCROLL", False)
 
 # BCS
 BCS_API_GATEWAY_TOKEN = os.getenv("BKAPP_BCS_API_GATEWAY_TOKEN", "")
-BCS_CC_SSM_SWITCH = os.getenv("BKAPP_BCS_CC_SSM_SWITCH", "on")
 BCS_APIGATEWAY_HOST = os.getenv("BKAPP_BCS_APIGATEWAY_HOST", "")
 BCS_CC_APIGATEWAY_HOST = os.getenv("BKAPP_BCS_CC_APIGATEWAY_HOST", "")
-BK_SSM_HOST = os.getenv("BKAPP_SSM_HOST", "http://bkssm.service.consul:5000/api/v1/auth/access-tokens")
 BCS_WEB_CONSOLE_DOMAIN = os.getenv("BKAPP_BCS_WEB_CONSOLE_DOMAIN", BK_BKLOG_HOST.replace("bklog", "bcs"))
 BKLOG_CONFIG_KIND = os.getenv("BKAPP_BKLOG_CONFIG_KIND", "BkLogConfig")
 BKLOG_CONFIG_API_VERSION = os.getenv("BKAPP_BKLOG_CONFIG_API_VERSION", "bk.tencent.com/v1alpha1")
@@ -1026,6 +1042,13 @@ ESQUERY_WHITE_LIST = [
     "apigw-dashboard",
     "bk_apigateway",
 ] + ESQUERY_EXTRA_WHITE_LIST
+
+# Resource Call 的 API 网关主动授权提供只读准入；此白名单只提升管理能力。
+# 默认继承现有 ESQUERY 白名单以保持已部署管理端兼容，各环境可通过环境变量逐步切换到
+# 专用 APP Code。最终边界由 AdminResourceRegistry.call 在真实 Handler 调用入口执行。
+RESOURCE_CALL_APP_CODE_WHITE_LIST = [
+    app for app in os.getenv("BKAPP_RESOURCE_CALL_APP_CODE_WHITE_LIST", ",".join(ESQUERY_WHITE_LIST)).split(",") if app
+]
 
 # BK repo conf
 BKREPO_ENDPOINT_URL = os.getenv("BKREPO_ENDPOINT_URL") or os.getenv("BKAPP_BKREPO_ENDPOINT_URL")
