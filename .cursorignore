@@ -1,8 +1,0 @@
-# AAFE runtime stays on the server. Do not list .ai-agent SKILL.md
-# as a second skill source; AIBOT triggers via `.cursor/skills`.
-.ai-agent/
-bklog/web/.ai-agent/
-bklog/web/tests/
-bklog/web/.docs/
-bklog/web/.aafe-memory/
-bklog/web/openspec/

@@ -200,12 +200,7 @@ bkcodeai.json
 # ruff
 .ruff_cache/
 
-.cursor/*
-!.cursor/skills/
-!.cursor/skills/**
-
-# AAFE local runtime; keep on the server only, do not commit.
-.ai-agent/
+.cursor/
 
 .codebuddy
 
