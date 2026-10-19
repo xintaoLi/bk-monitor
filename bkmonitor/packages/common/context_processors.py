@@ -60,8 +60,7 @@ def get_default_biz_id(request, biz_list: list[dict[str, Any]] | None = None, id
             if biz_id_or_none:
                 biz_id = safe_int(str(biz_id_or_none).strip("/"), dft=None)
             elif biz_list:
-                sorted(biz_list, key=lambda biz: biz[id_key])
-                biz_id = biz_list[0]["bk_biz_id"]
+                biz_id = min(biz_list, key=lambda biz: biz[id_key])["bk_biz_id"]
             else:
                 biz_id = -1
 
@@ -145,6 +144,8 @@ def get_core_context(request):
         "BK_PAAS_HOST": settings.BK_PAAS_HOST,
         # bkchat 用户管理接口
         "BKCHAT_MANAGE_URL": settings.BKCHAT_MANAGE_URL,
+        # TAPD 前端跳转 / OAuth 基址，由环境变量注入，公开仓不写死主机
+        "TAPD_OAUTH_BASE_URL": getattr(settings, "TAPD_OAUTH_BASE_URL", "") or "",
         "CE_URL": settings.CE_URL,
         "BKLOGSEARCH_HOST": settings.BKLOGSEARCH_HOST,
         "BK_NODEMAN_HOST": settings.BK_NODEMAN_HOST,

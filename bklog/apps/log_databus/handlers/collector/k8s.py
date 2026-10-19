@@ -25,7 +25,6 @@ from collections import defaultdict
 import yaml
 from django.db import IntegrityError, transaction
 from django.utils.translation import gettext as _
-from kubernetes import client
 from rest_framework.exceptions import ErrorDetail, ValidationError
 
 from apps.api import TransferApi, BcsApi
@@ -38,6 +37,7 @@ from apps.feature_toggle.plugins.constants import (
 )
 from apps.log_bcs.handlers.bcs_handler import BcsHandler
 from apps.log_databus.constants import (
+    ADMIN_REQUEST_USER,
     META_DATA_ENCODING,
     ContainerCollectorType,
     ContainerCollectStatus,
@@ -393,7 +393,10 @@ class K8sCollectorHandler(CollectorHandler):
                     {
                         "key": expression["key"],
                         "operator": expression["operator"],
-                        "values": [v.strip() for v in expression.get("value", "").split(",") if v.strip()],
+                        "values": [v.strip() for v in expression.get("value", "").split(",") if v.strip()]
+                        if expression["operator"]
+                        not in (LabelSelectorOperator.EXISTS, LabelSelectorOperator.DOES_NOT_EXIST)
+                        else [],
                     }
                     for expression in container_config.match_expressions
                 ]
@@ -405,7 +408,10 @@ class K8sCollectorHandler(CollectorHandler):
                     {
                         "key": expression["key"],
                         "operator": expression["operator"],
-                        "values": [v.strip() for v in expression.get("value", "").split(",") if v.strip()],
+                        "values": [v.strip() for v in expression.get("value", "").split(",") if v.strip()]
+                        if expression["operator"]
+                        not in (LabelSelectorOperator.EXISTS, LabelSelectorOperator.DOES_NOT_EXIST)
+                        else [],
                     }
                     for expression in container_config.match_annotations
                 ]
@@ -1120,6 +1126,36 @@ class K8sCollectorHandler(CollectorHandler):
             raise ValueError("default es cluster not exists.")
         return {"data_link_id": data_link_id, "storage_cluster_id": storage_cluster_id}
 
+    def _schedule_bcs_scene_label_sync(self, *collector_configs: CollectorConfig):
+        """在外层数据库事务提交后，再同步外部场景标签。"""
+        collector_config_ids = [
+            collector_config.collector_config_id for collector_config in collector_configs if collector_config
+        ]
+        if not collector_config_ids:
+            return
+
+        transaction.on_commit(lambda: K8sCollectorHandler._sync_bcs_scene_labels(*collector_config_ids))
+
+    @staticmethod
+    def _sync_bcs_scene_labels(*collector_config_ids: int):
+        """同步 metadata 和索引集场景标签；失败不影响采集项持久化。"""
+        for collector_config_id in collector_config_ids:
+            try:
+                collector_config = CollectorConfig.objects.get(collector_config_id=collector_config_id)
+                collector_handler = K8sCollectorHandler(data=collector_config)
+                labels = collector_handler.build_scene_labels()
+                TransferApi.switch_result_table(
+                    {
+                        "table_id": collector_config.table_id,
+                        "bk_biz_id": collector_config.bk_biz_id,
+                        "operator": ADMIN_REQUEST_USER,
+                        "labels": labels,
+                    }
+                )
+                collector_handler._sync_scene_tags_to_index_set(labels)
+            except Exception:  # pylint: disable=broad-except
+                logger.exception("[bcs_scene_labels] failed to sync collector_config_id=%s", collector_config_id)
+
     @transaction.atomic
     def create_bcs_container_config(self, data, bk_app_code="bk_bcs"):
         conf = self._get_bcs_config(
@@ -1279,6 +1315,8 @@ class K8sCollectorHandler(CollectorHandler):
                 )
 
         ContainerCollectorConfig.objects.bulk_create(container_collector_config_list)
+
+        self._schedule_bcs_scene_label_sync(path_collector_config, std_collector_config)
 
         if is_send_create_notify:
             self._send_create_notify(path_collector_config)
@@ -1505,6 +1543,8 @@ class K8sCollectorHandler(CollectorHandler):
                 func=self.compare_config,
                 **{"data_configs": std_container_config},
             )
+
+        self._schedule_bcs_scene_label_sync(path_collector, std_collector)
 
         if is_send_path_create_notify:
             self._send_create_notify(path_collector_config)
@@ -1964,9 +2004,7 @@ class K8sCollectorHandler(CollectorHandler):
         raw_config.update(
             {
                 "dataId": collector_config.bk_data_id,
-                "extMeta": {
-                    label["key"]: label["value"] for label in (collector_config.extra_labels or []) if label
-                },
+                "extMeta": {label["key"]: label["value"] for label in (collector_config.extra_labels or []) if label},
                 "addPodLabel": collector_config.add_pod_label,
                 "addPodAnnotation": collector_config.add_pod_annotation,
             }
@@ -1982,27 +2020,23 @@ class K8sCollectorHandler(CollectorHandler):
         )
 
     @staticmethod
-    def filter_pods_by_annotations(pods, match_annotations):
+    def filter_by_annotations(resources, match_annotations):
         """
-        通过annotation过滤pod信息
+        按 Kubernetes 选择器语义过滤 Pod/Node 注解，保留原列表类型和元数据。
         """
-        # 用于存储符合条件的 pods
-        filtered_pods = []
-        # 遍历 pods，检查每个 pod 的 annotations
-        for pod in pods.items:
-            annotations = pod.metadata.annotations
-            if not annotations:
-                continue
+        filtered_resources = []
+        for resource in resources.items:
+            annotations = resource.metadata.annotations or {}
 
             is_matched = True
             # 遍历match_annotations条件,如果不满足条件,is_matched设置为False
             for _match in match_annotations:
                 key = _match["key"]
                 op = _match["operator"]
-                value = _match["value"].strip("()").split(",")
+                value = [v.strip() for v in _match.get("value", "").strip("()").split(",") if v.strip()]
                 if op == LabelSelectorOperator.IN and not (key in annotations and annotations[key] in value):
                     is_matched = False
-                elif op == LabelSelectorOperator.NOT_IN and not (key in annotations and annotations[key] not in value):
+                elif op == LabelSelectorOperator.NOT_IN and key in annotations and annotations[key] in value:
                     is_matched = False
                 elif op == LabelSelectorOperator.EXISTS and key not in annotations:
                     is_matched = False
@@ -2011,14 +2045,13 @@ class K8sCollectorHandler(CollectorHandler):
 
             if is_matched:
                 # 满足匹配条件时,加入到结果列表中
-                filtered_pods.append(pod)
+                filtered_resources.append(resource)
 
-        # 把返回的数据重新构建为V1PodList类型
-        return client.models.V1PodList(
-            api_version=pods.api_version,
-            kind=pods.kind,
-            items=filtered_pods,
-            metadata=pods.metadata,
+        return type(resources)(
+            api_version=resources.api_version,
+            kind=resources.kind,
+            items=filtered_resources,
+            metadata=resources.metadata,
         )
 
     def list_namespace(self, bk_biz_id, bcs_cluster_id):
@@ -2154,7 +2187,7 @@ class K8sCollectorHandler(CollectorHandler):
                         break
 
                 if is_break:
-                    break
+                    continue
 
             filtered_pods.append(pod)
 
@@ -2220,6 +2253,8 @@ class K8sCollectorHandler(CollectorHandler):
                 nodes = api_instance.list_node(label_selector=label_expression)
             else:
                 nodes = api_instance.list_node()
+            if match_annotations:
+                nodes = self.filter_by_annotations(nodes, match_annotations)
             previews.append(
                 {"group": "node", "total": len(nodes.items), "items": [item.metadata.name for item in nodes.items]}
             )
@@ -2241,7 +2276,7 @@ class K8sCollectorHandler(CollectorHandler):
 
         if match_annotations:
             # 根据annotation过滤
-            pods = self.filter_pods_by_annotations(pods, match_annotations)
+            pods = self.filter_by_annotations(pods, match_annotations)
 
         is_shared_cluster = False
         shared_cluster_namespace = list()
@@ -2305,8 +2340,24 @@ class K8sCollectorHandler(CollectorHandler):
                     NamespaceNotValidException.MESSAGE.format(namespaces=", ".join(invalid_namespaces))
                 )
 
-    def list_topo(self, topo_type, bk_biz_id, bcs_cluster_id, namespace):
-        namespace_list = [ns for ns in namespace.split(",") if ns]
+    def list_topo(self, topo_type, bk_biz_id, bcs_cluster_id, namespace="", namespaces_exclude=""):
+        namespace_list = [ns for ns in (namespace or "").split(",") if ns]
+        excluded_namespaces = {ns for ns in (namespaces_exclude or "").split(",") if ns}
+        if namespace_list and excluded_namespaces:
+            raise ValidationError(_("不能同时指定命名空间和排除指定空间"))
+
+        result = {"id": bcs_cluster_id, "name": bcs_cluster_id, "type": "cluster"}
+        if excluded_namespaces and topo_type == TopoType.POD.value:
+            cluster_info = self.get_cluster_info(bk_biz_id, bcs_cluster_id)
+            if cluster_info["is_shared"]:
+                namespace_list = [
+                    ns["id"]
+                    for ns in self.list_namespace(bk_biz_id, bcs_cluster_id)
+                    if ns["id"] not in excluded_namespaces
+                ]
+                if not namespace_list:
+                    result["children"] = []
+                    return result
 
         collector_type = (
             ContainerCollectorType.NODE if topo_type == TopoType.NODE.value else ContainerCollectorType.CONTAINER
@@ -2314,7 +2365,6 @@ class K8sCollectorHandler(CollectorHandler):
         self.check_cluster_config(bk_biz_id, collector_type, bcs_cluster_id, namespace_list)
 
         api_instance = Bcs(cluster_id=bcs_cluster_id).api_instance_core_v1
-        result = {"id": bcs_cluster_id, "name": bcs_cluster_id, "type": "cluster"}
         if topo_type == TopoType.NODE.value:
             node_result = []
             nodes = api_instance.list_node().to_dict()
@@ -2325,7 +2375,7 @@ class K8sCollectorHandler(CollectorHandler):
             return result
         if topo_type == TopoType.POD.value:
             result["children"] = []
-            if namespace_list:
+            if namespace_list and not excluded_namespaces:
                 for namespace_item in namespace_list:
                     namespace_result = {"id": namespace_item, "name": namespace_item, "type": "namespace"}
                     pods = api_instance.list_namespaced_pod(namespace=namespace_item).to_dict()
@@ -2342,6 +2392,9 @@ class K8sCollectorHandler(CollectorHandler):
             namespaced_dict = defaultdict(list)
             items = pods.get("items", [])
             for pod in items:
+                pod_namespace = pod["metadata"]["namespace"]
+                if pod_namespace in excluded_namespaces or (namespace_list and pod_namespace not in namespace_list):
+                    continue
                 namespaced_dict[pod["metadata"]["namespace"]].append(
                     {"id": pod["metadata"]["name"], "name": pod["metadata"]["name"], "type": "pod"}
                 )
@@ -2350,22 +2403,38 @@ class K8sCollectorHandler(CollectorHandler):
             return result
 
     @classmethod
-    def generate_objs(cls, objs_dict, namespaces=None):
+    def generate_objs(cls, objs_dict, namespaces=None, namespaces_exclude=None):
         result = []
         if not objs_dict.get("items"):
             return result
         for item in objs_dict["items"]:
+            if namespaces_exclude and item["metadata"]["namespace"] in namespaces_exclude:
+                continue
             if not namespaces or item["metadata"]["namespace"] in namespaces:
                 # 有指定命名空间的，按命名空间过滤
                 result.append(item["metadata"]["name"])
         return result
 
-    def get_workload(self, workload_type, bcs_cluster_id, namespace):
+    def get_workload(self, workload_type, bcs_cluster_id, namespace="", namespaces_exclude="", bk_biz_id=None):
+        namespaces = [ns for ns in (namespace or "").split(",") if ns]
+        excluded_namespaces = {ns for ns in (namespaces_exclude or "").split(",") if ns}
+        if namespaces and excluded_namespaces:
+            raise ValidationError(_("不能同时指定命名空间和排除指定空间"))
+
+        if excluded_namespaces:
+            cluster_info = self.get_cluster_info(bk_biz_id, bcs_cluster_id)
+            if cluster_info["is_shared"]:
+                namespaces = [
+                    ns["id"]
+                    for ns in self.list_namespace(bk_biz_id, bcs_cluster_id)
+                    if ns["id"] not in excluded_namespaces
+                ]
+                if not namespaces:
+                    return []
+
         bcs = Bcs(cluster_id=bcs_cluster_id)
 
-        namespaces = [ns for ns in namespace.split(",") if ns]
-
-        if len(namespaces) == 1:
+        if len(namespaces) == 1 and not excluded_namespaces:
             workload_type_handler_dict = {
                 WorkLoadType.DEPLOYMENT: bcs.api_instance_apps_v1.list_namespaced_deployment,
                 WorkLoadType.STATEFUL_SET: bcs.api_instance_apps_v1.list_namespaced_stateful_set,
@@ -2387,7 +2456,9 @@ class K8sCollectorHandler(CollectorHandler):
         if not workload_handler:
             return []
 
-        return self.generate_objs(workload_handler().to_dict(), namespaces=namespaces)
+        return self.generate_objs(
+            workload_handler().to_dict(), namespaces=namespaces, namespaces_exclude=excluded_namespaces
+        )
 
     @staticmethod
     def _convert_lower_cluster_id(bcs_cluster_id: str):

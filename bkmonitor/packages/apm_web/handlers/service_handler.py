@@ -10,7 +10,6 @@ specific language governing permissions and limitations under the License.
 
 import copy
 import logging
-import operator
 from collections import defaultdict
 from typing import Any
 
@@ -21,14 +20,13 @@ from django.utils.translation import gettext_lazy as _
 from apm_web.handlers import metric_group
 from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.semconv.trace import SpanAttributes
-from constants.apm import MetricTemporality, TelemetryDataType, Vendor
+from constants.apm import LLMProduct, MetricTemporality, OtlpKey, TelemetryDataType, Vendor
 
 from apm_web.constants import (
     APM_APPLICATION_DEFAULT_METRIC,
     APM_APPLICATION_METRIC,
     APM_APPLICATION_METRIC_DEFAULT_EXPIRED_TIME,
     ApdexCategoryMapping,
-    CategoryEnum,
     CustomServiceMatchType,
     DataStatus,
     TopoNodeKind,
@@ -37,11 +35,9 @@ from apm_web.handlers.log_handler import ServiceLogHandler
 from apm_web.metric_handler import RequestCountInstance, ServiceFlowCount
 from apm_web.metrics import APPLICATION_LIST
 from apm_web.models import ApdexServiceRelation, Application, ApplicationCustomService
-from bkmonitor.utils import group_by
 from bkmonitor.utils.cache import CacheType, lru_cache_with_ttl, using_cache
 from bkmonitor.utils.thread_backend import ThreadPool
 from bkmonitor.utils.time_tools import get_datetime_range
-from constants.apm import OtlpKey
 from core.drf_resource import api
 from core.errors.api import BKAPIError
 
@@ -91,14 +87,8 @@ class ServiceHandler:
         return service_map
 
     @classmethod
-    def list_services(cls, application):
-        """
-        获取应用的服务列表 =
-            已发现的服务(service, remote_service)
-            + 未发现的自定义服务
-            + 服务下的组件(component)
-            + 无 Trace 上报的 Profiling 服务
-        """
+    def list_services(cls, application: Application | dict[str, Any]) -> list[dict[str, Any]]:
+        """获取拓扑服务、组件及尚未发现的手动自定义服务。"""
         if isinstance(application, dict):
             bk_biz_id = application["bk_biz_id"]
             app_name = application["app_name"]
@@ -108,10 +98,14 @@ class ServiceHandler:
             app_name = application.app_name
             is_enabled_profiling = application.is_enabled_profiling
 
-        trace_services = cls.list_nodes(bk_biz_id, app_name)
+        services = [
+            node
+            for node in cls.list_nodes(bk_biz_id, app_name)
+            if is_enabled_profiling or node.get("source") != [TelemetryDataType.PROFILING.value]
+        ]
 
         # step1: 获取已发现的服务
-        found_service_names = [i["topo_key"] for i in trace_services if i["extra_data"]["kind"] == "remote_service"]
+        found_service_names = [i["topo_key"] for i in services if i["extra_data"]["kind"] == "remote_service"]
         # step2: 额外补充手动配置的自定义服务
         custom_services = ApplicationCustomService.objects.filter(
             bk_biz_id=bk_biz_id, app_name=app_name, match_type=CustomServiceMatchType.MANUAL
@@ -121,7 +115,7 @@ class ServiceHandler:
             if topo_key in found_service_names:
                 continue
 
-            trace_services.append(
+            services.append(
                 {
                     "topo_key": topo_key,
                     "extra_data": {
@@ -134,42 +128,7 @@ class ServiceHandler:
                 }
             )
 
-        # step3: 计算服务下组件
-
-        # step4: 获取 Profile 服务
-        profile_services = []
-        if is_enabled_profiling:
-            profile_services = api.apm_api.query_profile_services_detail(
-                **{"bk_biz_id": bk_biz_id, "app_name": app_name}
-            )
-
-        # step5: 将 Profile 服务和 Trace 服务重名的结合
-        return cls._combine_profile_trace_service(trace_services, profile_services)
-
-    @classmethod
-    def _combine_profile_trace_service(cls, trace_services, profile_services):
-        """合并 TraceService 和 ProfileService"""
-        res = copy.deepcopy(trace_services)
-        trace_names_mapping = group_by(res, operator.itemgetter("topo_key"))
-        visited = []
-        for profile_svr in profile_services:
-            if profile_svr["name"] not in trace_names_mapping and profile_svr["name"] not in visited:
-                # 如果没有 Trace 数据 则单独开一个服务
-                res.append(
-                    {
-                        "topo_key": profile_svr["name"],
-                        "extra_data": {
-                            "category": CategoryEnum.PROFILING,
-                            "kind": "profiling",
-                            "predicate_value": None,
-                            "service_language": None,
-                            "instance": {},
-                        },
-                    }
-                )
-                visited.append(profile_svr["name"])
-
-        return res
+        return services
 
     @classmethod
     def generate_remote_service_name(cls, name, category="http"):
@@ -669,10 +628,16 @@ class ServiceHandler:
         """
         从节点提取系统信息
         :param node: 节点信息
-        :return: 无 system 返回 {}，否则 {name, sdk, temporality}
+        :return: 无 system 且不支持 LLM 返回 {}
         """
         systems: list[dict[str, Any]] = node.get("system") or []
-        if not systems:
+        llm: dict[str, Any] = (node.get("extra_data") or {}).get("llm") or {}
+        product: str = llm.get("product") or ""
+        is_support_llm: bool = bool(product)
+        if is_support_llm and Vendor.has_sdk(node.get("sdk"), Vendor.G):
+            product = LLMProduct.GALILEO.value
+
+        if not systems and not is_support_llm:
             return {}
 
         name: str = ""
@@ -699,6 +664,8 @@ class ServiceHandler:
             "name": name,
             "rpc_system": rpc_system,
             "is_support_call_analysis": name == metric_group.GroupEnum.TRPC.value,
+            "is_support_llm": is_support_llm,
+            "product": product,
             "sdk": sdk_name or "",
             "temporality": temporality,
         }

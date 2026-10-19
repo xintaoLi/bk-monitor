@@ -14,6 +14,7 @@ import datetime
 import logging
 import time
 import traceback
+from typing import Any
 
 from django.conf import settings
 from django.db.models import Q, Value
@@ -37,12 +38,14 @@ from apm.models import (
     ApmApplication,
     AppConfigBase,
     EbpfApplicationConfig,
+    LogDataSource,
     MetricDataSource,
     ProfileDataSource,
     QpsConfig,
 )
 from apm.utils.report_event import EventReportHelper
 from bkmonitor.utils.tenant import bk_biz_id_to_bk_tenant_id, set_local_tenant_id
+from bkmonitor.utils.user import get_user_display_name
 from constants.apm import TelemetryDataType
 from constants.common import DEFAULT_TENANT_ID
 from core.drf_resource import api
@@ -103,51 +106,59 @@ def topo_discover_cron():
 
 
 @app.task(ignore_result=True, queue="celery_cron")
-def datasource_discover_handler(metric_datasource, interval, start_time):
-    cur = timezone.now()
-    all_seconds = interval * 60
-    split_seconds = settings.APM_APPLICATION_METRIC_DISCOVER_SPLIT_DELTA
-    for start in range(0, all_seconds, split_seconds):
-        end = start + split_seconds
-        for d in DiscoverContainer.list_discovers(TelemetryDataType.METRIC.value):
-            d(metric_datasource).discover(start_time + start, start_time + end)
+def datasource_discover_handler(
+    datasource: MetricDataSource | LogDataSource,
+    interval: int,
+    start_time: int,
+    data_type: str = TelemetryDataType.METRIC.value,
+) -> None:
+    cur: datetime.datetime = timezone.now()
+    all_seconds: int = interval * 60
+    for discover_cls in DiscoverContainer.list_discovers(data_type):
+        split_seconds: int = discover_cls.SPLIT_SECONDS or all_seconds
+        for offset in range(0, all_seconds, split_seconds):
+            discover_cls(datasource).discover(start_time + offset, start_time + offset + split_seconds)
 
     logger.info(
         f"[datasource_discover_handler] finished datasource discover, "
-        f"({metric_datasource.bk_biz_id}){metric_datasource.app_name} elapsed: {(timezone.now() - cur).seconds}s"
+        f"({datasource.bk_biz_id}){datasource.app_name} elapsed: {(timezone.now() - cur).seconds}s"
     )
 
 
-def datasource_discover_cron():
-    """Metric|Log 数据源数据发现"""
-
-    interval = 10
-    current_time = timezone.now()
-    current_timestamp = int(current_time.timestamp())
-    slug = current_time.minute % interval
-
-    valid_application_mapping = {
-        (i["bk_biz_id"], i["app_name"]): i
-        for i in ApmApplication.objects.filter(is_enabled=Value(1), is_enabled_metric=Value(1)).values(
-            "id", "bk_biz_id", "app_name"
+def datasource_discover_cron() -> None:
+    """Metric、Log 数据源数据发现。"""
+    interval: int = 10
+    current_time: datetime.datetime = timezone.now()
+    current_timestamp: int = int(current_time.timestamp())
+    slug: int = current_time.minute % interval
+    valid_application_mapping: dict[tuple[int, str], dict[str, Any]] = {
+        (item["bk_biz_id"], item["app_name"]): item
+        for item in ApmApplication.objects.filter(is_enabled=Value(1)).values(
+            "id", "bk_biz_id", "app_name", "is_enabled_metric", "is_enabled_log"
         )
     }
-    datasource_mapping = {
-        (i.bk_biz_id, i.app_name): i
-        for i in MetricDataSource.objects.filter(~Q(result_table_id="") & ~Q(bk_data_id=-1))
-        if (i.bk_biz_id, i.app_name) in valid_application_mapping
-    }
-    for k, v in datasource_mapping.items():
-        app_id = valid_application_mapping[k]["id"]
-        try:
-            apm_cache_handler = ApmCacheHandler()
-            with apm_cache_handler.distributed_lock("datasource_discover", app_id=app_id):
-                if app_id % interval == slug:
-                    logger.info(f"[datasource_discover_cron] delay task for app_id: {app_id}")
-                    datasource_discover_handler.delay(v, interval, current_timestamp)
-        except LockError:
-            logger.info(f"skipped: [datasource_discover_cron] already running. app_id: {app_id}")
-            continue
+    for data_type, datasource_model in (
+        (TelemetryDataType.METRIC.value, MetricDataSource),
+        (TelemetryDataType.LOG.value, LogDataSource),
+    ):
+        datasource_mapping: dict[tuple[int, str], MetricDataSource | LogDataSource] = {
+            (item.bk_biz_id, item.app_name): item
+            for item in datasource_model.objects.filter(~Q(result_table_id="") & ~Q(bk_data_id=-1))
+            if valid_application_mapping.get((item.bk_biz_id, item.app_name), {}).get(f"is_enabled_{data_type}")
+        }
+        for key, datasource in datasource_mapping.items():
+            app_id: int = valid_application_mapping[key]["id"]
+            try:
+                apm_cache_handler = ApmCacheHandler()
+                with apm_cache_handler.distributed_lock("datasource_discover", app_id=app_id):
+                    if app_id % interval == slug:
+                        logger.info(f"[datasource_discover_cron] delay {data_type} task for app_id: {app_id}")
+                        datasource_discover_handler.delay(
+                            datasource, interval, current_timestamp - interval * 60, data_type
+                        )
+            except LockError:
+                logger.info(f"skipped: [datasource_discover_cron] already running. app_id: {app_id}")
+                continue
 
 
 def refresh_apm_config():
@@ -222,11 +233,16 @@ def create_or_update_tail_sampling(trace_datasource, data, operator=None):
     """创建/更新尾部采样Flow"""
     bk_biz_id = trace_datasource.bk_biz_id
     app_name = trace_datasource.app_name
+    if settings.ENABLE_MULTI_TENANT_MODE:
+        set_local_tenant_id(bk_biz_id_to_bk_tenant_id(bk_biz_id))
+    operator_display_name = get_user_display_name(operator) if operator else operator
     try:
         TailSamplingFlow(trace_datasource, data).start()
-        EventReportHelper.report(f"应用: ({bk_biz_id}){app_name} 开启尾部采样成功，操作人：{operator}, 规则: {data}")
+        EventReportHelper.report(
+            f"应用: ({bk_biz_id}){app_name} 开启尾部采样成功，操作人：{operator_display_name}, 规则: {data}"
+        )
     except Exception as e:  # noqa
-        EventReportHelper.report(f"应用：({bk_biz_id}){app_name} 开启尾部采样失败，操作人：{operator}")
+        EventReportHelper.report(f"应用：({bk_biz_id}){app_name} 开启尾部采样失败，操作人：{operator_display_name}")
 
 
 @app.task(ignore_result=True, queue="celery_cron")
@@ -254,12 +270,14 @@ def profile_handler(bk_biz_id: int, app_name: str):
     logger.info(f"[profile_handler] ({bk_biz_id}){app_name} end at {datetime.datetime.now()}")
 
 
-def profile_discover_cron():
-    """定时发现profile服务"""
+def profile_discover_cron() -> None:
+    """定时发现 Profile 服务。"""
     logger.info(f"[profile_discover_cron] start at {datetime.datetime.now()}")
     apps = [
         (i["bk_biz_id"], i["app_name"])
-        for i in ApmApplication.objects.filter(is_enabled=True).values("bk_biz_id", "app_name")
+        for i in ApmApplication.objects.filter(is_enabled=True, is_enabled_profiling=True).values(
+            "bk_biz_id", "app_name"
+        )
     ]
     apps = [i for i in ProfileDataSource.objects.all() if (i.bk_biz_id, i.app_name) in apps]
 
@@ -328,11 +346,14 @@ def create_application_async(application_id, storage_config, options, cur_retry_
 
     try:
         application = ApmApplication.objects.get(id=application_id)
+        if settings.ENABLE_MULTI_TENANT_MODE:
+            set_local_tenant_id(application.bk_tenant_id)
         application.apply_datasource(storage_config, storage_config, options)
+        create_user = get_user_display_name(application.create_user)
         EventReportHelper.report(
             f"[异步创建任务] 业务：{application.bk_biz_id}，"
             f"应用：{application.app_name}，"
-            f"创建人：{application.create_user}，创建成功"
+            f"创建人：{create_user}，创建成功"
         )
     except Exception as e:  # pylint: disable=broad-except
         logger.error(f"[create_application_async] occur exception of app_id:{application_id} error: {e}")
@@ -382,9 +403,15 @@ def delete_application_async(bk_biz_id, app_name, operator=None):
     异步删除 API 侧 APM 应用
     """
     application = ApmApplication.objects.filter(bk_biz_id=bk_biz_id, app_name=app_name).first()
+    if settings.ENABLE_MULTI_TENANT_MODE:
+        bk_tenant_id = application.bk_tenant_id if application else bk_biz_id_to_bk_tenant_id(bk_biz_id)
+        set_local_tenant_id(bk_tenant_id)
+    operator_display_name = get_user_display_name(operator) if operator else operator
     if not application:
         logger.info(f"[DeleteApplication] application: {bk_biz_id}-{app_name} not found")
-        EventReportHelper.report(f"操作人: {operator} 尝试删除应用: ({bk_biz_id}){app_name} 但是此应用未在 DB 中")
+        EventReportHelper.report(
+            f"操作人: {operator_display_name} 尝试删除应用: ({bk_biz_id}){app_name} 但是此应用未在 DB 中"
+        )
         return
 
     qps = QpsConfig.get_application_qps(bk_biz_id, app_name)
@@ -403,13 +430,13 @@ def delete_application_async(bk_biz_id, app_name, operator=None):
         application.stop_profiling()
         application.stop_metric()
         application.stop_log()
-        EventReportHelper.report(f"操作人: {operator} 删除了应用: ({bk_biz_id}){app_name}")
+        EventReportHelper.report(f"操作人: {operator_display_name} 删除了应用: ({bk_biz_id}){app_name}")
     except Exception as e:  # noqa
         logger.exception(
             f"[DeleteApplication] stop app: {application.bk_biz_id}-{application.app_name} failed {e} "
             f"{traceback.format_exc()}"
         )
         get_current_span().record_exception(e)
-        EventReportHelper.report(f"删除应用: ({bk_biz_id}){app_name} 失败，操作人: {operator}")
+        EventReportHelper.report(f"删除应用: ({bk_biz_id}){app_name} 失败，操作人: {operator_display_name}")
     application.delete()
     _schedule_trace_scope_index_set_sync(bk_biz_id)
